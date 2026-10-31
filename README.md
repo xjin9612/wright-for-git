@@ -58,6 +58,7 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
 | `gitWorkbench.autoRefresh` | `true` | Refresh when refs or HEAD change |
 | `gitWorkbench.scanDepth` | `3` | How many folder levels below each workspace folder are scanned for repositories |
 | `gitWorkbench.scanExclude` | `node_modules`, `target`, … | Folder names skipped while scanning |
+| `gitWorkbench.language` | `auto` | Language of the panel, dialogs and messages: `auto` (follow VS Code), `en`, `zh-tw` |
 
 ## Installation
 

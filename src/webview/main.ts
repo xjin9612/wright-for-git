@@ -6,6 +6,7 @@ import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
 import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
+import { showConfirm } from './confirmDialog';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { t } from './l10n';
@@ -961,6 +962,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'pushCommitFiles':
     case 'pushStatus':
       handlePushMessage(m);
+      break;
+    case 'confirm':
+      showConfirm(m);
       break;
     case 'openPush':
       // repos 還沒到（webview 剛建立）時，等 repos 訊息後再開

@@ -7,6 +7,7 @@ import type { GitRepository } from './git/repository';
 import type { WorkbenchViewProvider } from './provider';
 import type { ChangedFile, StashInfo } from './shared/protocol';
 import { t } from './i18n';
+import { confirm } from './dialogs';
 
 
 interface RepoNode {
@@ -214,12 +215,7 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
       const n = stashNode(arg);
       if (!n) return;
       const ok = t('Drop');
-      const answer = await vscode.window.showWarningMessage(
-        t('Drop {0}? Its changes will be lost.', n.stash.ref),
-        { modal: true, detail: `${n.repoName}\n${n.stash.message}` },
-        ok,
-      );
-      if (answer !== ok) return;
+      if (!(await confirm(t('Drop {0}? Its changes will be lost.', n.stash.ref), { detail: `${n.repoName}\n${n.stash.message}`, ok, kind: 'danger' }))) return;
       await run(n, (r, ref) => r.stashDrop(ref), (ref) => t('Dropped {0}', ref));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.branch', async (arg?: unknown) => {

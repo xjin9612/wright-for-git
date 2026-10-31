@@ -36,7 +36,8 @@
 - In a diff opened from the log, step to the previous / next changed file from the editor title bar or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`
 
 ### Other
-- The panel UI follows the VS Code display language (English and Traditional Chinese)
+- English and Traditional Chinese UI. The new `gitWorkbench.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
+- Confirmations triggered from the panel (delete, force push, hard reset, checkout a tag or revision, …) are shown inside the panel in the same style as the Push dialog; destructive actions use a red button with Cancel focused
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
 - New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Previous Changed File / Next Changed File
 

@@ -57,6 +57,7 @@
 | `gitWorkbench.autoRefresh` | `true` | refs／HEAD 變動時自動重新整理 |
 | `gitWorkbench.scanDepth` | `3` | 工作區資料夾往下掃描 repo 的層數 |
 | `gitWorkbench.scanExclude` | `node_modules`、`target`… | 掃描時略過的資料夾名稱 |
+| `gitWorkbench.language` | `auto` | 面板、對話框與訊息的語言：`auto`（跟隨 VS Code）、`en`、`zh-tw` |
 
 ## 安裝
 

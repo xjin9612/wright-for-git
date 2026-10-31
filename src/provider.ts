@@ -13,6 +13,7 @@ import { combineChanges } from './shared/combine';
 import { promises as fsp } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
+import { confirm, setWebviewConfirm, type ConfirmOptions } from './dialogs';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -56,6 +57,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   /** webview 尚未就緒時暫存的篩選（例如從檔案總管觸發「顯示 Git 歷史」） */
   private pendingFilter?: Partial<LogFilter>;
   private pendingOpenPush = false;
+  private confirmSeq = 0;
+  private readonly pendingConfirms = new Map<number, (ok: boolean) => void>();
   /** 最近一次從詳情開啟的 diff 所屬的檔案清單（diff 內切換上一個／下一個檔案） */
   private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number; right?: string } | undefined;
   private readonly disposables: vscode.Disposable[] = [];
@@ -289,8 +292,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       undefined,
       this.disposables,
     );
+    // 面板可見時，確認框顯示在面板內
+    setWebviewConfirm((message, opts) => (this.view?.visible ? this.confirmInPanel(message, opts) : Promise.resolve(undefined)));
     view.onDidDispose(() => {
       this.view = undefined;
+      setWebviewConfirm(undefined);
+      for (const resolve of this.pendingConfirms.values()) resolve(false);
+      this.pendingConfirms.clear();
       this.logAbort?.abort();
     });
   }
@@ -302,7 +310,16 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private async onMessage(m: ToExtension): Promise<void> {
     try {
       switch (m.type) {
+        case 'confirmResult': {
+          const resolve = this.pendingConfirms.get(m.id);
+          this.pendingConfirms.delete(m.id);
+          resolve?.(m.ok);
+          break;
+        }
         case 'ready':
+          // webview 重新載入時，尚未回覆的確認框視為取消
+          for (const resolve of this.pendingConfirms.values()) resolve(false);
+          this.pendingConfirms.clear();
           if (this.pendingOpenPush) {
             this.pendingOpenPush = false;
             this.post({ type: 'openPush' });
@@ -731,19 +748,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const ok = t('Checkout');
     const label = plans[0].label;
     if (isTag) {
-      const answer = await vscode.window.showWarningMessage(
-        t('Checkout tag {0}? This will put the repository in detached HEAD state.', label),
-        { modal: true, detail: plans.map((p) => p.entry.name).join('\n') },
-        ok,
-      );
-      if (answer !== ok) return;
+      if (!(await confirm(t('Checkout tag {0}? This will put the repository in detached HEAD state.', label), { detail: plans.map((p) => p.entry.name).join('\n'), ok, kind: 'warning' }))) return;
     } else if (plans.length > 1) {
-      const answer = await vscode.window.showInformationMessage(
-        t('Checkout {0} in {1} repositories?', label, plans.length),
-        { modal: true, detail: plans.map((p) => p.entry.name).join('\n') },
-        ok,
-      );
-      if (answer !== ok) return;
+      if (!(await confirm(t('Checkout {0} in {1} repositories?', label, plans.length), { detail: plans.map((p) => p.entry.name).join('\n'), ok, kind: 'info' }))) return;
     }
     await this.runCheckouts(plans, label);
   }
@@ -752,12 +759,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const entry = this.find(root);
     if (!entry) return;
     const ok = t('Checkout');
-    const answer = await vscode.window.showWarningMessage(
-      t('Checkout revision {0}? This will put the repository in detached HEAD state.', hash.slice(0, 8)),
-      { modal: true, detail: entry.name },
-      ok,
-    );
-    if (answer === ok) await this.runCheckouts([{ entry, target: hash, track: false }], hash.slice(0, 8));
+    const yes = await confirm(t('Checkout revision {0}? This will put the repository in detached HEAD state.', hash.slice(0, 8)), { detail: entry.name, ok, kind: 'warning' });
+    if (yes) await this.runCheckouts([{ entry, target: hash, track: false }], hash.slice(0, 8));
   }
 
   private async runCheckouts(plans: { entry: RepoEntry; target: string; track: boolean }[], label: string): Promise<void> {
@@ -779,6 +782,14 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   // ---------- html ----------
+
+  private confirmInPanel(message: string, opts: ConfirmOptions): Promise<boolean> {
+    const id = ++this.confirmSeq;
+    return new Promise<boolean>((resolve) => {
+      this.pendingConfirms.set(id, resolve);
+      this.post({ type: 'confirm', id, message, detail: opts.detail, ok: opts.ok, cancel: t('Cancel'), kind: opts.kind ?? 'warning' });
+    });
+  }
 
   /** 介面語言變更：重新產生 webview（篩選、版面等狀態由 webview 的 state 保存） */
   reloadWebview(): void {

@@ -6,6 +6,7 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
 import { t } from './i18n';
+import { confirm } from './dialogs';
 
 export interface RepoTarget {
   repo: GitRepository;
@@ -182,8 +183,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
       '',
       t('Uses --force-with-lease: the push is rejected instead of overwriting if the remote has commits you have not fetched.'),
     ].join('\n');
-    const answer = await vscode.window.showWarningMessage(t('Force push {0} branch(es)? Remote history will be rewritten.', work.length), { modal: true, detail }, ok);
-    if (answer !== ok) return false;
+    if (!(await confirm(t('Force push {0} branch(es)? Remote history will be rewritten.', work.length), { detail, ok, kind: 'danger' }))) return false;
   }
   onStarted();
 
@@ -256,17 +256,12 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
         if (mode.mode === 'hard') {
           const dirty = await repo.isDirty();
           const ok = t('Reset Hard');
-          const answer = await vscode.window.showWarningMessage(
-            t('Hard reset {0} to {1}?', branch, short(hash)),
-            {
-              modal: true,
-              detail: dirty
-                ? t('You have uncommitted changes. They will be permanently lost.')
-                : t('Commits after this one will no longer be on the branch.'),
-            },
+          const yes = await confirm(t('Hard reset {0} to {1}?', branch, short(hash)), {
+            detail: dirty ? t('You have uncommitted changes. They will be permanently lost.') : t('Commits after this one will no longer be on the branch.'),
             ok,
-          );
-          if (answer !== ok) return;
+            kind: 'danger',
+          });
+          if (!yes) return;
         }
         await repo.reset(hash, mode.mode);
         vscode.window.setStatusBarMessage(`$(check) ${t('Reset {0} to {1}', branch, short(hash))}`, 4000);
@@ -340,12 +335,11 @@ export async function runCommitsAction(action: 'cherryPick' | 'revert', target: 
     return;
   }
   const ok = action === 'cherryPick' ? t('Cherry-Pick') : t('Revert');
-  const answer = await vscode.window.showInformationMessage(
+  const yes = await confirm(
     action === 'cherryPick' ? t('Cherry-pick {0} commits onto {1}?', commits.length, currentBranch(target) ?? 'HEAD') : t('Revert {0} commits on {1}?', commits.length, currentBranch(target) ?? 'HEAD'),
-    { modal: true, detail: commits.map((c) => `${short(c.hash)} ${c.subject}`).join('\n') },
-    ok,
+    { detail: commits.map((c) => `${short(c.hash)} ${c.subject}`).join('\n'), ok, kind: 'info' },
   );
-  if (answer !== ok) return;
+  if (!yes) return;
   try {
     const hashes = commits.map((c) => c.hash);
     const op = await withConflictCheck(target, () => (action === 'cherryPick' ? target.repo.cherryPickMany(hashes) : target.repo.revertMany(hashes)));
@@ -363,10 +357,9 @@ function refIn(target: RepoTarget, refName: string): RefInfo | undefined {
 }
 
 /** 多個 repo 時先以 modal 確認，列出受影響的 repo */
-async function confirmMulti(targets: RepoTarget[], message: string, ok: string, always = false): Promise<boolean> {
+async function confirmMulti(targets: RepoTarget[], message: string, ok: string, always = false, kind: 'warning' | 'danger' = 'warning'): Promise<boolean> {
   if (targets.length <= 1 && !always) return true;
-  const answer = await vscode.window.showWarningMessage(message, { modal: true, detail: targets.map((x) => x.name).join('\n') }, ok);
-  return answer === ok;
+  return confirm(message, { detail: targets.map((x) => x.name).join('\n'), ok, kind });
 }
 
 async function pickTarget(targets: RepoTarget[]): Promise<RepoTarget | undefined> {
@@ -463,7 +456,7 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
           void vscode.window.showErrorMessage(t('Cannot delete the current branch {0}. Check out another branch first.', name));
           return;
         }
-        if (!(await confirmMulti(targets, t('Delete branch {0} in {1} repositories?', name, targets.length), t('Delete')))) return;
+        if (!(await confirmMulti(targets, t('Delete branch {0} in {1} repositories?', name, targets.length), t('Delete'), false, 'danger'))) return;
         const unmerged: RepoTarget[] = [];
         await each(async (target) => {
           try {
@@ -476,12 +469,12 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
         });
         if (unmerged.length > 0) {
           const force = t('Delete Anyway');
-          const answer = await vscode.window.showWarningMessage(
-            t('Branch {0} has commits that are not merged into the current branch or its upstream. Delete it anyway?', name),
-            { modal: true, detail: [t('Those commits will only be reachable through the reflog.'), '', ...unmerged.map((x) => x.name)].join('\n') },
-            force,
-          );
-          if (answer !== force) return;
+          const yes = await confirm(t('Branch {0} has commits that are not merged into the current branch or its upstream. Delete it anyway?', name), {
+            detail: [t('Those commits will only be reachable through the reflog.'), '', ...unmerged.map((x) => x.name)].join('\n'),
+            ok: force,
+            kind: 'danger',
+          });
+          if (!yes) return;
           for (const target of unmerged) {
             try {
               await target.repo.deleteBranch(name, true);
@@ -494,13 +487,13 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
       } else if (first.type === 'remote') {
         const remote = first.remote!;
         const branch = first.remoteBranch!;
-        if (!(await confirmMulti(targets, t('Delete remote branch {0}? This removes it from {1} for everyone.', name, remote), t('Delete'), true))) return;
+        if (!(await confirmMulti(targets, t('Delete remote branch {0}? This removes it from {1} for everyone.', name, remote), t('Delete'), true, 'danger'))) return;
         await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Deleting {0}…', name) }, () =>
           each((target) => target.repo.deleteRemoteBranch(remote, branch)),
         );
         done(t('Deleted remote branch {0}', name));
       } else {
-        if (!(await confirmMulti(targets, t('Delete tag {0}? Tags already pushed stay on the remote.', name), t('Delete'), true))) return;
+        if (!(await confirmMulti(targets, t('Delete tag {0}? Tags already pushed stay on the remote.', name), t('Delete'), true, 'danger'))) return;
         await each((target) => target.repo.deleteTag(name));
         done(t('Deleted tag {0}', name));
       }

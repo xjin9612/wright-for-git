@@ -418,3 +418,24 @@ select.push-remote {
 .icon.ftype { display: inline-flex; align-items: center; justify-content: center; width: 16px; font-size: 9px; font-weight: 700; letter-spacing: -0.3px; line-height: 1; font-family: var(--vscode-editor-font-family, monospace); }
 .icon.ftype.small { font-size: 7px; }
 .pane-toolbar .icon-button.on { background: var(--vscode-inputOption-activeBackground, rgba(0, 122, 204, 0.2)); }
+
+/* ---------- 面板內確認框 ---------- */
+.confirm-overlay { z-index: 95; }
+.confirm-dialog {
+  width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 16px); display: flex; flex-direction: column;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background, var(--vscode-panel-background)));
+  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, transparent));
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.4)); border-radius: 4px; overflow: hidden;
+}
+.confirm-body { display: flex; gap: 12px; padding: 16px 16px 8px; min-height: 0; overflow: auto; }
+.confirm-icon { flex: none; line-height: 0; }
+.confirm-icon.info { color: var(--vscode-editorInfo-foreground, #3794ff); }
+.confirm-icon.warning { color: var(--vscode-editorWarning-foreground, #cca700); }
+.confirm-icon.danger { color: var(--vscode-errorForeground, #f48771); }
+.confirm-text { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.confirm-message { font-weight: 600; line-height: 1.45; }
+.confirm-detail { white-space: pre-wrap; color: var(--muted); line-height: 1.45; word-break: break-word; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }
+.button.danger { background: var(--vscode-statusBarItem-errorBackground, #c72e0f); color: var(--vscode-statusBarItem-errorForeground, #fff); }
+.button.danger:hover { filter: brightness(1.1); }

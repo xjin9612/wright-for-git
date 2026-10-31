@@ -146,6 +146,8 @@ export type ToExtension =
   | { type: 'pushPreview'; requestId: number; roots: string[]; branch?: string; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
   /** Push 對話框中點選 commit：取得變更檔案 */
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
+  /** 面板內確認框的結果 */
+  | { type: 'confirmResult'; id: number; ok: boolean }
   /** Push 對話框確認 */
   | { type: 'pushConfirm'; requestId: number; targets: PushTarget[]; force: boolean; tags: boolean }
   /** Branches 右鍵選單的操作：ref 為完整名稱，roots 為擁有此 ref 的 repository */
@@ -226,6 +228,8 @@ export type ToWebview =
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string; files: ChangedFile[] }
   /** started：已開始推送（對話框關閉）；cancelled：使用者在確認框取消 */
   | { type: 'pushStatus'; requestId: number; status: 'started' | 'cancelled' }
+  /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
+  | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由指令開啟 Push 對話框 */
   | { type: 'openPush' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */
