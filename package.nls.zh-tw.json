@@ -18,6 +18,5 @@
   "command.showAllRepositories": "顯示全部 Repository",
   "command.fetch": "Fetch",
   "command.pull": "Pull",
-  "command.push": "Push",
-  "command.forcePush": "Force Push（with lease）"
+  "command.push": "Push…"
 }

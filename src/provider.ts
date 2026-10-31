@@ -3,11 +3,11 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { DEFAULT_SCAN_EXCLUDE, dedupePaths, pathKey, scanForRepositories } from './git/discovery';
 import { LogMerger } from './git/logMerger';
-import { isGraphFilter } from './git/parsers';
+import { isGraphFilter, isHash } from './git/parsers';
 import { GitRepository } from './git/repository';
 import { builtinRepositoryRoots, onRepositoryChange } from './gitExtension';
 import { revisionUri } from './diffProvider';
-import { runCommitAction, runSync, type RepoTarget } from './actions';
+import { buildPushPlans, runCommitAction, runPush, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
 import { promises as fsp } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
@@ -53,6 +53,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private dirtyWhileHidden = false;
   /** webview 尚未就緒時暫存的篩選（例如從檔案總管觸發「顯示 Git 歷史」） */
   private pendingFilter?: Partial<LogFilter>;
+  private pendingOpenPush = false;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   /** repository 清單、HEAD／refs 或 repo 篩選變動時觸發（供側邊欄 Repositories 更新） */
@@ -275,6 +276,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     try {
       switch (m.type) {
         case 'ready':
+          if (this.pendingOpenPush) {
+            this.pendingOpenPush = false;
+            this.post({ type: 'openPush' });
+          }
           if (this.pendingFilter) {
             this.post({ type: 'applyFilter', filter: this.pendingFilter });
             this.pendingFilter = undefined;
@@ -320,6 +325,31 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'sync':
           await this.sync(m.action, m.roots);
           break;
+        case 'pushPreview': {
+          const plans = await buildPushPlans(await this.freshTargets(m.roots), m.upTo, m.overrides);
+          // 依 webview 傳入的順序排列
+          plans.sort((a, b) => m.roots.indexOf(a.root) - m.roots.indexOf(b.root));
+          this.post({ type: 'pushPreview', requestId: m.requestId, plans });
+          break;
+        }
+        case 'pushCommitFiles': {
+          const e = this.find(m.root);
+          if (!e || !isHash(m.hash)) break;
+          const parents = (await e.repo.exec(['rev-list', '--parents', '-n1', m.hash])).trim().split(' ').slice(1);
+          this.post({ type: 'pushCommitFiles', requestId: m.requestId, root: m.root, hash: m.hash, files: await e.repo.getChangedFiles(m.hash, parents) });
+          break;
+        }
+        case 'pushConfirm': {
+          const targets = await this.freshTargets(m.targets.map((x) => x.root));
+          const entries = m.targets.flatMap((push) => {
+            const target = targets.find((t) => pathKey(t.repo.root) === pathKey(push.root));
+            return target ? [{ target, push }] : [];
+          });
+          const started = await runPush(entries, m.force, m.tags, () => this.post({ type: 'pushStatus', requestId: m.requestId, status: 'started' }));
+          if (!started) this.post({ type: 'pushStatus', requestId: m.requestId, status: 'cancelled' });
+          await this.refresh(true);
+          break;
+        }
         case 'commitAction': {
           const [target] = await this.freshTargets([m.root]);
           if (!target) break;
@@ -540,6 +570,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const list = roots ?? this.visibleEntries().map((e) => e.repo.root);
     await runSync(action, await this.freshTargets(list));
     await this.refresh(true);
+  }
+
+  /** 開啟 Push 對話框（webview 尚未建立時，等 ready 後再開） */
+  async openPush(): Promise<void> {
+    if (this.view) this.post({ type: 'openPush' });
+    else this.pendingOpenPush = true;
+    await vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`);
   }
 
   // ---------- checkout ----------

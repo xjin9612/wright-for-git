@@ -27,6 +27,8 @@ export interface BranchesCallbacks {
   /** roots：擁有此 ref 的 repository */
   onCheckout: (refName: string, roots: string[]) => void;
   onRefresh: () => void;
+  /** Fetch 所有 remote */
+  onFetch: () => void;
   onCollapsePane: () => void;
   onExpandedChange: (expanded: string[]) => void;
 }
@@ -55,6 +57,7 @@ export class BranchesPane {
       iconButton('chevron-left', 'Hide branches', () => cb.onCollapsePane()),
       el('div', { className: 'toolbar-sep' }),
       iconButton('refresh', 'Refresh', () => cb.onRefresh()),
+      iconButton('fetch', 'Fetch all remotes', () => cb.onFetch()),
       iconButton('locate', 'Navigate to current branch', () => this.locateCurrent()),
       iconButton('expand-all', 'Expand all', () => this.expandAll()),
       iconButton('collapse-all', 'Collapse all', () => this.collapseAll()),

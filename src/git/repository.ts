@@ -1,6 +1,6 @@
 // 單一 git repository 的高階操作（不依賴 vscode，可在 Node 直接測試）
 import * as path from 'node:path';
-import type { ChangedFile, CommitDetails, CommitInfo, LogFilter, RepoState, UserInfo } from '../shared/protocol';
+import type { ChangedFile, CommitDetails, CommitInfo, LogFilter, PushPlan, RepoState, UserInfo } from '../shared/protocol';
 import { runGit, runGitBuffer, streamGit, GitError } from './gitRunner';
 import {
   buildLogArgs,
@@ -196,18 +196,71 @@ export class GitRepository {
     await this.run(['pull']);
   }
 
+  /** 是否為 ancestor 的祖先（含自己） */
+  private async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
+    return (await this.tryRun(['merge-base', '--is-ancestor', ancestor, descendant])) !== undefined;
+  }
+
   /**
-   * push 目前 branch。setUpstream 時以 `-u <remote> <branch>` 建立 upstream；
-   * forceWithLease 只在遠端仍是本機最後看到的狀態時才覆蓋，不提供無保護的 --force。
+   * Push 預覽：目前 branch（或 upTo commit）要推到哪裡、會推哪些 commit。
+   * 目標預設為 upstream；沒有 upstream 時為 origin（或第一個 remote）上的同名 branch。
    */
-  async push(opts: { setUpstream?: { remote: string; branch: string }; forceWithLease?: boolean } = {}): Promise<void> {
-    const args = ['push'];
-    if (opts.forceWithLease) args.push('--force-with-lease');
-    if (opts.setUpstream) {
-      const { remote, branch } = opts.setUpstream;
-      if (remote.startsWith('-') || branch.startsWith('-')) throw new GitError('Invalid remote or branch', null, '');
-      args.push('-u', remote, branch);
+  async getPushPlan(opts: { upTo?: string; remote?: string; remoteBranch?: string } = {}, limit = 500): Promise<Omit<PushPlan, 'name'>> {
+    const remotes = ((await this.tryRun(['remote'])) ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+    const branch = (await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD']))?.trim() || undefined;
+    const plan: Omit<PushPlan, 'name'> = { root: this.root, branch, remotes, hasUpstream: false, isNew: false, upTo: opts.upTo, commits: [], total: 0, behind: 0 };
+    if (!branch) return { ...plan, problem: 'detached' };
+    if (remotes.length === 0) return { ...plan, problem: 'noRemote' };
+
+    const upRemote = (await this.tryRun(['config', '--get', `branch.${branch}.remote`]))?.trim();
+    const upMerge = (await this.tryRun(['config', '--get', `branch.${branch}.merge`]))?.trim();
+    plan.hasUpstream = !!upRemote && remotes.includes(upRemote) && !!upMerge?.startsWith('refs/heads/');
+    const remote = opts.remote && remotes.includes(opts.remote) ? opts.remote : plan.hasUpstream ? upRemote! : remotes.includes('origin') ? 'origin' : remotes[0];
+    const remoteBranch = opts.remoteBranch || (plan.hasUpstream && remote === upRemote ? upMerge!.slice('refs/heads/'.length) : branch);
+    plan.remote = remote;
+    plan.remoteBranch = remoteBranch;
+    if (!(await this.isValidRefName(remoteBranch, 'branch'))) return { ...plan, problem: 'error', message: `Invalid branch name: ${remoteBranch}` };
+
+    let src = `refs/heads/${branch}`;
+    if (opts.upTo) {
+      if (!isHash(opts.upTo) || !(await this.isAncestor(opts.upTo, src))) return { ...plan, problem: 'notAncestor' };
+      src = opts.upTo;
     }
+    const tracking = `refs/remotes/${remote}/${remoteBranch}`;
+    plan.isNew = (await this.tryRun(['rev-parse', '-q', '--verify', tracking])) === undefined;
+    // 新 branch：遠端任何 branch 都還沒有的 commit 才算要推的
+    const range = plan.isNew ? [src, '--not', '--remotes'] : [src, '--not', tracking];
+    plan.total = Number((await this.run(['rev-list', '--count', ...range])).trim()) || 0;
+    const out = await this.run(['log', `-n${limit}`, '--format=%H%x1f%P%x1f%an%x1f%at%x1f%s%x1e', ...range, '--']);
+    plan.commits = out
+      .split('\x1e')
+      .map((r) => r.replace(/^\n/, ''))
+      .filter(Boolean)
+      .map((r) => {
+        const [hash, parents, author, at, subject] = r.split('\x1f');
+        return { hash, parents: parents ? parents.split(' ') : [], author, authorTime: Number(at), subject: subject ?? '' };
+      });
+    if (!plan.isNew) plan.behind = Number((await this.run(['rev-list', '--count', tracking, '--not', src])).trim()) || 0;
+    return plan;
+  }
+
+  /**
+   * 以明確的 refspec 推送：`git push <remote> <src>:refs/heads/<remoteBranch>`。
+   * src 為 refs/heads/<branch> 或 commit hash（Push All up to Here）。
+   * force 一律使用 --force-with-lease：遠端若有本機沒看過的 commit 就拒絕，不提供無保護的 --force。
+   */
+  async pushTo(remote: string, src: string, remoteBranch: string, opts: { force?: boolean; tags?: boolean; setUpstream?: boolean } = {}): Promise<void> {
+    const remotes = ((await this.tryRun(['remote'])) ?? '').split('\n').map((s) => s.trim());
+    if (!remotes.includes(remote)) throw new GitError(`Unknown remote: ${remote}`, null, '');
+    if (!(await this.isValidRefName(remoteBranch, 'branch'))) throw new GitError(`Invalid branch name: ${remoteBranch}`, null, '');
+    const isBranch = src.startsWith('refs/heads/') && (await this.isValidRefName(src.slice('refs/heads/'.length), 'branch'));
+    if (!isBranch && !isHash(src)) throw new GitError(`Invalid push source: ${src}`, null, '');
+    const args = ['push'];
+    if (opts.force) args.push('--force-with-lease');
+    if (opts.tags) args.push('--follow-tags');
+    // upstream 只能為 branch 設定，推送單一 commit 時不設
+    if (opts.setUpstream && isBranch) args.push('--set-upstream');
+    args.push(remote, `${src}:refs/heads/${remoteBranch}`);
     await this.run(args);
   }
 

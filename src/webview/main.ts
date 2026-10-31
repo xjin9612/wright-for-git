@@ -4,8 +4,9 @@ import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type 
 import { mergeRefs } from '../shared/refs';
 import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
-import { debounce, el, icon, iconButton, makeSplitter } from './dom';
+import { debounce, el, icon, iconButton, makeSplitter, showMenu } from './dom';
 import { LogTable, type Columns, type Highlights } from './logTable';
+import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { loadState, post, saveState } from './vscodeApi';
 
@@ -56,6 +57,7 @@ let usersPicker: { refresh: () => void } | undefined;
 const dirsByRoot = new Map<string, string[]>();
 const dirsRequested = new Set<string>();
 let pathsPicker: { refresh: () => void } | undefined;
+let openPushWhenReady = false;
 
 /** 目前 Paths（repo）篩選下要顯示的 repository */
 function visibleRepos(): RepoState[] {
@@ -75,6 +77,7 @@ const branches = new BranchesPane(
     onSelect: (ref) => setFilter({ branches: [ref] }),
     onCheckout: (ref, roots) => post({ type: 'checkout', ref, roots }),
     onRefresh: () => post({ type: 'refresh' }),
+    onFetch: () => sync('fetch'),
     onCollapsePane: () => setPaneVisible('left', false),
     onExpandedChange: (expanded) => {
       ui.expanded = expanded;
@@ -133,20 +136,18 @@ const viewButton = iconButton('eye', 'View options', () => showViewMenu());
 
 /** 同步：作用於目前 Paths 篩選下可見的 repository */
 const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
-const pushMenuButton = iconButton('chevron-down', 'More push options', () => {
-  const r = pushMenuButton.getBoundingClientRect();
-  showMenu(r.left - 120, r.bottom + 2, [
-    { label: 'Push', action: () => sync('push') },
-    { label: 'Force Push (with lease)…', action: () => sync('forcePush') },
-  ]);
-}, 'split-caret');
+/** Push 一律先開對話框確認；upTo 為「Push All up to Here」 */
+const openPush = (upTo?: { root: string; hash: string }) =>
+  openPushDialog({
+    roots: upTo ? [upTo.root] : visibleRepos().map((r) => r.root),
+    upTo,
+    onOpenDiff: (root, hash, parent, file) => post({ type: 'openDiff', root, hash, parent, file }),
+  });
 const syncGroup = el(
   'div',
   { className: 'toolbar-group' },
-  iconButton('fetch', 'Fetch all remotes', () => sync('fetch')),
   iconButton('pull', 'Pull (uses your pull.rebase setting)', () => sync('pull')),
-  iconButton('push', 'Push', () => sync('push')),
-  pushMenuButton,
+  iconButton('push', 'Push…', () => openPush()),
 );
 const progress = el('div', { className: 'progress' });
 const warningBar = el('div', { className: 'log-warning hidden' });
@@ -522,39 +523,6 @@ function onCommitSelected(index: number): void {
 }
 
 // ---------- 選單 ----------
-function showMenu(x: number, y: number, items: ({ label: string; checked?: boolean; action: () => void } | '-')[]): void {
-  document.querySelector('.context-menu')?.remove();
-  const menu = el('div', { className: 'context-menu', attrs: { role: 'menu' } });
-  for (const it of items) {
-    if (it === '-') {
-      menu.append(el('div', { className: 'menu-sep' }));
-      continue;
-    }
-    const row = el('div', { className: 'menu-item', attrs: { role: 'menuitem' } }, el('span', { className: 'menu-check' }, it.checked ? icon('check') : null), el('span', { text: it.label }));
-    row.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      menu.remove();
-      it.action();
-    });
-    menu.append(row);
-  }
-  document.body.append(menu);
-  const r = menu.getBoundingClientRect();
-  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
-  menu.style.top = `${Math.min(y, window.innerHeight - r.height - 4)}px`;
-  const close = (e: Event) => {
-    if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
-    menu.remove();
-    document.removeEventListener('mousedown', close, true);
-    document.removeEventListener('keydown', close, true);
-  };
-  setTimeout(() => {
-    document.addEventListener('mousedown', close, true);
-    document.addEventListener('keydown', close, true);
-  });
-}
-
 function showContextMenu(index: number, x: number, y: number): void {
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
@@ -571,6 +539,7 @@ function showContextMenu(index: number, x: number, y: number): void {
     { label: 'Cherry-Pick', action: act('cherryPick') },
     { label: 'Revert Commit', action: act('revert') },
     { label: 'Reset Current Branch to Here…', action: act('reset') },
+    { label: 'Push All up to Here…', action: () => openPush({ root, hash: c.hash }) },
     '-',
     { label: 'Compare with Local', action: act('compareLocal') },
   ]);
@@ -644,6 +613,10 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       table.setRepos(repos);
       details.setRepos(repos);
       renderChips();
+      if (openPushWhenReady) {
+        openPushWhenReady = false;
+        openPush();
+      }
       // repo 清單沒變（只是 refs／HEAD 更新）時保留捲動位置
       loadLog(before === repos.map((r) => r.root).join('\n') && commits.length > 0);
       break;
@@ -679,6 +652,16 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'paths':
       dirsByRoot.set(m.root, m.paths);
       pathsPicker?.refresh();
+      break;
+    case 'pushPreview':
+    case 'pushCommitFiles':
+    case 'pushStatus':
+      handlePushMessage(m);
+      break;
+    case 'openPush':
+      // repos 還沒到（webview 剛建立）時，等 repos 訊息後再開
+      if (repos.length > 0) openPush();
+      else openPushWhenReady = true;
       break;
     case 'applyFilter':
       if (m.filter.text !== undefined) searchInput.value = m.filter.text;

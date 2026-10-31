@@ -120,10 +120,58 @@ export type ToExtension =
   | { type: 'selectRepository' }
   /** 同步：對 roots 中的 repository 執行 */
   | { type: 'sync'; action: SyncAction; roots: string[] }
+  /** Push 對話框：取得各 repo 要推的內容；upTo 為「Push All up to Here」的 commit */
+  | { type: 'pushPreview'; requestId: number; roots: string[]; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
+  /** Push 對話框中點選 commit：取得變更檔案 */
+  | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
+  /** Push 對話框確認 */
+  | { type: 'pushConfirm'; requestId: number; targets: PushTarget[]; force: boolean; tags: boolean }
   /** Commit 右鍵選單的操作 */
   | { type: 'commitAction'; action: CommitAction; root: string; hash: string; parents: string[]; subject: string };
 
-export type SyncAction = 'fetch' | 'pull' | 'push' | 'forcePush';
+export type SyncAction = 'fetch' | 'pull';
+
+/** Push 的目標：把 root 的目前 branch（或 upTo commit）推到 remote/remoteBranch */
+export interface PushTarget {
+  root: string;
+  remote: string;
+  remoteBranch: string;
+  upTo?: string;
+}
+
+export interface PushCommit {
+  hash: string;
+  parents: string[];
+  subject: string;
+  author: string;
+  authorTime: number;
+}
+
+/** 單一 repository 的 push 預覽 */
+export interface PushPlan {
+  root: string;
+  name: string;
+  /** 目前 branch；detached 時為 undefined */
+  branch?: string;
+  remote?: string;
+  remoteBranch?: string;
+  remotes: string[];
+  /** 已設定 upstream（沒有時 push 會一併以 -u 設定） */
+  hasUpstream: boolean;
+  /** 遠端還沒有這個 branch */
+  isNew: boolean;
+  /** 只推到這個 commit 為止 */
+  upTo?: string;
+  /** 要推的 commit（新到舊，最多 limit 筆） */
+  commits: PushCommit[];
+  /** 要推的 commit 總數 */
+  total: number;
+  /** 遠端有而本機沒有的 commit 數（一般 push 會被拒絕） */
+  behind: number;
+  /** 無法 push 的原因 */
+  problem?: 'detached' | 'noRemote' | 'notAncestor' | 'error';
+  message?: string;
+}
 export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'newTag' | 'compareLocal';
 
 /** Extension → Webview */
@@ -138,5 +186,11 @@ export type ToWebview =
   | { type: 'containing'; root: string; hash: string; branches: string[] }
   | { type: 'users'; users: UserInfo[] }
   | { type: 'paths'; root: string; paths: string[] }
+  | { type: 'pushPreview'; requestId: number; plans: PushPlan[] }
+  | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string; files: ChangedFile[] }
+  /** started：已開始推送（對話框關閉）；cancelled：使用者在確認框取消 */
+  | { type: 'pushStatus'; requestId: number; status: 'started' | 'cancelled' }
+  /** 由指令開啟 Push 對話框 */
+  | { type: 'openPush' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */
   | { type: 'applyFilter'; filter: Partial<LogFilter> };

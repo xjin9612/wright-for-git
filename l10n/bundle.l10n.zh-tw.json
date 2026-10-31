@@ -32,7 +32,6 @@
   "Not a valid tag name.": "不是有效的 tag 名稱。",
   "Open Source Control": "開啟原始檔控制",
   "Parent {0}": "Parent {0}",
-  "Push and Set Upstream": "Push 並設定 Upstream",
   "Reset Hard": "Hard Reset",
   "Reset {0} to {1}": "將 {0} reset 到 {1}",
   "Reverted {0}": "已 revert {0}",
@@ -46,13 +45,13 @@
   "You have uncommitted changes. They will be permanently lost.": "你有未提交的變更，將會永久遺失。",
   "skipped: {0}": "略過：{0}",
   "{0} (detached HEAD)": "{0}（detached HEAD）",
-  "{0} (no remote)": "{0}（沒有 remote）",
   "{0} (no upstream)": "{0}（沒有 upstream）",
-  "{0} branch(es) have no upstream yet. Push and set the upstream?": "{0} 個 branch 尚未設定 upstream，要推送並設定 upstream 嗎？",
   "{0} failed": "{0} 個失敗",
   "{0} file(s) differ between {1} and the working tree": "{1} 與工作區有 {0} 個檔案不同",
   "{0}: conflicts": "{0}：發生衝突",
   "{0}: nothing to do. Skipped: {1}": "{0}：沒有可執行的 repository。略過：{1}",
   "{0}: {1} stopped because of conflicts. Resolve them in Source Control, then continue or abort.": "{0}：{1} 因衝突而暫停，請在原始檔控制解決衝突後繼續，或中止。",
-  "{0}: {1} succeeded": "{0}：{1} 個成功"
+  "{0}: {1} succeeded": "{0}：{1} 個成功",
+  "Push: {0} succeeded": "Push：{0} 個成功",
+  "{0}: cannot push ({1})": "{0}：無法推送（{1}）"
 }

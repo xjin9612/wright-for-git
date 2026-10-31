@@ -43,7 +43,7 @@ test('fetch／pull／push 與 ahead／behind', async () => {
   a.commit('local work', { 'b.txt': 'x' });
   let main = (await repo.getState()).refs.find((r) => r.name === 'refs/heads/main')!;
   assert.equal(main.ahead, 1);
-  await repo.push();
+  await repo.pushTo('origin', 'refs/heads/main', 'main');
   main = (await repo.getState()).refs.find((r) => r.name === 'refs/heads/main')!;
   assert.equal(main.ahead, undefined);
 
@@ -62,20 +62,81 @@ test('fetch／pull／push 與 ahead／behind', async () => {
   assert.equal(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: a.dir, encoding: 'utf8' }).trim(), 'from other');
 });
 
-test('push：沒有 upstream 時以 -u 建立；force-with-lease 遇到遠端新 commit 會被拒絕', async () => {
+test('push 預覽：目標、待推 commit、新 branch、落後與 up to here', async () => {
   const { a, b } = remoteSetup();
+  const repo = (await GitRepository.open('git', a.dir))!;
+
+  let plan = await repo.getPushPlan();
+  assert.equal(plan.branch, 'main');
+  assert.equal(plan.remote, 'origin');
+  assert.equal(plan.remoteBranch, 'main');
+  assert.equal(plan.hasUpstream, true);
+  assert.equal(plan.isNew, false);
+  assert.equal(plan.total, 0);
+
+  const c1 = a.commit('one');
+  const c2 = a.commit('two');
+  plan = await repo.getPushPlan();
+  assert.equal(plan.total, 2);
+  assert.deepEqual(plan.commits.map((c) => c.subject), ['two', 'one']);
+  assert.equal(plan.commits[0].hash, c2);
+  assert.deepEqual(plan.commits[0].parents, [c1]);
+
+  // 只推到 c1
+  plan = await repo.getPushPlan({ upTo: c1 });
+  assert.equal(plan.total, 1);
+  assert.equal(plan.commits[0].hash, c1);
+  await repo.pushTo('origin', c1, 'main');
+  plan = await repo.getPushPlan();
+  assert.equal(plan.total, 1);
+
+  // 不在目前 branch 上的 commit
+  a.git('branch', '-q', 'side', c1);
+  a.git('checkout', '-q', 'side');
+  const side = a.commit('side work');
+  a.git('checkout', '-q', 'main');
+  assert.equal((await repo.getPushPlan({ upTo: side })).problem, 'notAncestor');
+
+  // 遠端有本機沒有的 commit → behind
+  b('pull', '-q');
+  b('commit', '-q', '--allow-empty', '-m', 'from other');
+  b('push', '-q');
+  await repo.fetch();
+  plan = await repo.getPushPlan();
+  assert.equal(plan.behind, 1);
+
+  // 新 branch：沒有 upstream、遠端也沒有
+  a.git('checkout', '-q', 'side');
+  plan = await repo.getPushPlan();
+  assert.equal(plan.hasUpstream, false);
+  assert.equal(plan.isNew, true);
+  assert.equal(plan.remoteBranch, 'side');
+  assert.deepEqual(plan.commits.map((c) => c.subject), ['side work']);
+  // 改目標名稱
+  plan = await repo.getPushPlan({ remoteBranch: 'feature/renamed' });
+  assert.equal(plan.remoteBranch, 'feature/renamed');
+  assert.equal((await repo.getPushPlan({ remoteBranch: 'bad..name' })).problem, 'error');
+
+  // detached
+  a.git('checkout', '-q', '--detach');
+  assert.equal((await repo.getPushPlan()).problem, 'detached');
+});
+
+test('pushTo：設定 upstream、tags、force-with-lease 與參數驗證', async () => {
+  const { a, bare, b } = remoteSetup();
   const repo = (await GitRepository.open('git', a.dir))!;
   a.git('checkout', '-q', '-b', 'feat/x');
   a.commit('feature', { 'f.txt': '1' });
-  await assert.rejects(repo.push(), '沒有 upstream 應失敗');
-  await repo.push({ setUpstream: { remote: 'origin', branch: 'feat/x' } });
+  a.git('tag', '-a', '-m', 'release', 'v9');
+  await repo.pushTo('origin', 'refs/heads/feat/x', 'feat/x', { setUpstream: true, tags: true });
   const feat = (await repo.getState()).refs.find((r) => r.name === 'refs/heads/feat/x')!;
   assert.equal(feat.upstream, 'origin/feat/x');
+  assert.match(execFileSync('git', ['tag'], { cwd: bare, encoding: 'utf8' }), /v9/);
 
-  // 改寫歷史後 force-with-lease 成功
+  // 改寫歷史：一般 push 被拒，force-with-lease 成功
   a.git('commit', '-q', '--amend', '-m', 'feature (amended)');
-  await assert.rejects(repo.push(), '一般 push 應被拒絕（non-fast-forward）');
-  await repo.push({ forceWithLease: true });
+  await assert.rejects(repo.pushTo('origin', 'refs/heads/feat/x', 'feat/x'), '一般 push 應被拒絕（non-fast-forward）');
+  await repo.pushTo('origin', 'refs/heads/feat/x', 'feat/x', { force: true });
 
   // 遠端被別人更新（本機沒 fetch）→ force-with-lease 應被拒絕，不覆蓋
   b('fetch', '-q');
@@ -83,8 +144,13 @@ test('push：沒有 upstream 時以 -u 建立；force-with-lease 遇到遠端新
   b('commit', '-q', '--allow-empty', '-m', 'someone else');
   b('push', '-q');
   a.git('commit', '-q', '--amend', '-m', 'feature (amended again)');
-  await assert.rejects(repo.push({ forceWithLease: true }));
+  await assert.rejects(repo.pushTo('origin', 'refs/heads/feat/x', 'feat/x', { force: true }));
   assert.match(b('log', '-1', '--format=%s', 'origin/feat/x'), /someone else/);
+
+  // 參數驗證：未知 remote、不合法 branch、選項注入
+  await assert.rejects(repo.pushTo('nope', 'refs/heads/feat/x', 'feat/x'), /Unknown remote/);
+  await assert.rejects(repo.pushTo('origin', 'refs/heads/feat/x', '--force'), /Invalid branch/);
+  await assert.rejects(repo.pushTo('origin', '--mirror', 'feat/x'), /Invalid push source/);
 });
 
 test('cherry-pick、衝突偵測與 abort；revert；reset', async () => {

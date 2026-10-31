@@ -123,12 +123,6 @@
         "title": "%command.push%",
         "category": "Git Workbench",
         "icon": "$(repo-push)"
-      },
-      {
-        "command": "gitWorkbench.forcePush",
-        "title": "%command.forcePush%",
-        "category": "Git Workbench",
-        "icon": "$(repo-force-push)"
       }
     ],
     "menus": {

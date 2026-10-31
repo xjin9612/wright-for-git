@@ -19,7 +19,7 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
   - Columns: Author (`*` when author ≠ committer), Date, Hash — toggle them from the 👁 menu
   - Virtual scrolling with streamed loading; tested with 100,000 commits
   - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), compare with the working tree
-- **Sync** — Fetch, Pull and Push in the toolbar (Force Push uses `--force-with-lease` and asks first). Pull follows your `pull.rebase` setting; pushing a branch without an upstream offers to set it. Local branches show ↑ahead ↓behind in the Branches tree
+- **Sync** — Fetch in the Branches toolbar, Pull and Push in the log toolbar. Push always opens a Push Commits dialog listing what will be pushed; Force Push (`--force-with-lease`) is in the dialog's drop-down. Push All up to Here… pushes only up to a chosen commit. Local branches show ↑ahead ↓behind in the Branches tree
 - **Changed files** — tree with compacted folders and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff.
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`

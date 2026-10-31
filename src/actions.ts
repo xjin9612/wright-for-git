@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
-import type { CommitAction, RepoState, SyncAction } from './shared/protocol';
+import type { CommitAction, PushPlan, PushTarget, RepoState, SyncAction } from './shared/protocol';
 
 export interface RepoTarget {
   repo: GitRepository;
@@ -53,18 +53,11 @@ function upstreamOf(target: RepoTarget): string | undefined {
   return branch ? target.state?.refs.find((r) => r.type === 'local' && r.short === branch)?.upstream : undefined;
 }
 
-function defaultRemote(target: RepoTarget): string | undefined {
-  const remotes = target.state?.remotes ?? [];
-  return remotes.includes('origin') ? 'origin' : remotes[0];
-}
-
 // ---------- 同步 ----------
 
 const SYNC_TITLES: Record<SyncAction, string> = {
   fetch: 'Fetch',
   pull: 'Pull',
-  push: 'Push',
-  forcePush: 'Force Push',
 };
 
 /**
@@ -75,51 +68,16 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
   const skipped: string[] = [];
   const failed: string[] = [];
   let succeeded = 0;
-  let plan: { target: RepoTarget; setUpstream?: { remote: string; branch: string } }[] = targets.map((target) => ({ target }));
-
-  if (action !== 'fetch') {
-    // 沒有 branch（detached）的 repo 無法 pull／push
-    plan = plan.filter(({ target }) => {
-      if (currentBranch(target)) return true;
-      skipped.push(t('{0} (detached HEAD)', target.name));
-      return false;
-    });
-  }
+  let plan: { target: RepoTarget }[] = targets.map((target) => ({ target }));
 
   if (action === 'pull') {
+    // 沒有 branch（detached）或沒有 upstream 的 repo 無法 pull
     plan = plan.filter(({ target }) => {
-      if (upstreamOf(target)) return true;
-      skipped.push(t('{0} (no upstream)', target.name));
+      if (!currentBranch(target)) skipped.push(t('{0} (detached HEAD)', target.name));
+      else if (!upstreamOf(target)) skipped.push(t('{0} (no upstream)', target.name));
+      else return true;
       return false;
     });
-  }
-
-  if (action === 'push' || action === 'forcePush') {
-    // 沒有 upstream：詢問一次是否推送並建立 upstream
-    const missing = plan.filter(({ target }) => !upstreamOf(target));
-    if (missing.length > 0) {
-      const withRemote = missing.filter(({ target }) => defaultRemote(target));
-      for (const m of missing.filter((x) => !withRemote.includes(x))) skipped.push(t('{0} (no remote)', m.target.name));
-      plan = plan.filter((p) => !missing.includes(p) || withRemote.includes(p));
-      if (withRemote.length > 0) {
-        const ok = t('Push and Set Upstream');
-        const detail = withRemote.map(({ target }) => `${target.name}: ${defaultRemote(target)}/${currentBranch(target)}`).join('\n');
-        const answer = await vscode.window.showInformationMessage(t('{0} branch(es) have no upstream yet. Push and set the upstream?', withRemote.length), { modal: true, detail }, ok);
-        if (answer !== ok) return;
-        for (const p of withRemote) p.setUpstream = { remote: defaultRemote(p.target)!, branch: currentBranch(p.target)! };
-      }
-    }
-  }
-
-  if (action === 'forcePush' && plan.length > 0) {
-    const ok = t('Force Push');
-    const detail = [
-      ...plan.map(({ target }) => `${target.name}: ${currentBranch(target)} → ${upstreamOf(target) ?? `${defaultRemote(target)}/${currentBranch(target)}`}`),
-      '',
-      t('Uses --force-with-lease: the push is rejected instead of overwriting if the remote has commits you have not fetched.'),
-    ].join('\n');
-    const answer = await vscode.window.showWarningMessage(t('Force push {0} branch(es)? Remote history will be rewritten.', plan.length), { modal: true, detail }, ok);
-    if (answer !== ok) return;
   }
 
   if (plan.length === 0) {
@@ -134,8 +92,7 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
         progress.report({ message: plan.length > 1 ? `${p.target.name} (${i + 1}/${plan.length})` : p.target.name });
         try {
           if (action === 'fetch') await p.target.repo.fetch();
-          else if (action === 'pull') await p.target.repo.pull();
-          else await p.target.repo.push({ setUpstream: p.setUpstream, forceWithLease: action === 'forcePush' });
+          else await p.target.repo.pull();
           succeeded++;
         } catch (e) {
           if (action === 'pull' && (await handleConflict(p.target))) failed.push(t('{0}: conflicts', p.target.name));
@@ -155,6 +112,78 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
     const show = (failed.length > 0 ? vscode.window.showErrorMessage : vscode.window.showWarningMessage).bind(vscode.window);
     void show(parts.join(' · '), { detail: failed.join('\n') });
   }
+}
+
+// ---------- Push ----------
+
+/** 各 repo 的 push 預覽（Push 對話框用）；overrides 為使用者在對話框改過的目標 */
+export async function buildPushPlans(targets: RepoTarget[], upTo?: { root: string; hash: string }, overrides: PushTarget[] = []): Promise<PushPlan[]> {
+  return Promise.all(
+    targets.map(async (target): Promise<PushPlan> => {
+      const o = overrides.find((x) => x.root === target.repo.root);
+      const hash = upTo && upTo.root === target.repo.root ? upTo.hash : undefined;
+      try {
+        return { ...(await target.repo.getPushPlan({ upTo: hash, remote: o?.remote, remoteBranch: o?.remoteBranch })), name: target.name };
+      } catch (e) {
+        return { root: target.repo.root, name: target.name, remotes: [], hasUpstream: false, isNew: false, commits: [], total: 0, behind: 0, problem: 'error', message: errorMessage(e) };
+      }
+    }),
+  );
+}
+
+/**
+ * 依對話框確認的目標推送。force 時再以 modal 確認一次（改寫遠端歷史無法復原）。
+ * @returns false：使用者在確認框取消
+ */
+export async function runPush(entries: { target: RepoTarget; push: PushTarget }[], force: boolean, tags: boolean, onStarted: () => void): Promise<boolean> {
+  // 送出前重新計算，確保與目前狀態一致（對話框開著時可能有其他操作）
+  const plans = await buildPushPlans(
+    entries.map((e) => e.target),
+    undefined,
+    entries.map((e) => e.push),
+  );
+  const work = entries.map((e, i) => ({ ...e, plan: plans[i] })).filter(({ plan, target }) => {
+    if (!plan.problem) return true;
+    void vscode.window.showWarningMessage(t('{0}: cannot push ({1})', target.name, plan.message ?? plan.problem));
+    return false;
+  });
+  if (work.length === 0) {
+    onStarted();
+    return true;
+  }
+
+  if (force) {
+    const ok = t('Force Push');
+    const detail = [
+      ...work.map(({ target, push }) => `${target.name}: ${push.upTo ? short(push.upTo) : target.state?.head.branch ?? ''} → ${push.remote}/${push.remoteBranch}`),
+      '',
+      t('Uses --force-with-lease: the push is rejected instead of overwriting if the remote has commits you have not fetched.'),
+    ].join('\n');
+    const answer = await vscode.window.showWarningMessage(t('Force push {0} branch(es)? Remote history will be rewritten.', work.length), { modal: true, detail }, ok);
+    if (answer !== ok) return false;
+  }
+  onStarted();
+
+  const failed: string[] = [];
+  let succeeded = 0;
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: force ? 'Force Push' : 'Push', cancellable: false }, async (progress) => {
+    for (const [i, { target, push, plan }] of work.entries()) {
+      progress.report({ message: work.length > 1 ? `${target.name} (${i + 1}/${work.length})` : target.name });
+      try {
+        const src = push.upTo ?? `refs/heads/${plan.branch}`;
+        // 第一次推送（沒有 upstream）且推整個 branch 時，一併設定 upstream
+        await target.repo.pushTo(push.remote, src, push.remoteBranch, { force, tags, setUpstream: !plan.hasUpstream && !push.upTo });
+        succeeded++;
+      } catch (e) {
+        failed.push(`${target.name}: ${errorMessage(e)}`);
+      }
+    }
+  });
+
+  const summary = t('Push: {0} succeeded', succeeded);
+  if (failed.length === 0) vscode.window.setStatusBarMessage(`$(check) ${summary}`, 4000);
+  else void vscode.window.showErrorMessage(`${summary} · ${t('{0} failed', failed.length)}`, { detail: failed.join('\n') });
+  return true;
 }
 
 // ---------- Commit 操作 ----------

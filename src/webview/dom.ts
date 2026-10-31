@@ -69,6 +69,43 @@ export function iconButton(name: IconName, title: string, onClick: () => void, c
   return b;
 }
 
+export type MenuItem = { label: string; checked?: boolean; disabled?: boolean; action: () => void } | '-';
+
+/** 彈出選單（右鍵選單、下拉選單共用）；點外面或 Esc 關閉 */
+export function showMenu(x: number, y: number, items: MenuItem[]): void {
+  document.querySelector('.context-menu')?.remove();
+  const menu = el('div', { className: 'context-menu', attrs: { role: 'menu' } });
+  for (const it of items) {
+    if (it === '-') {
+      menu.append(el('div', { className: 'menu-sep' }));
+      continue;
+    }
+    const row = el('div', { className: `menu-item${it.disabled ? ' disabled' : ''}`, attrs: { role: 'menuitem' } }, el('span', { className: 'menu-check' }, it.checked ? icon('check') : null), el('span', { text: it.label }));
+    row.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (it.disabled) return;
+      menu.remove();
+      it.action();
+    });
+    menu.append(row);
+  }
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - r.height - 4)}px`;
+  const close = (e: Event) => {
+    if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
+    menu.remove();
+    document.removeEventListener('mousedown', close, true);
+    document.removeEventListener('keydown', close, true);
+  };
+  setTimeout(() => {
+    document.addEventListener('mousedown', close, true);
+    document.addEventListener('keydown', close, true);
+  });
+}
+
 /** 可拖曳分隔線：onDrag 收到相對按下時的位移 */
 export function makeSplitter(orientation: 'vertical' | 'horizontal', onStart: () => void, onDrag: (delta: number) => void, onEnd: () => void): HTMLDivElement {
   const s = el('div', { className: `splitter splitter-${orientation}` });

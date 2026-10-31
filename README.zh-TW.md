@@ -19,7 +19,7 @@
   - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換
   - 虛擬捲動，串流分批載入
   - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、與工作區比較
-- **同步**：工具列 Fetch／Pull／Push（Force Push 使用 `--force-with-lease` 並先確認）；Pull 依照 `pull.rebase` 設定；沒有 upstream 時會詢問是否設定；Branches 樹顯示 ↑領先 ↓落後
+- **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框，列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後
 - **變更檔案**：樹狀（壓縮單一子目錄、檔案數；新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`

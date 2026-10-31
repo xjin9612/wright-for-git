@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Sync
+- Fetch in the Branches toolbar; Pull and Push in the log toolbar. Pull follows your `pull.rebase` setting
+- Push opens a Push Commits dialog first: each repository's target (`branch → remote : branch`, editable), the commits to push and their changed files (double-click for the diff), and a Push tags option (`--follow-tags`)
+- Force Push (with lease) lives in the dialog's Push drop-down and asks for confirmation; it never uses a plain `--force`
+- A branch that is not on the remote yet is marked New and gets its upstream set on the first push; a remote branch with commits you don't have is flagged before you push
+- Push All up to Here… in the commit context menu pushes only up to the selected commit
+- In multi-repository workspaces, Fetch, Pull and Push cover every repository visible under the Paths filter, one after another, with a single combined summary
+- Local branches show ↑ahead ↓behind their upstream in the Branches tree, or `gone` when the upstream was deleted
+
+### Commit context menu
+- New Branch… and New Tag… (optionally annotated)
+- Cherry-Pick and Revert Commit (asks for the mainline parent on merge commits)
+- Reset Current Branch to Here… (soft / mixed / hard); hard reset asks for confirmation and warns about uncommitted changes
+- Compare with Local: lists files that differ from the working tree and opens the diff
+- On conflicts, offers to open Source Control to resolve them, or to abort
+
+### Other
+- `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
+- New commands: Git Workbench: Fetch / Pull / Push…
+
 ## 1.0.0
 
 First release.
