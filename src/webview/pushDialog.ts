@@ -5,6 +5,7 @@ import type { ChangedFile, PushCommit, PushPlan, PushTarget, ToWebview } from '.
 import { clear, el, formatDate, icon, showMenu } from './dom';
 import { fileIcon } from './fileIcons';
 import { post } from './vscodeApi';
+import { plural, t } from './l10n';
 
 export interface PushDialogOptions {
   roots: string[];
@@ -17,7 +18,7 @@ export interface PushDialogOptions {
 
 type DialogMessage = Extract<ToWebview, { type: 'pushPreview' | 'pushCommitFiles' | 'pushStatus' }>;
 
-const STATUS_TEXT: Record<string, string> = { A: 'Added', M: 'Modified', D: 'Deleted', R: 'Renamed', C: 'Copied', T: 'Type changed', U: 'Conflict' };
+const STATUS_TEXT: Record<string, string> = { A: t('Added'), M: t('Modified'), D: t('Deleted'), R: t('Renamed'), C: t('Copied'), T: t('Type changed'), U: t('Unmerged') };
 
 let current: PushDialog | undefined;
 let nextRequest = 1;
@@ -44,15 +45,15 @@ function pushable(p: PushPlan): boolean {
 function problemText(p: PushPlan): string {
   switch (p.problem) {
     case 'detached':
-      return 'detached HEAD';
+      return t('detached HEAD');
     case 'noRemote':
-      return 'no remote';
+      return t('no remote');
     case 'notAncestor':
-      return 'commit is not on the current branch';
+      return t('commit is not on the current branch');
     case 'error':
-      return p.message ?? 'error';
+      return p.message ?? t('error');
     default:
-      return 'nothing to push';
+      return t('nothing to push');
   }
 }
 
@@ -79,21 +80,21 @@ class PushDialog {
 
   constructor(private readonly opts: PushDialogOptions) {
     this.list = el('div', { className: 'push-list', attrs: { tabindex: '0' } });
-    this.filesTitle = el('div', { className: 'push-files-title muted', text: 'Changed files' });
+    this.filesTitle = el('div', { className: 'push-files-title muted', text: t('Changed files') });
     this.files = el('div', { className: 'tree push-files' });
     this.tagsBox = el('input', { attrs: { type: 'checkbox', id: 'push-tags' } });
 
-    this.pushButton = el('button', { className: 'button primary push-main', text: 'Push', attrs: { type: 'button' } });
+    this.pushButton = el('button', { className: 'button primary push-main', text: t('Push'), attrs: { type: 'button' } });
     this.pushButton.addEventListener('click', () => this.confirm(false));
-    this.caretButton = el('button', { className: 'button primary push-caret', title: 'More push options', attrs: { type: 'button', 'aria-label': 'More push options' } }, icon('chevron-down'));
+    this.caretButton = el('button', { className: 'button primary push-caret', title: t('More push options'), attrs: { type: 'button', 'aria-label': t('More push options') } }, icon('chevron-down'));
     this.caretButton.addEventListener('click', () => {
       const r = this.caretButton.getBoundingClientRect();
-      showMenu(r.right - 200, r.bottom + 2, [{ label: 'Force Push (with lease)…', disabled: !this.canPush(), action: () => this.confirm(true) }]);
+      showMenu(r.right - 200, r.bottom + 2, [{ label: t('Force Push (with lease)…'), disabled: !this.canPush(), action: () => this.confirm(true) }]);
     });
-    const cancel = el('button', { className: 'button secondary', text: 'Cancel', attrs: { type: 'button' } });
+    const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => this.close());
 
-    const title = opts.upTo ? `Push Commits up to ${opts.upTo.hash.slice(0, 8)}` : opts.branch ? `Push ${opts.branch}` : 'Push Commits';
+    const title = opts.upTo ? t('Push Commits up to {0}', opts.upTo.hash.slice(0, 8)) : opts.branch ? t('Push {0}', opts.branch) : t('Push Commits');
     const dialog = el(
       'div',
       { className: 'push-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': title } },
@@ -102,7 +103,7 @@ class PushDialog {
       el(
         'div',
         { className: 'push-footer' },
-        el('label', { className: 'push-option', title: 'Also push annotated tags that point at the pushed commits (--follow-tags)', attrs: { for: 'push-tags' } }, this.tagsBox, 'Push tags'),
+        el('label', { className: 'push-option', title: t('Also push annotated tags that point at the pushed commits (--follow-tags)'), attrs: { for: 'push-tags' } }, this.tagsBox, t('Push tags')),
         el('div', { className: 'toolbar-spacer' }),
         cancel,
         el('div', { className: 'split-button' }, this.pushButton, this.caretButton),
@@ -112,7 +113,7 @@ class PushDialog {
     // 點遮罩不關閉（避免誤觸），只有 Cancel／Esc 會關閉
     document.body.append(this.overlay);
     document.addEventListener('keydown', this.onKey, true);
-    this.list.append(el('div', { className: 'empty-text', text: 'Loading…' }));
+    this.list.append(el('div', { className: 'empty-text', text: t('Loading…') }));
     this.updateButtons();
     this.requestPreview();
     this.list.focus();
@@ -163,12 +164,12 @@ class PushDialog {
     this.selected = sel;
     clear(this.files);
     if (!sel) {
-      this.filesTitle.textContent = 'Changed files';
+      this.filesTitle.textContent = t('Changed files');
       return;
     }
     this.filesTitle.textContent = `${sel.commit.hash.slice(0, 8)} ${sel.commit.subject}`;
     this.filesTitle.title = this.filesTitle.textContent;
-    this.files.append(el('div', { className: 'empty-text', text: 'Loading…' }));
+    this.files.append(el('div', { className: 'empty-text', text: t('Loading…') }));
     this.filesRequest = nextRequest++;
     post({ type: 'pushCommitFiles', requestId: this.filesRequest, root: sel.root, hash: sel.commit.hash });
   }
@@ -181,7 +182,7 @@ class PushDialog {
     const ok = this.canPush();
     this.pushButton.disabled = !ok;
     this.caretButton.disabled = this.busy || !this.plans.some(pushable);
-    this.pushButton.textContent = this.busy ? 'Pushing…' : 'Push';
+    this.pushButton.textContent = this.busy ? t('Pushing…') : t('Push');
   }
 
   private confirm(force: boolean): void {
@@ -226,12 +227,12 @@ class PushDialog {
     const multi = this.plans.length > 1;
 
     if (active.length === 0) {
-      const text = this.plans.length === 1 ? `Nothing to push (${problemText(this.plans[0])})` : 'Nothing to push';
+      const text = this.plans.length === 1 ? t('Nothing to push ({0})', problemText(this.plans[0])) : t('Nothing to push');
       this.list.append(el('div', { className: 'empty-text', text, title: idle.map((p) => `${p.name} (${problemText(p)})`).join('\n') }));
     }
 
     for (const p of active) {
-      const box = el('input', { attrs: { type: 'checkbox', 'aria-label': `Push ${p.name}` } });
+      const box = el('input', { attrs: { type: 'checkbox', 'aria-label': t('Push {0}', p.name) } });
       box.checked = this.checked.has(p.root);
       box.addEventListener('change', () => {
         if (box.checked) this.checked.add(p.root);
@@ -242,7 +243,7 @@ class PushDialog {
       const remote: HTMLElement =
         p.remotes.length > 1
           ? (() => {
-              const s = el('select', { className: 'push-remote', attrs: { 'aria-label': 'Remote' } });
+              const s = el('select', { className: 'push-remote', attrs: { 'aria-label': t('Remote') } });
               for (const r of p.remotes) s.append(el('option', { text: r, attrs: { value: r } }));
               s.value = p.remote!;
               s.addEventListener('change', () => this.retarget(p, { remote: s.value }));
@@ -250,7 +251,7 @@ class PushDialog {
             })()
           : el('span', { className: 'push-remote', text: p.remote! });
 
-      const branchInput = el('input', { className: 'push-branch', attrs: { type: 'text', spellcheck: 'false', 'aria-label': 'Remote branch', title: 'Remote branch (click to edit)' } });
+      const branchInput = el('input', { className: 'push-branch', attrs: { type: 'text', spellcheck: 'false', 'aria-label': t('Remote branch'), title: t('Remote branch (click to edit)') } });
       branchInput.value = p.remoteBranch!;
       branchInput.size = Math.max(4, p.remoteBranch!.length);
       const commitBranch = () => {
@@ -272,7 +273,7 @@ class PushDialog {
         }
       });
 
-      const source = p.upTo ? el('span', { className: 'push-source hash', text: p.upTo.slice(0, 8), title: `Only commits up to ${p.upTo}` }) : el('span', { className: 'push-source', text: p.branch ?? '' });
+      const source = p.upTo ? el('span', { className: 'push-source hash', text: p.upTo.slice(0, 8), title: t('Only commits up to {0}', p.upTo) }) : el('span', { className: 'push-source', text: p.branch ?? '' });
       const header = el(
         'div',
         { className: 'push-repo' },
@@ -284,10 +285,10 @@ class PushDialog {
         remote,
         el('span', { className: 'muted', text: ':' }),
         branchInput,
-        p.isNew ? el('span', { className: 'push-badge new', text: 'New', title: 'The branch does not exist on the remote yet' }) : null,
-        !p.hasUpstream && !p.upTo ? el('span', { className: 'push-badge', text: 'set upstream', title: 'The local branch will track this remote branch (--set-upstream)' }) : null,
+        p.isNew ? el('span', { className: 'push-badge new', text: t('New'), title: t('The branch does not exist on the remote yet') }) : null,
+        !p.hasUpstream && !p.upTo ? el('span', { className: 'push-badge', text: t('set upstream'), title: t('The local branch will track this remote branch (--set-upstream)') }) : null,
         el('span', { className: 'toolbar-spacer' }),
-        el('span', { className: 'tree-count', text: `${p.total} ${p.total === 1 ? 'commit' : 'commits'}` }),
+        el('span', { className: 'tree-count', text: plural(p.total, '{0} commit', '{0} commits') }),
       );
       this.list.append(header);
 
@@ -296,7 +297,7 @@ class PushDialog {
           el(
             'div',
             { className: 'push-warning' },
-            `⚠ The remote branch has ${p.behind} ${p.behind === 1 ? 'commit' : 'commits'} you don't have. Push will be rejected — pull first, or use Force Push to overwrite.`,
+            `⚠ ${t("The remote branch has {0} commit(s) you don't have. Push will be rejected — pull first, or use Force Push to overwrite.", p.behind)}`,
           ),
         );
       }
@@ -315,12 +316,12 @@ class PushDialog {
         });
         this.list.append(row);
       }
-      if (p.total > p.commits.length) this.list.append(el('div', { className: 'push-more muted', text: `… and ${p.total - p.commits.length} more` }));
+      if (p.total > p.commits.length) this.list.append(el('div', { className: 'push-more muted', text: t('… and {0} more', p.total - p.commits.length) }));
     }
 
     if (idle.length > 0 && active.length > 0) {
       const names = idle.map((p) => `${p.name} (${problemText(p)})`);
-      this.list.append(el('div', { className: 'push-idle muted', text: `Nothing to push in ${idle.length} ${idle.length === 1 ? 'repository' : 'repositories'}`, title: names.join('\n') }));
+      this.list.append(el('div', { className: 'push-idle muted', text: plural(idle.length, 'Nothing to push in {0} repository', 'Nothing to push in {0} repositories'), title: names.join('\n') }));
     }
     this.updateButtons();
   }
@@ -330,7 +331,7 @@ class PushDialog {
     const sel = this.selected;
     if (!sel) return;
     if (files.length === 0) {
-      this.files.append(el('div', { className: 'empty-text', text: 'No changes' }));
+      this.files.append(el('div', { className: 'empty-text', text: t('No changes') }));
       return;
     }
     for (const f of files) {
@@ -338,7 +339,7 @@ class PushDialog {
       const dir = f.path.slice(0, f.path.length - name.length).replace(/\/$/, '');
       const row = el(
         'div',
-        { className: 'tree-row', title: `${STATUS_TEXT[f.status] ?? f.status}: ${f.oldPath ? `${f.oldPath} → ` : ''}${f.path}\nDouble-click to show the diff` },
+        { className: 'tree-row', title: `${STATUS_TEXT[f.status] ?? f.status}: ${f.oldPath ? `${f.oldPath} → ` : ''}${f.path}\n${t('Double-click to show the diff')}` },
         fileIcon(f.path),
         el('span', { className: `tree-label status-${f.status}`, text: name }),
         dir ? el('span', { className: 'tree-count', text: dir }) : null,

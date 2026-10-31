@@ -3,6 +3,7 @@ import type { ChangedFile, CommitDetails, HeadInfo, RefInfo, RepoState } from '.
 import { buildLabels } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, formatDate, icon, iconButton, makeSplitter } from './dom';
+import { plural, t } from './l10n';
 import { fileIcon } from './fileIcons';
 import { renderLabel } from './logTable';
 
@@ -24,14 +25,14 @@ export interface DetailsCallbacks {
 }
 
 const STATUS_TEXT: Record<string, string> = {
-  A: 'Added',
-  M: 'Modified',
-  D: 'Deleted',
-  R: 'Renamed',
-  C: 'Copied',
-  T: 'Type changed',
-  U: 'Unmerged',
-  X: 'Unknown',
+  A: t('Added'),
+  M: t('Modified'),
+  D: t('Deleted'),
+  R: t('Renamed'),
+  C: t('Copied'),
+  T: t('Type changed'),
+  U: t('Unmerged'),
+  X: t('Unknown'),
 };
 
 /** 多選時資訊區列出的 commit */
@@ -79,7 +80,7 @@ export class DetailsPane {
   ) {
     this.splitRatio = splitRatio ?? 0.55;
     this.flat = flat;
-    this.flatButton = iconButton('list-flat', 'Show as list', () => {
+    this.flatButton = iconButton('list-flat', t('Show as list'), () => {
       this.flat = !this.flat;
       this.syncFlatButton();
       cb.onFlatChange?.(this.flat);
@@ -89,18 +90,18 @@ export class DetailsPane {
     const toolbar = el(
       'div',
       { className: 'pane-toolbar' },
-      iconButton('diff', 'Show diff (Enter)', () => this.openSelected()),
+      iconButton('diff', t('Show diff (Enter)'), () => this.openSelected()),
       this.flatButton,
       el('div', { className: 'toolbar-spacer' }),
-      iconButton('expand-all', 'Expand all', () => {
+      iconButton('expand-all', t('Expand all'), () => {
         this.collapsed.clear();
         this.renderFiles();
       }),
-      iconButton('collapse-all', 'Collapse all', () => {
+      iconButton('collapse-all', t('Collapse all'), () => {
         for (const r of this.rows) if (r.expandable) this.collapsed.add(r.key);
         this.renderFiles();
       }),
-      iconButton('close', 'Hide details', () => cb.onCollapsePane()),
+      iconButton('close', t('Hide details'), () => cb.onCollapsePane()),
     );
     this.fileList = el('div', { className: 'tree file-tree', attrs: { tabindex: '0', role: 'tree' } });
     this.fileList.addEventListener('keydown', (e) => this.onKey(e));
@@ -120,12 +121,12 @@ export class DetailsPane {
     );
     this.element = el('div', { className: 'details-pane' }, this.filesSection, splitter, this.info);
     this.applySplit();
-    this.renderEmpty('Select a commit to view changes');
+    this.renderEmpty(t('Select a commit to view changes'));
   }
 
   private syncFlatButton(): void {
     this.flatButton.classList.toggle('on', this.flat);
-    this.flatButton.title = this.flat ? 'Group by directory' : 'Show as list';
+    this.flatButton.title = this.flat ? t('Group by directory') : t('Show as list');
     this.flatButton.setAttribute('aria-pressed', String(this.flat));
   }
 
@@ -263,7 +264,7 @@ export class DetailsPane {
     clear(this.fileList);
     if (!this.details && !this.multi?.groups) return;
     if (this.groups.every((g) => g.files.length === 0)) {
-      this.fileList.append(el('div', { className: 'empty-text', text: 'No changes' }));
+      this.fileList.append(el('div', { className: 'empty-text', text: t('No changes') }));
       return;
     }
     const frag = document.createDocumentFragment();
@@ -277,7 +278,7 @@ export class DetailsPane {
         twisty,
         f ? fileIcon(f.path) : icon(r.depth === 0 ? 'repo' : 'folder'),
         el('span', { className: `tree-label${f ? ` status-${f.status}` : ''}`, text: r.label }),
-        r.count !== undefined ? el('span', { className: 'tree-count', text: `${r.count} ${r.count === 1 ? 'file' : 'files'}` }) : null,
+        r.count !== undefined ? el('span', { className: 'tree-count', text: plural(r.count, '{0} file', '{0} files') }) : null,
         f && this.flat && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
         f?.oldPath ? el('span', { className: 'tree-count', text: `← ${f.oldPath}` }) : null,
       );
@@ -352,21 +353,21 @@ export class DetailsPane {
     }
     if (!d) return;
     const short = d.hash.slice(0, 8);
-    const hashLink = el('a', { className: 'link hash-link', text: short, title: `Copy ${d.hash}`, attrs: { href: '#' } });
+    const hashLink = el('a', { className: 'link hash-link', text: short, title: t('Copy {0}', d.hash), attrs: { href: '#' } });
     hashLink.addEventListener('click', (e) => {
       e.preventDefault();
       this.cb.onCopy(d.hash);
     });
 
-    const when = (t: number) => {
-      const s = formatDate(t);
+    const when = (unix: number) => {
+      const s = formatDate(unix);
       const [date, time] = s.split(' ');
-      return `${date} at ${time}`;
+      return t('{0} at {1}', date, time);
     };
-    const meta = el('div', { className: 'details-meta' }, hashLink, ` ${d.author} `, el('span', { className: 'muted', text: `<${d.authorEmail}>` }), ` on ${when(d.authorTime)}`);
+    const meta = el('div', { className: 'details-meta' }, hashLink, ` ${d.author} `, el('span', { className: 'muted', text: `<${d.authorEmail}>` }), ` ${t('on {0}', when(d.authorTime))}`);
     const committerDiffers = d.committer !== d.author || d.committerEmail !== d.authorEmail;
     const committed = committerDiffers
-      ? el('div', { className: 'details-meta' }, `committed by ${d.committer} `, el('span', { className: 'muted', text: `<${d.committerEmail}>` }), ` on ${when(d.commitTime)}`)
+      ? el('div', { className: 'details-meta' }, `${t('committed by {0}', d.committer)} `, el('span', { className: 'muted', text: `<${d.committerEmail}>` }), ` ${t('on {0}', when(d.commitTime))}`)
       : null;
 
     const labels = buildLabels(
@@ -378,22 +379,22 @@ export class DetailsPane {
 
     let branchesLine: HTMLElement;
     if (!this.containing || this.containing.hash !== d.hash) {
-      branchesLine = el('div', { className: 'details-branches muted', text: 'Loading branches…' });
+      branchesLine = el('div', { className: 'details-branches muted', text: t('Loading branches…') });
     } else {
       const list = this.containing.branches;
       const head = this.head.branch && list.includes(this.head.branch) ? ['HEAD'] : [];
       const all = [...head, ...list];
       const LIMIT = 3;
       if (all.length <= LIMIT || this.showAllBranches) {
-        branchesLine = el('div', { className: 'details-branches' }, `In ${all.length} ${all.length === 1 ? 'branch' : 'branches'}: ${all.join(', ') || '—'}`);
+        branchesLine = el('div', { className: 'details-branches' }, `${plural(all.length, 'In {0} branch', 'In {0} branches')}: ${all.join(', ') || '—'}`);
       } else {
-        const more = el('a', { className: 'link', text: 'Show all', attrs: { href: '#' } });
+        const more = el('a', { className: 'link', text: t('Show all'), attrs: { href: '#' } });
         more.addEventListener('click', (e) => {
           e.preventDefault();
           this.showAllBranches = true;
           this.renderInfo();
         });
-        branchesLine = el('div', { className: 'details-branches' }, `In ${all.length} branches: ${all.slice(0, LIMIT).join(', ')}… `, more);
+        branchesLine = el('div', { className: 'details-branches' }, `${plural(all.length, 'In {0} branch', 'In {0} branches')}: ${all.slice(0, LIMIT).join(', ')}… `, more);
       }
     }
 
@@ -408,7 +409,7 @@ export class DetailsPane {
 
   private renderMultiInfo(commits: SelectedCommit[]): void {
     const repos = new Set(commits.map((c) => c.root)).size;
-    const header = el('div', { className: 'details-subject', text: `${commits.length} commits selected${repos > 1 ? ` in ${repos} repositories` : ''}` });
+    const header = el('div', { className: 'details-subject', text: repos > 1 ? t('{0} commits selected in {1} repositories', commits.length, repos) : t('{0} commits selected', commits.length) });
     const list = el('div', { className: 'multi-list' });
     for (const c of commits) {
       const row = el(

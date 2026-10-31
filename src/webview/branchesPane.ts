@@ -3,6 +3,7 @@ import type { RepoState } from '../shared/protocol';
 import { mergeRefs, naturalCompare, type MergedRef } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, icon, iconButton, type IconName } from './dom';
+import { t } from './l10n';
 
 interface Row {
   key: string;
@@ -63,7 +64,7 @@ export class BranchesPane {
     this.expanded = new Set(expanded ?? ['local', 'remote', 'remote:origin']);
     this.favorites = favorites ? new Set(favorites) : undefined;
     this.onlyFavorites = onlyFavorites;
-    this.onlyFavButton = iconButton('star', 'Show only favorites', () => {
+    this.onlyFavButton = iconButton('star', t('Show only favorites'), () => {
       this.onlyFavorites = !this.onlyFavorites;
       this.syncOnlyFavButton();
       this.cb.onFavoritesChange(this.favoriteList(), this.onlyFavorites);
@@ -74,18 +75,18 @@ export class BranchesPane {
     const toolbar = el(
       'div',
       { className: 'vertical-toolbar' },
-      iconButton('chevron-left', 'Hide branches', () => cb.onCollapsePane()),
+      iconButton('chevron-left', t('Hide branches'), () => cb.onCollapsePane()),
       el('div', { className: 'toolbar-sep' }),
-      iconButton('refresh', 'Refresh', () => cb.onRefresh()),
-      iconButton('fetch', 'Fetch all remotes', () => cb.onFetch()),
-      iconButton('locate', 'Navigate to current branch', () => this.locateCurrent()),
-      iconButton('expand-all', 'Expand all', () => this.expandAll()),
-      iconButton('collapse-all', 'Collapse all', () => this.collapseAll()),
+      iconButton('refresh', t('Refresh'), () => cb.onRefresh()),
+      iconButton('fetch', t('Fetch all remotes'), () => cb.onFetch()),
+      iconButton('locate', t('Navigate to current branch'), () => this.locateCurrent()),
+      iconButton('expand-all', t('Expand all'), () => this.expandAll()),
+      iconButton('collapse-all', t('Collapse all'), () => this.collapseAll()),
       el('div', { className: 'toolbar-sep' }),
       this.onlyFavButton,
     );
 
-    this.search = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: 'Branch or tag', spellcheck: 'false' } });
+    this.search = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: t('Branch or tag'), spellcheck: 'false' } });
     this.search.addEventListener('input', () => this.render());
     this.search.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -217,19 +218,19 @@ export class BranchesPane {
     };
 
     if (!filtering || 'head'.includes(q)) {
-      rows.push({ key: 'head', label: 'HEAD (Current Branch)', depth: 0, kind: 'head', expandable: false, expanded: false, current: false, favorite: false });
+      rows.push({ key: 'head', label: t('HEAD (Current Branch)'), depth: 0, kind: 'head', expandable: false, expanded: false, current: false, favorite: false });
     }
 
     const sortRefs = (a: MergedRef, b: MergedRef) => naturalCompare(a.short, b.short);
     const favOk = (r: MergedRef) => !this.onlyFavorites || this.isFavorite(r);
     const locals = this.refs.filter((r) => r.type === 'local' && match(r) && favOk(r)).sort(sortRefs);
-    group('local', 'Local', 0, () => pushRefs(locals, 1, 'local', (r) => r.short), locals.length);
+    group('local', t('Local'), 0, () => pushRefs(locals, 1, 'local', (r) => r.short), locals.length);
 
     const remotes = this.refs.filter((r) => r.type === 'remote' && match(r) && favOk(r)).sort(sortRefs);
     const remoteNames = [...new Set(remotes.map((r) => r.remote ?? ''))].sort(naturalCompare);
     group(
       'remote',
-      'Remote',
+      t('Remote'),
       0,
       () => {
         for (const name of remoteNames) {
@@ -241,7 +242,7 @@ export class BranchesPane {
     );
 
     const tags = this.onlyFavorites ? [] : this.refs.filter((r) => r.type === 'tag' && match(r)).sort(sortRefs);
-    if (tags.length > 0 || !this.onlyFavorites) group('tags', 'Tags', 0, () => pushTree(buildTree(tags, (r) => r.short, { compress: false }), 1, 'tags'), tags.length);
+    if (tags.length > 0 || !this.onlyFavorites) group('tags', t('Tags'), 0, () => pushTree(buildTree(tags, (r) => r.short, { compress: false }), 1, 'tags'), tags.length);
 
     return rows;
   }
@@ -282,7 +283,7 @@ export class BranchesPane {
       twisty,
       iconName ? icon(iconName, iconClass) : null,
       label,
-      row.track ? el('span', { className: 'tree-track', text: row.track, title: row.ref?.gone ? 'Upstream is gone' : `${row.ref?.ahead ?? 0} ahead, ${row.ref?.behind ?? 0} behind` }) : null,
+      row.track ? el('span', { className: 'tree-track', text: row.track, title: row.ref?.gone ? t('Upstream is gone') : t('{0} ahead, {1} behind', row.ref?.ahead ?? 0, row.ref?.behind ?? 0) }) : null,
       row.extra ? el('span', { className: 'tree-count', text: row.extra, title: row.extraTitle }) : null,
       row.ref && row.ref.type !== 'tag' ? this.favButton(row.ref, row.favorite) : null,
     );
@@ -305,7 +306,7 @@ export class BranchesPane {
 
   /** 列尾的星號：滑過時出現，點一下加入／移出我的最愛 */
   private favButton(ref: MergedRef, favorite: boolean): HTMLElement {
-    const title = favorite ? 'Remove from favorites' : 'Add to favorites';
+    const title = favorite ? t('Remove from Favorites') : t('Add to Favorites');
     const b = el('span', { className: `fav-toggle${favorite ? ' on' : ''}`, title, attrs: { role: 'button', 'aria-label': title } }, icon(favorite ? 'star' : 'star-outline'));
     b.addEventListener('click', (e) => {
       e.stopPropagation();

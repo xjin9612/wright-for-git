@@ -765,8 +765,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       `img-src ${webview.cspSource} data:`,
       `script-src 'nonce-${nonce}'`,
     ].join('; ');
+    // 目前語系的翻譯（英文時為空）；跳脫 '<' 避免提早結束 script 區塊
+    const l10nJson = JSON.stringify(vscode.l10n.bundle ?? {}).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${vscode.env.language}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -776,6 +778,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 </head>
 <body>
 <div id="app"></div>
+<script type="application/json" id="l10n-bundle">${l10nJson}</script>
 <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;

@@ -1,6 +1,7 @@
 // 多值選擇彈出框（Branch／User 篩選）：
 // 上方輸入框可直接輸入多個值（以 | 或換行分隔，Ctrl+Enter 完成），下方清單點選切換。
 import { el, icon, type IconName } from './dom';
+import { t } from './l10n';
 
 export interface PickerOption {
   value: string;
@@ -46,10 +47,10 @@ export function openPicker(cfg: PickerConfig): { refresh: () => void } {
 
   const input = el('textarea', {
     className: 'picker-input',
-    attrs: { rows: '1', spellcheck: 'false', 'aria-label': 'Values' },
+    attrs: { rows: '1', spellcheck: 'false', 'aria-label': t('Values') },
   });
   input.value = cfg.values.length > 0 ? `${cfg.values.join('|')}|` : '';
-  const hint = el('div', { className: 'picker-hint', text: 'Select one or more values separated with | or new lines, Enter to pick, Ctrl+Enter to finish' });
+  const hint = el('div', { className: 'picker-hint', text: t('Select one or more values separated with | or new lines, Enter to pick, Ctrl+Enter to finish') });
   const list = el('div', { className: 'picker-list', attrs: { role: 'listbox' } });
   const popup = el('div', { className: 'picker' }, input, hint, list);
   let active = -1;
@@ -105,7 +106,7 @@ export function openPicker(cfg: PickerConfig): { refresh: () => void } {
         return row;
       }),
     );
-    if (options.length === 0) list.append(el('div', { className: 'picker-empty', text: 'No matches' }));
+    if (options.length === 0) list.append(el('div', { className: 'picker-empty', text: t('No matches') }));
   };
 
   const apply = () => {

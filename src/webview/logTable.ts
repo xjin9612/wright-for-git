@@ -3,6 +3,7 @@ import type { CommitInfo, HeadInfo, RefInfo, RepoState } from '../shared/protoco
 import { MultiGraph, type FrameLayout, type GraphModel } from '../shared/multiGraph';
 import { buildLabels, type RefLabel } from '../shared/refs';
 import { el, formatDate, icon } from './dom';
+import { t } from './l10n';
 
 export const ROW_HEIGHT = 22;
 const LANE_WIDTH = 14;
@@ -104,11 +105,11 @@ export class LogTable {
     this.spacer = el('div', { className: 'log-spacer' });
     this.rowsLayer = el('div', { className: 'log-rows' });
     this.canvas = el('canvas', { className: 'log-graph' });
-    this.viewport = el('div', { className: 'log-viewport', attrs: { tabindex: '0', role: 'grid', 'aria-label': 'Commits' } }, this.canvas, this.spacer, this.rowsLayer);
+    this.viewport = el('div', { className: 'log-viewport', attrs: { tabindex: '0', role: 'grid', 'aria-label': t('Commits') } }, this.canvas, this.spacer, this.rowsLayer);
     this.overlay = el('div', { className: 'log-overlay hidden' });
     this.element = el('div', { className: 'log-table' }, this.viewport, this.overlay);
     for (const col of COLS) {
-      const h = el('div', { className: 'col-resizer', title: `Drag to resize the ${col} column (double-click to reset)` });
+      const h = el('div', { className: 'col-resizer', title: t('Drag to resize the column (double-click to reset)') });
       this.attachResizer(h, col);
       this.handles.set(col, h);
       this.element.append(h);
@@ -467,7 +468,7 @@ export class LogTable {
 
     const differs = c.author !== c.committer || c.authorEmail !== c.committerEmail;
     view.author.textContent = differs ? `${c.author}*` : c.author;
-    view.author.title = differs ? `Author: ${c.author} <${c.authorEmail}>\nCommitter: ${c.committer} <${c.committerEmail}>` : `${c.author} <${c.authorEmail}>`;
+    view.author.title = differs ? `${t('Author')}: ${c.author} <${c.authorEmail}>\n${t('Committer')}: ${c.committer} <${c.committerEmail}>` : `${c.author} <${c.authorEmail}>`;
     view.date.textContent = formatDate(c.authorTime);
     view.hash.textContent = c.hash.slice(0, 8);
   }

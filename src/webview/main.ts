@@ -8,6 +8,7 @@ import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type Men
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
+import { t } from './l10n';
 import { loadState, post, saveState } from './vscodeApi';
 
 interface Persisted {
@@ -160,10 +161,10 @@ const details = new DetailsPane(
 );
 
 // ---------- 篩選列 ----------
-const searchInput = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: 'Text or hash', spellcheck: 'false', 'aria-label': 'Text or hash' } });
+const searchInput = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: t('Text or hash'), spellcheck: 'false', 'aria-label': t('Text or hash') } });
 searchInput.value = ui.filter.text;
-const regexToggle = toggleButton('.*', 'Regex', () => ui.filter.regex, (v) => setFilter({ regex: v }));
-const caseToggle = toggleButton('Cc', 'Match case', () => ui.filter.matchCase, (v) => setFilter({ matchCase: v }));
+const regexToggle = toggleButton('.*', t('Regex'), () => ui.filter.regex, (v) => setFilter({ regex: v }));
+const caseToggle = toggleButton('Cc', t('Match case'), () => ui.filter.matchCase, (v) => setFilter({ matchCase: v }));
 const applyText = debounce(() => setFilter({ text: searchInput.value }), 350);
 searchInput.addEventListener('input', () => applyText());
 searchInput.addEventListener('keydown', (e) => {
@@ -182,7 +183,7 @@ const branchChip = filterChip('Branch', () => openBranchPicker(), () => setFilte
 const userChip = filterChip('User', () => openUserPicker(), () => setFilter({ users: [] }));
 const pathsChip = filterChip('Paths', () => openPathsPicker(), () => setFilter({ paths: [], roots: [] }));
 const dateChip = filterChip('Date', () => openDatePicker(), () => setFilter({ since: undefined, until: undefined }));
-const viewButton = iconButton('eye', 'View options', () => showViewMenu());
+const viewButton = iconButton('eye', t('View options'), () => showViewMenu());
 
 /** 同步：作用於目前 Paths 篩選下可見的 repository */
 const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
@@ -197,8 +198,8 @@ const openPush = (upTo?: { root: string; hash: string }, branch?: { name: string
 const syncGroup = el(
   'div',
   { className: 'toolbar-group' },
-  iconButton('pull', 'Pull (uses your pull.rebase setting)', () => sync('pull')),
-  iconButton('push', 'Push…', () => openPush()),
+  iconButton('pull', t('Pull (uses your pull.rebase setting)'), () => sync('pull')),
+  iconButton('push', t('Push…'), () => openPush()),
 );
 const progress = el('div', { className: 'progress' });
 /** 目前 branch 不在 Branch 篩選中時的提示列（對應 IntelliJ 的「HEAD is not in filter」） */
@@ -237,7 +238,7 @@ function tabTitle(f: LogFilter): string {
   if (f.text.trim()) parts.push(`"${f.text.trim()}"`);
   if (f.paths.length > 0 || f.roots.length > 0) parts.push(pathsLabel());
   if (f.since || f.until) parts.push(dateLabel());
-  return parts.join(' · ') || 'All';
+  return parts.join(' · ') || t('All');
 }
 
 function renderTabs(): void {
@@ -247,13 +248,13 @@ function renderTabs(): void {
   if (tabs.length <= 1) return;
   tabs.forEach((tab, i) => {
     const title = i === 0 ? 'Log' : `Log: ${tabTitle(tab.filter)}`;
-    const t = el('div', { className: `log-tab${i === ui.activeTab ? ' active' : ''}`, title, attrs: { role: 'tab', 'aria-selected': String(i === ui.activeTab), tabindex: '0' } }, el('span', { className: 'log-tab-title', text: title }));
-    if (i > 0) t.append(iconButton('close', 'Close tab', () => closeTab(i), 'tab-close'));
-    t.addEventListener('click', () => switchTab(i));
-    t.addEventListener('auxclick', (e) => {
+    const tabEl = el('div', { className: `log-tab${i === ui.activeTab ? ' active' : ''}`, title, attrs: { role: 'tab', 'aria-selected': String(i === ui.activeTab), tabindex: '0' } }, el('span', { className: 'log-tab-title', text: title }));
+    if (i > 0) tabEl.append(iconButton('close', t('Close tab'), () => closeTab(i), 'tab-close'));
+    tabEl.addEventListener('click', () => switchTab(i));
+    tabEl.addEventListener('auxclick', (e) => {
       if (e.button === 1 && i > 0) closeTab(i);
     });
-    tabStrip.append(t);
+    tabStrip.append(tabEl);
   });
 }
 
@@ -415,17 +416,17 @@ function renderHeadHint(): void {
   headHint.classList.toggle('hidden', !missing);
   if (!missing) return;
   const names = [...new Set(visibleRepos().map((r) => r.head.branch ?? 'detached HEAD'))].join(', ');
-  const add = el('a', { className: 'link', text: 'Show HEAD', attrs: { href: '#' } });
+  const add = el('a', { className: 'link', text: t('Show HEAD'), attrs: { href: '#' } });
   add.addEventListener('click', (e) => {
     e.preventDefault();
     setFilter({ branches: [...f.branches, 'HEAD'] });
   });
-  const all = el('a', { className: 'link', text: 'Show all branches', attrs: { href: '#' } });
+  const all = el('a', { className: 'link', text: t('Show all branches'), attrs: { href: '#' } });
   all.addEventListener('click', (e) => {
     e.preventDefault();
     setFilter({ branches: [] });
   });
-  headHint.append(icon('head'), el('span', { text: `The current branch (${names}) is not in the filter.` }), add, all);
+  headHint.append(icon('head'), el('span', { text: t('The current branch ({0}) is not in the filter.', names) }), add, all);
 }
 
 const DATE_PRESETS: { label: string; since: string }[] = [
@@ -443,18 +444,18 @@ function dateLabel(): string {
   const { since, until } = ui.filter;
   if (!since && !until) return '';
   const preset = !until && DATE_PRESETS.find((p) => p.since === since);
-  if (preset) return preset.label;
+  if (preset) return t(preset.label);
   if (since && until) return `${dayOf(since)} – ${dayOf(until)}`;
-  return since ? `since ${dayOf(since)}` : `until ${dayOf(until)}`;
+  return since ? t('since {0}', dayOf(since)) : t('until {0}', dayOf(until));
 }
 
 function openDatePicker(): void {
   const r = dateChip.element.getBoundingClientRect();
   const { since, until } = ui.filter;
   showMenu(r.left, r.bottom + 2, [
-    ...DATE_PRESETS.map((p) => ({ label: p.label, checked: !until && since === p.since, action: () => setFilter({ since: p.since, until: undefined }) })),
+    ...DATE_PRESETS.map((p) => ({ label: t(p.label), checked: !until && since === p.since, action: () => setFilter({ since: p.since, until: undefined }) })),
     '-',
-    { label: 'Select Period…', checked: !!until || (!!since && !DATE_PRESETS.some((p) => p.since === since)), action: () => openDateRange() },
+    { label: t('Select Period…'), checked: !!until || (!!since && !DATE_PRESETS.some((p) => p.since === since)), action: () => openDateRange() },
   ]);
 }
 
@@ -463,17 +464,17 @@ function openDateRange(): void {
   document.querySelector('.date-range')?.remove();
   const r = dateChip.element.getBoundingClientRect();
   const isDay = (v: string | undefined) => !!v && /^\d{4}-\d{2}-\d{2}/.test(v);
-  const from = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': 'From' } });
-  const to = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': 'To' } });
+  const from = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': t('From') } });
+  const to = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': t('To') } });
   if (isDay(ui.filter.since)) from.value = dayOf(ui.filter.since);
   if (isDay(ui.filter.until)) to.value = dayOf(ui.filter.until);
-  const apply = el('button', { className: 'button primary', text: 'Apply', attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: 'Cancel', attrs: { type: 'button' } });
+  const apply = el('button', { className: 'button primary', text: t('Apply'), attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
   const box = el(
     'div',
-    { className: 'date-range context-menu', attrs: { role: 'dialog', 'aria-label': 'Select period' } },
-    el('label', { className: 'date-field' }, el('span', { text: 'From' }), from),
-    el('label', { className: 'date-field' }, el('span', { text: 'To' }), to),
+    { className: 'date-range context-menu', attrs: { role: 'dialog', 'aria-label': t('Select period') } },
+    el('label', { className: 'date-field' }, el('span', { text: t('From') }), from),
+    el('label', { className: 'date-field' }, el('span', { text: t('To') }), to),
     el('div', { className: 'date-actions' }, cancel, apply),
   );
   const close = () => {
@@ -507,7 +508,7 @@ function openBranchPicker(): void {
     values: ui.filter.branches.map(shortRefName),
     options: () => {
       const vis = visibleRepos();
-      const opts: PickerOption[] = [{ value: 'HEAD', detail: vis.length === 1 ? (vis[0].head.branch ?? 'detached') : 'current branch' }];
+      const opts: PickerOption[] = [{ value: 'HEAD', detail: vis.length === 1 ? (vis[0].head.branch ?? 'detached') : t('current branch') }];
       const merged = mergeRefs(vis);
       for (const type of ['local', 'remote', 'tag'] as const) {
         for (const r of merged) if (r.type === type) opts.push({ value: r.short, detail: vis.length > 1 ? `${type} · ${r.roots.length}/${vis.length}` : type });
@@ -634,12 +635,13 @@ function toggleButton(label: string, title: string, get: () => boolean, set: (v:
   return b;
 }
 
-function filterChip(name: string, onOpen: () => void, onClear: () => void) {
+function filterChip(key: string, onOpen: () => void, onClear: () => void) {
+  const name = t(key);
   const label = el('span', { className: 'chip-label' });
   const value = el('span', { className: 'chip-value' });
   const caret = icon('chevron-down', 'chip-caret');
-  const clearBtn = iconButton('close', `Clear ${name} filter`, onClear, 'chip-clear');
-  const element = el('div', { className: 'chip', attrs: { role: 'button', tabindex: '0', title: `Filter by ${name.toLowerCase()}` } }, label, value, caret, clearBtn);
+  const clearBtn = iconButton('close', t('Clear {0} filter', name), onClear, 'chip-clear');
+  const element = el('div', { className: 'chip', attrs: { role: 'button', tabindex: '0', title: t('Filter by {0}', name) } }, label, value, caret, clearBtn);
   element.addEventListener('click', onOpen);
   element.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -653,7 +655,7 @@ function filterChip(name: string, onOpen: () => void, onClear: () => void) {
       element.classList.toggle('active', v !== '');
       label.textContent = v ? `${name}: ` : name;
       value.textContent = v;
-      element.title = v ? `${name}: ${v}` : `Filter by ${name.toLowerCase()}`;
+      element.title = v ? `${name}: ${v}` : t('Filter by {0}', name);
     },
   };
 }
@@ -709,8 +711,8 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
     table.releaseScroll();
     setWarnings(m.warnings);
     if (commits.length === 0) {
-      table.setMessage(hasActiveFilter() ? 'No commits matching filters' : 'No commits');
-      details.renderEmpty('No commit selected');
+      table.setMessage(hasActiveFilter() ? t('No commits matching filters') : t('No commits'));
+      details.renderEmpty(t('No commit selected'));
     } else if (table.selectedIndex < 0) {
       pendingSelect = undefined;
       // 預設選取最上方的 HEAD（多 repo 時為最近有動的 repo）
@@ -764,19 +766,19 @@ function showContextMenu(index: number, x: number, y: number): void {
   if (!c || !root) return;
   const act = (action: CommitAction) => () => post({ type: 'commitAction', action, root, hash: c.hash, parents: c.parents, subject: c.subject });
   showMenu(x, y, [
-    { label: 'Copy Revision Number', action: () => post({ type: 'copy', text: c.hash }) },
-    { label: 'Copy Subject', action: () => post({ type: 'copy', text: c.subject }) },
+    { label: t('Copy Revision Number'), action: () => post({ type: 'copy', text: c.hash }) },
+    { label: t('Copy Subject'), action: () => post({ type: 'copy', text: c.subject }) },
     '-',
-    { label: 'Checkout Revision…', action: () => post({ type: 'checkoutRevision', root, hash: c.hash }) },
-    { label: 'New Branch…', action: act('newBranch') },
-    { label: 'New Tag…', action: act('newTag') },
+    { label: t('Checkout Revision…'), action: () => post({ type: 'checkoutRevision', root, hash: c.hash }) },
+    { label: t('New Branch…'), action: act('newBranch') },
+    { label: t('New Tag…'), action: act('newTag') },
     '-',
     { label: 'Cherry-Pick', action: act('cherryPick') },
-    { label: 'Revert Commit', action: act('revert') },
-    { label: 'Reset Current Branch to Here…', action: act('reset') },
-    { label: 'Push All up to Here…', action: () => openPush({ root, hash: c.hash }) },
+    { label: t('Revert Commit'), action: act('revert') },
+    { label: t('Reset Current Branch to Here…'), action: act('reset') },
+    { label: t('Push All up to Here…'), action: () => openPush({ root, hash: c.hash }) },
     '-',
-    { label: 'Compare with Local', action: act('compareLocal') },
+    { label: t('Compare with Local'), action: act('compareLocal') },
   ]);
 }
 
@@ -787,11 +789,11 @@ function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
   // 依列順序為新到舊；cherry-pick 由舊到新套用，revert 由新到舊
   const items = (order: CommitInfo[]) => order.map((c) => ({ hash: c.hash, parents: c.parents, subject: c.subject }));
   showMenu(x, y, [
-    { label: `Copy ${selected.length} Revision Numbers`, action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
-    { label: 'Copy Subjects', action: () => post({ type: 'copy', text: selected.map((c) => c.subject).join('\n') }) },
+    { label: t('Copy {0} Revision Numbers', selected.length), action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
+    { label: t('Copy Subjects'), action: () => post({ type: 'copy', text: selected.map((c) => c.subject).join('\n') }) },
     '-',
-    { label: `Cherry-Pick ${selected.length} Commits`, disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) }) },
-    { label: `Revert ${selected.length} Commits`, disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'revert', root, commits: items(selected) }) },
+    { label: t('Cherry-Pick {0} Commits', selected.length), disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) }) },
+    { label: t('Revert {0} Commits', selected.length), disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'revert', root, commits: items(selected) }) },
   ]);
 }
 
@@ -804,31 +806,31 @@ function showRefMenu(ref: MergedRef, x: number, y: number): void {
   const current = isLocal && ref.current;
   const items: MenuItem[] = [
     { label: 'Checkout', disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
-    { label: `New Branch from ${q}…`, action: act('newBranch') },
-    { label: `Compare with Current`, disabled: current, action: act('compare') },
-    { label: `Show in Log`, action: () => setFilter({ branches: [ref.name] }) },
-    { label: `Show in New Tab`, action: () => openTab({ branches: [ref.name], roots: ui.filter.roots }) },
+    { label: t('New Branch from {0}…', q), action: act('newBranch') },
+    { label: t('Compare with Current'), disabled: current, action: act('compare') },
+    { label: t('Show in Log'), action: () => setFilter({ branches: [ref.name] }) },
+    { label: t('Show in New Tab'), action: () => openTab({ branches: [ref.name], roots: ui.filter.roots }) },
     '-',
-    { label: `Merge ${q} into Current`, disabled: current, action: act('merge') },
+    { label: t('Merge {0} into Current', q), disabled: current, action: act('merge') },
   ];
-  if (ref.type !== 'tag') items.push({ label: `Rebase Current onto ${q}`, disabled: current, action: act('rebase') });
+  if (ref.type !== 'tag') items.push({ label: t('Rebase Current onto {0}', q), disabled: current, action: act('rebase') });
   if (ref.type !== 'tag') {
     const fav = branches.isFavorite(ref);
-    items.push('-', { label: fav ? 'Remove from Favorites' : 'Add to Favorites', action: () => branches.toggleFavorite(ref) });
+    items.push('-', { label: fav ? t('Remove from Favorites') : t('Add to Favorites'), action: () => branches.toggleFavorite(ref) });
   }
   if (isLocal) {
     items.push(
       '-',
-      { label: 'Update', disabled: !ref.upstream, action: act('update') },
-      { label: 'Push…', action: () => openPush(undefined, { name: ref.short, roots: ref.roots }) },
+      { label: t('Update'), disabled: !ref.upstream, action: act('update') },
+      { label: t('Push…'), action: () => openPush(undefined, { name: ref.short, roots: ref.roots }) },
       '-',
-      { label: 'Rename…', action: act('rename') },
-      { label: 'Delete', disabled: current, action: act('delete') },
+      { label: t('Rename…'), action: act('rename') },
+      { label: t('Delete'), disabled: current, action: act('delete') },
     );
   } else if (ref.type === 'remote') {
-    items.push('-', { label: 'Delete', action: act('delete') });
+    items.push('-', { label: t('Delete'), action: act('delete') });
   } else {
-    items.push('-', { label: 'Push Tag…', action: act('pushTag') }, { label: 'Delete', action: act('delete') });
+    items.push('-', { label: t('Push Tag…'), action: act('pushTag') }, { label: t('Delete'), action: act('delete') });
   }
   showMenu(x, y, items);
 }
@@ -847,18 +849,18 @@ function showViewMenu(): void {
   };
   // 選單靠按鈕右緣對齊，showMenu 會再夾在視窗內
   showMenu(r.right - 220, r.bottom + 2, [
-    { label: 'Show Author', checked: ui.columns.author, action: toggleCol('author') },
-    { label: 'Show Date', checked: ui.columns.date, action: toggleCol('date') },
-    { label: 'Show Hash', checked: ui.columns.hash, action: toggleCol('hash') },
+    { label: t('Show Author'), checked: ui.columns.author, action: toggleCol('author') },
+    { label: t('Show Date'), checked: ui.columns.date, action: toggleCol('date') },
+    { label: t('Show Hash'), checked: ui.columns.hash, action: toggleCol('hash') },
     '-',
-    { label: 'Highlight Commit Type', checked: ui.highlights.commitType, action: toggleHl('commitType') },
-    { label: 'Highlight My Commits', checked: ui.highlights.mine, action: toggleHl('mine') },
-    { label: 'Dim Merge Commits', checked: ui.highlights.merges, action: toggleHl('merges') },
+    { label: t('Highlight Commit Type'), checked: ui.highlights.commitType, action: toggleHl('commitType') },
+    { label: t('Highlight My Commits'), checked: ui.highlights.mine, action: toggleHl('mine') },
+    { label: t('Dim Merge Commits'), checked: ui.highlights.merges, action: toggleHl('merges') },
     '-',
-    { label: 'New Log Tab', action: () => openTab({}) },
+    { label: t('New Log Tab'), action: () => openTab({}) },
     '-',
-    { label: 'Show Branches', checked: ui.leftVisible, action: () => setPaneVisible('left', !ui.leftVisible) },
-    { label: 'Show Details', checked: ui.rightVisible, action: () => setPaneVisible('right', !ui.rightVisible) },
+    { label: t('Show Branches'), checked: ui.leftVisible, action: () => setPaneVisible('left', !ui.leftVisible) },
+    { label: t('Show Details'), checked: ui.rightVisible, action: () => setPaneVisible('right', !ui.rightVisible) },
   ]);
 }
 
@@ -888,7 +890,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       if (repos.length === 0) {
         commits = [];
         table.setData([], new MultiGraph(true));
-        table.setMessage(m.message ?? 'No repository');
+        table.setMessage(m.message ?? t('No repository'));
         branches.setRepos([]);
         details.renderEmpty('');
         setLoading(false);
