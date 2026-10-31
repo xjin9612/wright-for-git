@@ -8,9 +8,11 @@
 //
 // 產生的結構：
 //   playground/                 ← 用 VS Code 開這個資料夾（本身不是 git repo）
-//     api-server/               ← repo；main 領先遠端 2 筆、有沒有 upstream 的新 branch、未合併的 branch、tag
+//     api-server/               ← repo；main 領先遠端 2 筆、有沒有 upstream 的新 branch、未合併的 branch、tag、
+//                                  未提交的變更（Commit 視窗）、packages/sdk 子模組
 //       libs/shared/            ← 巢狀 repo
-//     web-app/                  ← repo；main 落後遠端 1 筆、2 個 stash、會衝突的 branch、與 api-server 同名的 branch
+//     web-app/                  ← repo；main 落後遠端 1 筆、2 個 stash、會衝突的 branch、與 api-server 同名的 branch、
+//                                  1 個未提交的修改
 //     notes/                    ← 一般資料夾（不是 repo）
 //   playground-remotes/         ← 遠端（bare repo）與模擬另一台電腦的 clone，不要用 VS Code 開
 import { execFileSync } from 'node:child_process';
@@ -30,6 +32,10 @@ const PEOPLE = {
   dave: ['Dave Lee', 'dave@example.com'],
 };
 const NOW = Date.now();
+/** src/config.ts：20 行，讓兩段修改分成兩個 hunk */
+const CONFIG_LINES = Array.from({ length: 20 }, (_, i) =>
+  i === 1 ? 'export const port = 3000;' : i === 18 ? 'export const logLevel = "info";' : `export const option${i} = ${i};`,
+);
 
 function git(cwd, ...a) {
   return execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -123,7 +129,7 @@ function buildApiServer(root, remotes) {
   commit(dir, 'bob', 80, 'feat(orders): add pagination', { 'src/orders/list.ts': 'export function list(page = 1) { return page; }\n' });
   commit(dir, 'bob', 78, 'test(orders): cover pagination', { 'test/orders.test.ts': 'test("page", () => {});\n' });
   git(dir, 'checkout', '-q', 'main');
-  commit(dir, 'alice', 79, 'fix(api): return Retry-After header', { 'src/index.ts': 'export const app = "api";\nexport const retryAfter = 30;\n' });
+  commit(dir, 'alice', 79, 'fix(api): return Retry-After header (#12)', { 'src/index.ts': 'export const app = "api";\nexport const retryAfter = 30;\n' });
   merge(dir, 'alice', 75, 'feature/orders-pagination', "Merge branch 'feature/orders-pagination'");
 
   // rename、刪除、多種檔案類型
@@ -144,7 +150,13 @@ function buildApiServer(root, remotes) {
   git(dir, 'checkout', '-q', '-b', 'release/1.x');
   commit(dir, 'dave', 20, 'fix(release): hotfix order total rounding', { 'src/orders/pricing.ts': 'export const price = (n: number) => Math.round(n * 1.05);\n' });
   git(dir, 'checkout', '-q', 'main');
-  commit(dir, 'bob', 10, 'feat(auth): add API keys', { 'src/auth/keys.ts': 'export const keys = new Map<string, string>();\n' });
+  commit(dir, 'bob', 10, 'feat(auth): add API keys\n\nCloses #31, see PROJ-42 for the design.', { 'src/auth/keys.ts': 'export const keys = new Map<string, string>();\n' });
+  // 子模組（變更檔案依「模組」分組）與多行設定檔（部分提交：兩段相隔很遠的修改）
+  commit(dir, 'carol', 9, 'feat(sdk): add client package', {
+    'packages/sdk/package.json': '{\n  "name": "@example/sdk"\n}\n',
+    'packages/sdk/index.ts': 'export const client = {};\n',
+    'src/config.ts': CONFIG_LINES.join('\n') + '\n',
+  });
 
   publish(dir, remotes, 'api-server');
 
@@ -164,6 +176,17 @@ function buildApiServer(root, remotes) {
 
   // 已合併、可直接刪除的 branch
   git(dir, 'branch', 'old/merged-work', 'v1.0.0');
+
+  // 未提交的變更（Commit 視窗）：同一檔案兩段修改、刪除、新增未追蹤、已忽略、子模組內的修改
+  const lines = [...CONFIG_LINES];
+  lines[1] = 'export const port = 8080;';
+  lines[18] = 'export const logLevel = "debug";';
+  writeFileSync(path.join(dir, 'src/config.ts'), lines.join('\n') + '\n');
+  rmSync(path.join(dir, 'config/db.yml'));
+  writeFileSync(path.join(dir, 'src/todo.ts'), '// TODO: rate limit per key\n');
+  mkdirSync(path.join(dir, 'node_modules', 'left-pad'), { recursive: true });
+  writeFileSync(path.join(dir, 'node_modules', 'left-pad', 'index.js'), 'module.exports = (s) => s;\n');
+  writeFileSync(path.join(dir, 'packages/sdk/index.ts'), 'export const client = { version: 1 };\n');
 
   // 巢狀 repo（api-server 內的 libs/shared，父 repo 以 .gitignore 排除）
   const nested = path.join(dir, 'libs', 'shared');
@@ -211,6 +234,9 @@ function buildWebApp(root, remotes) {
   appendFileSync(path.join(dir, 'src/App.css'), '.draft { color: red; }\n');
   writeFileSync(path.join(dir, 'src/Draft.tsx'), 'export const Draft = () => null;\n');
   git(dir, 'stash', 'push', '-q', '--include-untracked', '-m', 'draft: new page with untracked file');
+
+  // 未提交的修改（Commit 視窗跨 repo 提交）；不碰 src/theme.ts，避免影響衝突測試
+  appendFileSync(path.join(dir, 'src/pages/Login.tsx'), 'export const title = "Sign in";\n');
 }
 
 function main() {
