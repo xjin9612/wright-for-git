@@ -20,6 +20,9 @@ interface Persisted {
   rightVisible: boolean;
   expanded?: string[];
   split?: number;
+  /** Branches 的我的最愛（完整 ref 名稱）；未設定時預設為 main／master */
+  favorites?: string[];
+  onlyFavorites?: boolean;
   /** 選取的 commit：`${root}|${hash}` */
   selectedHash?: string;
 }
@@ -36,6 +39,8 @@ const ui: Persisted = {
   expanded: saved?.expanded,
   split: saved?.split,
   selectedHash: saved?.selectedHash,
+  favorites: saved?.favorites,
+  onlyFavorites: saved?.onlyFavorites,
 };
 const persist = debounce(() => saveState(ui), 200);
 
@@ -84,8 +89,15 @@ const branches = new BranchesPane(
       ui.expanded = expanded;
       persist();
     },
+    onFavoritesChange: (favorites, onlyFavorites) => {
+      ui.favorites = favorites;
+      ui.onlyFavorites = onlyFavorites;
+      persist();
+    },
   },
   ui.expanded,
+  ui.favorites,
+  ui.onlyFavorites,
 );
 
 const table = new LogTable(
@@ -703,6 +715,10 @@ function showRefMenu(ref: MergedRef, x: number, y: number): void {
     { label: `Merge ${q} into Current`, disabled: current, action: act('merge') },
   ];
   if (ref.type !== 'tag') items.push({ label: `Rebase Current onto ${q}`, disabled: current, action: act('rebase') });
+  if (ref.type !== 'tag') {
+    const fav = branches.isFavorite(ref);
+    items.push('-', { label: fav ? 'Remove from Favorites' : 'Add to Favorites', action: () => branches.toggleFavorite(ref) });
+  }
   if (isLocal) {
     items.push(
       '-',

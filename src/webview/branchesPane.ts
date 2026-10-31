@@ -33,9 +33,12 @@ export interface BranchesCallbacks {
   onFetch: () => void;
   onCollapsePane: () => void;
   onExpandedChange: (expanded: string[]) => void;
+  /** 我的最愛（完整 ref 名稱）或「只顯示我的最愛」變更 */
+  onFavoritesChange: (favorites: string[], onlyFavorites: boolean) => void;
 }
 
-const FAVORITES = new Set(['main', 'master']);
+/** 沒有自訂我的最愛時的預設：main／master（local 與 remote） */
+const DEFAULT_FAVORITES = new Set(['main', 'master']);
 
 export class BranchesPane {
   readonly element: HTMLElement;
@@ -46,12 +49,27 @@ export class BranchesPane {
   private expanded: Set<string>;
   private selectedKey: string | undefined;
   private rows: Row[] = [];
+  /** undefined：使用預設（main／master） */
+  private favorites: Set<string> | undefined;
+  private onlyFavorites: boolean;
+  private readonly onlyFavButton: HTMLButtonElement;
 
   constructor(
     private readonly cb: BranchesCallbacks,
     expanded: string[] | undefined,
+    favorites?: string[],
+    onlyFavorites = false,
   ) {
     this.expanded = new Set(expanded ?? ['local', 'remote', 'remote:origin']);
+    this.favorites = favorites ? new Set(favorites) : undefined;
+    this.onlyFavorites = onlyFavorites;
+    this.onlyFavButton = iconButton('star', 'Show only favorites', () => {
+      this.onlyFavorites = !this.onlyFavorites;
+      this.syncOnlyFavButton();
+      this.cb.onFavoritesChange(this.favoriteList(), this.onlyFavorites);
+      this.render();
+    });
+    this.syncOnlyFavButton();
 
     const toolbar = el(
       'div',
@@ -63,6 +81,8 @@ export class BranchesPane {
       iconButton('locate', 'Navigate to current branch', () => this.locateCurrent()),
       iconButton('expand-all', 'Expand all', () => this.expandAll()),
       iconButton('collapse-all', 'Collapse all', () => this.collapseAll()),
+      el('div', { className: 'toolbar-sep' }),
+      this.onlyFavButton,
     );
 
     this.search = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: 'Branch or tag', spellcheck: 'false' } });
@@ -83,6 +103,32 @@ export class BranchesPane {
 
     const main = el('div', { className: 'branches-main' }, el('div', { className: 'search-box' }, icon('search'), this.search), this.list);
     this.element = el('div', { className: 'branches-pane' }, toolbar, main);
+  }
+
+  private syncOnlyFavButton(): void {
+    this.onlyFavButton.classList.toggle('on', this.onlyFavorites);
+    this.onlyFavButton.setAttribute('aria-pressed', String(this.onlyFavorites));
+  }
+
+  isFavorite(ref: Pick<MergedRef, 'name' | 'type' | 'short' | 'remoteBranch'>): boolean {
+    if (ref.type === 'tag') return false;
+    if (this.favorites) return this.favorites.has(ref.name);
+    return DEFAULT_FAVORITES.has(ref.type === 'remote' ? (ref.remoteBranch ?? ref.short) : ref.short);
+  }
+
+  /** 目前的我的最愛清單（預設值展開成實際的 ref） */
+  private favoriteList(): string[] {
+    if (this.favorites) return [...this.favorites];
+    return this.refs.filter((r) => this.isFavorite(r)).map((r) => r.name);
+  }
+
+  toggleFavorite(ref: MergedRef): void {
+    const set = new Set(this.favoriteList());
+    if (set.has(ref.name)) set.delete(ref.name);
+    else set.add(ref.name);
+    this.favorites = set;
+    this.cb.onFavoritesChange([...set], this.onlyFavorites);
+    this.render();
   }
 
   /** 顯示這些 repository 的 branch；同名 branch 合併為一筆 */
@@ -113,11 +159,33 @@ export class BranchesPane {
     const rows: Row[] = [];
     const isOpen = (key: string) => filtering || this.expanded.has(key);
 
+    const refRow = (r: MergedRef, label: string, depth: number): Row => ({
+      key: `ref:${r.name}`,
+      label,
+      depth,
+      kind: 'ref',
+      ref: r,
+      track: trackText(r),
+      extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : `${r.roots.length} repos`,
+      extraTitle: multi ? r.roots.map((x) => nameOf.get(x) ?? x).join('\n') : undefined,
+      expandable: false,
+      expanded: false,
+      current: r.current,
+      favorite: this.isFavorite(r),
+    });
+    /** 我的最愛置頂（平鋪、顯示完整名稱），其餘依 '/' 分資料夾 */
+    const pushRefs = (refs: MergedRef[], depth: number, prefix: string, nameOfRef: (r: MergedRef) => string) => {
+      const favs = refs.filter((r) => this.isFavorite(r));
+      for (const r of favs) rows.push(refRow(r, nameOfRef(r), depth));
+      if (this.onlyFavorites) return;
+      const rest = refs.filter((r) => !this.isFavorite(r));
+      pushTree(buildTree(rest, nameOfRef, { compress: false, sort: true }), depth, prefix);
+    };
+
     const pushTree = (nodes: TreeNode<MergedRef>[], depth: number, prefix: string) => {
       for (const n of nodes) {
         if (n.item) {
           const r = n.item;
-          const name = r.type === 'remote' ? (r.remoteBranch ?? r.short) : r.short;
           rows.push({
             key: `ref:${r.name}`,
             label: n.name,
@@ -130,7 +198,7 @@ export class BranchesPane {
             expandable: false,
             expanded: false,
             current: r.current,
-            favorite: r.type !== 'tag' && FAVORITES.has(name),
+            favorite: this.isFavorite(r),
           });
         } else {
           const key = `${prefix}/${n.path}`;
@@ -142,7 +210,7 @@ export class BranchesPane {
     };
 
     const group = (key: string, label: string, depth: number, build: () => void, count: number) => {
-      if (filtering && count === 0) return;
+      if ((filtering || this.onlyFavorites) && count === 0) return;
       const open = isOpen(key);
       rows.push({ key, label, depth, kind: 'group', expandable: true, expanded: open, current: false, favorite: false });
       if (open) build();
@@ -153,10 +221,11 @@ export class BranchesPane {
     }
 
     const sortRefs = (a: MergedRef, b: MergedRef) => naturalCompare(a.short, b.short);
-    const locals = this.refs.filter((r) => r.type === 'local' && match(r)).sort(sortRefs);
-    group('local', 'Local', 0, () => pushTree(buildTree(locals, (r) => r.short, { compress: false, sort: true }), 1, 'local'), locals.length);
+    const favOk = (r: MergedRef) => !this.onlyFavorites || this.isFavorite(r);
+    const locals = this.refs.filter((r) => r.type === 'local' && match(r) && favOk(r)).sort(sortRefs);
+    group('local', 'Local', 0, () => pushRefs(locals, 1, 'local', (r) => r.short), locals.length);
 
-    const remotes = this.refs.filter((r) => r.type === 'remote' && match(r)).sort(sortRefs);
+    const remotes = this.refs.filter((r) => r.type === 'remote' && match(r) && favOk(r)).sort(sortRefs);
     const remoteNames = [...new Set(remotes.map((r) => r.remote ?? ''))].sort(naturalCompare);
     group(
       'remote',
@@ -165,14 +234,14 @@ export class BranchesPane {
       () => {
         for (const name of remoteNames) {
           const refs = remotes.filter((r) => r.remote === name);
-          group(`remote:${name}`, name, 1, () => pushTree(buildTree(refs, (r) => r.remoteBranch ?? r.short, { compress: false }), 2, `remote:${name}`), refs.length);
+          group(`remote:${name}`, name, 1, () => pushRefs(refs, 2, `remote:${name}`, (r) => r.remoteBranch ?? r.short), refs.length);
         }
       },
       remotes.length,
     );
 
-    const tags = this.refs.filter((r) => r.type === 'tag' && match(r)).sort(sortRefs);
-    group('tags', 'Tags', 0, () => pushTree(buildTree(tags, (r) => r.short, { compress: false }), 1, 'tags'), tags.length);
+    const tags = this.onlyFavorites ? [] : this.refs.filter((r) => r.type === 'tag' && match(r)).sort(sortRefs);
+    if (tags.length > 0 || !this.onlyFavorites) group('tags', 'Tags', 0, () => pushTree(buildTree(tags, (r) => r.short, { compress: false }), 1, 'tags'), tags.length);
 
     return rows;
   }
@@ -215,6 +284,7 @@ export class BranchesPane {
       label,
       row.track ? el('span', { className: 'tree-track', text: row.track, title: row.ref?.gone ? 'Upstream is gone' : `${row.ref?.ahead ?? 0} ahead, ${row.ref?.behind ?? 0} behind` }) : null,
       row.extra ? el('span', { className: 'tree-count', text: row.extra, title: row.extraTitle }) : null,
+      row.ref && row.ref.type !== 'tag' ? this.favButton(row.ref, row.favorite) : null,
     );
     if (row.ref?.upstream && row.ref.type === 'local') div.title = `${row.ref.short} → ${row.ref.upstream}`;
     div.style.paddingLeft = `${4 + row.depth * 14}px`;
@@ -231,6 +301,18 @@ export class BranchesPane {
       if (row.ref) this.cb.onCheckout(row.ref.name, row.ref.roots);
     });
     return div;
+  }
+
+  /** 列尾的星號：滑過時出現，點一下加入／移出我的最愛 */
+  private favButton(ref: MergedRef, favorite: boolean): HTMLElement {
+    const title = favorite ? 'Remove from favorites' : 'Add to favorites';
+    const b = el('span', { className: `fav-toggle${favorite ? ' on' : ''}`, title, attrs: { role: 'button', 'aria-label': title } }, icon(favorite ? 'star' : 'star-outline'));
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleFavorite(ref);
+    });
+    b.addEventListener('dblclick', (e) => e.stopPropagation());
+    return b;
   }
 
   private activate(row: Row, fromKeyboard: boolean): void {

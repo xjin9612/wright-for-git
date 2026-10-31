@@ -390,3 +390,9 @@ select.push-remote {
 .date-field span { width: 36px; color: var(--muted); }
 .date-field input { flex: 1; color-scheme: light dark; }
 .date-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+
+/* ---------- 我的最愛 ---------- */
+.fav-toggle { margin-left: auto; flex: none; display: none; align-items: center; padding: 0 4px; color: var(--muted); cursor: pointer; }
+.fav-toggle:hover { color: var(--vscode-charts-yellow, #e2c08d); }
+.tree-row:hover .fav-toggle:not(.on) { display: flex; }
+.vertical-toolbar .icon-button.on { color: var(--vscode-charts-yellow, #e2c08d); background: var(--vscode-inputOption-activeBackground, rgba(0, 122, 204, 0.2)); }
