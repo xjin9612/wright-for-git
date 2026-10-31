@@ -188,7 +188,7 @@ searchInput.addEventListener('keydown', (e) => {
   }
 });
 
-const branchChip = filterChip('Branch', () => openBranchPicker(), () => setFilter({ branches: [] }));
+const branchChip = filterChip('Branch', () => showBranchMenu(), () => setFilter({ branches: [] }));
 const userChip = filterChip('User', () => openUserPicker(), () => setFilter({ users: [] }));
 const pathsChip = filterChip('Paths', () => openPathsPicker(), () => setFilter({ paths: [], roots: [] }));
 const dateChip = filterChip('Date', () => openDatePicker(), () => setFilter({ since: undefined, until: undefined }));
@@ -511,6 +511,38 @@ function openDateRange(): void {
   from.focus();
 }
 
+/** Branch 篩選選單（對應 IntelliJ）：Select…、Favorites、我的最愛、本機 ▸、各遠端 ▸、標籤 ▸ */
+function showBranchMenu(): void {
+  const r = branchChip.element.getBoundingClientRect();
+  const merged = mergeRefs(visibleRepos()).sort((a, b) => a.short.localeCompare(b.short, undefined, { numeric: true }));
+  const current = new Set(ui.filter.branches);
+  const item = (ref: MergedRef, label = ref.short): MenuItem => ({
+    label,
+    checked: current.has(ref.name),
+    star: ref.type === 'tag' ? undefined : { on: branches.isFavorite(ref), toggle: () => (branches.toggleFavorite(ref), branches.isFavorite(ref)) },
+    action: () => setFilter({ branches: [ref.name] }),
+  });
+  const favorites = merged.filter((x) => x.type !== 'tag' && branches.isFavorite(x));
+  const locals = merged.filter((x) => x.type === 'local');
+  const remotes = [...new Set(merged.filter((x) => x.type === 'remote').map((x) => x.remote ?? ''))];
+  const tags = merged.filter((x) => x.type === 'tag');
+  const items: MenuItem[] = [
+    { label: t('Select…'), action: () => openBranchPicker() },
+    { label: t('Favorites'), disabled: favorites.length === 0, action: () => setFilter({ branches: favorites.map((x) => x.name) }) },
+    '-',
+    { label: 'HEAD', checked: current.has('HEAD'), star: { on: true, toggle: () => true }, action: () => setFilter({ branches: ['HEAD'] }) },
+    ...favorites.map((x) => item(x)),
+    '-',
+  ];
+  if (locals.length > 0) items.push({ label: t('Local'), submenu: locals.map((x) => item(x)) });
+  for (const name of remotes) {
+    const list = merged.filter((x) => x.type === 'remote' && x.remote === name);
+    items.push({ label: `${name}/…`, submenu: list.map((x) => item(x, x.remoteBranch ?? x.short)) });
+  }
+  if (tags.length > 0) items.push({ label: t('Tags'), submenu: tags.map((x) => item(x)) });
+  showMenu(r.left, r.bottom + 2, items);
+}
+
 function openBranchPicker(): void {
   openPicker({
     anchor: branchChip.element,
@@ -801,8 +833,8 @@ function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
     { label: t('Copy {0} Revision Numbers', selected.length), action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
     { label: t('Copy Subjects'), action: () => post({ type: 'copy', text: selected.map((c) => c.subject).join('\n') }) },
     '-',
-    { label: t('Cherry-Pick {0} Commits', selected.length), disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) }) },
-    { label: t('Revert {0} Commits', selected.length), disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'revert', root, commits: items(selected) }) },
+    { label: t('Cherry-Pick {0} Commits', selected.length), disabled: !sameRepo, action: () => void (root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) })) },
+    { label: t('Revert {0} Commits', selected.length), disabled: !sameRepo, action: () => void (root && post({ type: 'commitsAction', action: 'revert', root, commits: items(selected) })) },
   ]);
 }
 

@@ -77,41 +77,149 @@ export function iconButton(name: IconName, title: string, onClick: () => void, c
   return b;
 }
 
-export type MenuItem = { label: string; checked?: boolean; disabled?: boolean; action: () => void } | '-';
+export type MenuItem =
+  | {
+      label: string;
+      checked?: boolean;
+      disabled?: boolean;
+      /** 名稱後方的淡色說明 */
+      detail?: string;
+      /** 左側星號（我的最愛）；點星號切換、選單不關閉 */
+      star?: { on: boolean; toggle: () => boolean };
+      /** 點選後不關閉選單；action 回傳 boolean 時更新勾選狀態 */
+      keepOpen?: boolean;
+      /** 子選單（滑鼠移過去時展開） */
+      submenu?: MenuItem[];
+      action?: (e: MouseEvent) => void | boolean;
+    }
+  | '-';
 
-/** 彈出選單（右鍵選單、下拉選單共用）；點外面或 Esc 關閉 */
+/** 關閉所有彈出選單 */
+export function closeMenus(): void {
+  document.querySelectorAll('.context-menu').forEach((m) => m.remove());
+}
+
+let menuCleanup: (() => void) | undefined;
+
+/** 彈出選單（右鍵選單、下拉選單共用）；支援子選單、星號與不關閉的勾選項；點外面或 Esc 關閉 */
 export function showMenu(x: number, y: number, items: MenuItem[]): void {
-  document.querySelector('.context-menu')?.remove();
-  const menu = el('div', { className: 'context-menu', attrs: { role: 'menu' } });
+  menuCleanup?.();
+  closeMenus();
+  const root = openLevel(x, y, items, 0);
+  if (!root) return;
+  const close = (e: Event) => {
+    if (e instanceof KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+    } else if ((e.target as Element | null)?.closest?.('.context-menu')) {
+      return;
+    }
+    cleanup();
+  };
+  const cleanup = () => {
+    closeMenus();
+    document.removeEventListener('mousedown', close, true);
+    document.removeEventListener('keydown', close, true);
+    menuCleanup = undefined;
+  };
+  menuCleanup = cleanup;
+  setTimeout(() => {
+    document.addEventListener('mousedown', close, true);
+    document.addEventListener('keydown', close, true);
+  });
+}
+
+function openLevel(x: number, y: number, items: MenuItem[], level: number): HTMLElement | undefined {
+  // 同層以下的子選單先關閉
+  document.querySelectorAll<HTMLElement>('.context-menu').forEach((m) => {
+    if (Number(m.dataset.level) >= level) m.remove();
+  });
+  const menu = el('div', { className: 'context-menu', attrs: { role: 'menu', 'data-level': String(level) } });
   for (const it of items) {
     if (it === '-') {
       menu.append(el('div', { className: 'menu-sep' }));
       continue;
     }
-    const row = el('div', { className: `menu-item${it.disabled ? ' disabled' : ''}`, attrs: { role: 'menuitem' } }, el('span', { className: 'menu-check' }, it.checked ? icon('check') : null), el('span', { text: it.label }));
-    row.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (it.disabled) return;
-      menu.remove();
-      it.action();
-    });
+    const check = el('span', { className: 'menu-check' });
+    const setCheck = (on: boolean | undefined) => {
+      clear(check);
+      if (on) check.append(icon('check'));
+    };
+    if (it.star) {
+      const star = it.star;
+      check.classList.add('menu-star');
+      check.title = star.on ? 'Remove from favorites' : 'Add to favorites';
+      const paint = () => {
+        clear(check);
+        check.append(icon(star.on ? 'star' : 'star-outline', star.on ? 'favorite' : ''));
+      };
+      paint();
+      check.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        star.on = star.toggle();
+        paint();
+      });
+    } else {
+      setCheck(it.checked);
+    }
+    const row = el(
+      'div',
+      { className: `menu-item${it.disabled ? ' disabled' : ''}${it.submenu ? ' has-submenu' : ''}`, attrs: { role: 'menuitem' } },
+      check,
+      el('span', { className: 'menu-label', text: it.label }),
+      it.detail ? el('span', { className: 'menu-detail', text: it.detail }) : null,
+      it.submenu ? icon('chevron-right', 'menu-arrow') : null,
+    );
+    if (it.submenu) {
+      const sub = it.submenu;
+      const open = () => {
+        if (it.disabled) return;
+        const r = row.getBoundingClientRect();
+        openLevel(r.right - 2, r.top - 4, sub, level + 1);
+        menu.querySelectorAll('.menu-item.open').forEach((n) => n.classList.remove('open'));
+        row.classList.add('open');
+      };
+      row.addEventListener('mouseenter', open);
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        open();
+      });
+    } else {
+      row.addEventListener('mouseenter', () => {
+        // 移到沒有子選單的項目時，收起更深層的子選單
+        document.querySelectorAll<HTMLElement>('.context-menu').forEach((m) => {
+          if (Number(m.dataset.level) > level) m.remove();
+        });
+        menu.querySelectorAll('.menu-item.open').forEach((n) => n.classList.remove('open'));
+      });
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (it.disabled) return;
+        if (it.keepOpen) {
+          const result = it.action?.(e);
+          if (typeof result === 'boolean') setCheck(result);
+          return;
+        }
+        menuCleanup?.();
+        closeMenus();
+        it.action?.(e);
+      });
+    }
     menu.append(row);
   }
   document.body.append(menu);
   const r = menu.getBoundingClientRect();
-  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
-  menu.style.top = `${Math.min(y, window.innerHeight - r.height - 4)}px`;
-  const close = (e: Event) => {
-    if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
-    menu.remove();
-    document.removeEventListener('mousedown', close, true);
-    document.removeEventListener('keydown', close, true);
-  };
-  setTimeout(() => {
-    document.addEventListener('mousedown', close, true);
-    document.addEventListener('keydown', close, true);
-  });
+  // 子選單放不下右側時改到父選單左側
+  let left = x;
+  if (level > 0 && x + r.width > window.innerWidth - 4) {
+    const parent = document.querySelector<HTMLElement>(`.context-menu[data-level="${level - 1}"]`);
+    left = parent ? parent.getBoundingClientRect().left - r.width + 2 : window.innerWidth - r.width - 4;
+  }
+  menu.style.left = `${Math.max(4, Math.min(left, window.innerWidth - r.width - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+  return menu;
 }
 
 /** 可拖曳分隔線：onDrag 收到相對按下時的位移 */
