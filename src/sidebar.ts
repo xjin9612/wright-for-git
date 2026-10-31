@@ -2,6 +2,7 @@
 // 打開活動列的 Git Workbench 時自動開啟底部的 Log 面板（對應 IntelliJ 左下角的 Git 工具視窗按鈕）
 import * as vscode from 'vscode';
 import type { RepositorySummary, WorkbenchViewProvider } from './provider';
+import { t } from './i18n';
 
 class RepoItem extends vscode.TreeItem {
   constructor(readonly repo: RepositorySummary) {
@@ -46,8 +47,8 @@ export function registerLaunchers(context: vscode.ExtensionContext, provider: Wo
 
   const status = vscode.window.createStatusBarItem('gitWorkbench.status', vscode.StatusBarAlignment.Left, -100);
   status.name = 'Git Workbench';
-  status.text = '$(git-commit) Git Log';
-  status.tooltip = vscode.l10n.t('Show Git Log (Alt+9)');
+  status.text = `$(git-commit) ${t('Git Log')}`;
+  status.tooltip = t('Show Git Log (Alt+9)');
   status.command = 'gitWorkbench.show';
   status.show();
 

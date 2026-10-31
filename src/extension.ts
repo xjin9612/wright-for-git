@@ -4,10 +4,13 @@ import { resolveGitPath } from './gitExtension';
 import { WorkbenchViewProvider } from './provider';
 import { RevisionFileSystem, SCHEME } from './diffProvider';
 import { registerLaunchers } from './sidebar';
-import { registerStash } from './stashView';
+import { registerStash, type StashTree } from './stashView';
+import { initI18n, resetI18n } from './i18n';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  initI18n(context);
   const gitPath = await resolveGitPath();
+  let stashTree: StashTree | undefined;
   const provider = new WorkbenchViewProvider(context, gitPath);
 
   context.subscriptions.push(
@@ -31,7 +34,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('gitWorkbench.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),
     // 設定變更集中處理，避免同一次變更觸發多次重新載入
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('gitWorkbench.scanDepth') || e.affectsConfiguration('gitWorkbench.scanExclude')) {
+      if (e.affectsConfiguration('gitWorkbench.language')) {
+        resetI18n();
+        provider.reloadWebview();
+        stashTree?.refresh();
+      } else if (e.affectsConfiguration('gitWorkbench.scanDepth') || e.affectsConfiguration('gitWorkbench.scanExclude')) {
         void provider.rediscover(true);
       } else if (e.affectsConfiguration('gitWorkbench.autoRefresh')) {
         provider.rewatch();
@@ -48,7 +55,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     console.error('[Git Workbench] sidebar init failed:', e);
   }
   try {
-    registerStash(context, provider);
+    stashTree = registerStash(context, provider);
   } catch (e) {
     console.error('[Git Workbench] stash view init failed:', e);
   }

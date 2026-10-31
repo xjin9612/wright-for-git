@@ -247,7 +247,7 @@ function renderTabs(): void {
   clear(tabStrip);
   if (tabs.length <= 1) return;
   tabs.forEach((tab, i) => {
-    const title = i === 0 ? 'Log' : `Log: ${tabTitle(tab.filter)}`;
+    const title = i === 0 ? t('Log') : `${t('Log')}: ${tabTitle(tab.filter)}`;
     const tabEl = el('div', { className: `log-tab${i === ui.activeTab ? ' active' : ''}`, title, attrs: { role: 'tab', 'aria-selected': String(i === ui.activeTab), tabindex: '0' } }, el('span', { className: 'log-tab-title', text: title }));
     if (i > 0) tabEl.append(iconButton('close', t('Close tab'), () => closeTab(i), 'tab-close'));
     tabEl.addEventListener('click', () => switchTab(i));
@@ -508,10 +508,10 @@ function openBranchPicker(): void {
     values: ui.filter.branches.map(shortRefName),
     options: () => {
       const vis = visibleRepos();
-      const opts: PickerOption[] = [{ value: 'HEAD', detail: vis.length === 1 ? (vis[0].head.branch ?? 'detached') : t('current branch') }];
+      const opts: PickerOption[] = [{ value: 'HEAD', detail: vis.length === 1 ? (vis[0].head.branch ?? t('detached')) : t('current branch') }];
       const merged = mergeRefs(vis);
       for (const type of ['local', 'remote', 'tag'] as const) {
-        for (const r of merged) if (r.type === type) opts.push({ value: r.short, detail: vis.length > 1 ? `${type} · ${r.roots.length}/${vis.length}` : type });
+        for (const r of merged) if (r.type === type) opts.push({ value: r.short, detail: vis.length > 1 ? `${t(type)} · ${r.roots.length}/${vis.length}` : t(type) });
       }
       return opts;
     },
@@ -582,7 +582,7 @@ function openPathsPicker(): void {
               ? repoOfFolderValue(current.find((v) => !byName.has(v)))
               : undefined;
       for (const r of repos) {
-        opts.push({ value: r.name, icon: 'repo', detail: r.head.branch ?? 'detached' });
+        opts.push({ value: r.name, icon: 'repo', detail: r.head.branch ?? t('detached') });
         if (folderRepo === r) opts.push(...folderOptions(r));
       }
       return opts;
@@ -773,7 +773,7 @@ function showContextMenu(index: number, x: number, y: number): void {
     { label: t('New Branch…'), action: act('newBranch') },
     { label: t('New Tag…'), action: act('newTag') },
     '-',
-    { label: 'Cherry-Pick', action: act('cherryPick') },
+    { label: t('Cherry-Pick'), action: act('cherryPick') },
     { label: t('Revert Commit'), action: act('revert') },
     { label: t('Reset Current Branch to Here…'), action: act('reset') },
     { label: t('Push All up to Here…'), action: () => openPush({ root, hash: c.hash }) },
@@ -805,7 +805,7 @@ function showRefMenu(ref: MergedRef, x: number, y: number): void {
   const isLocal = ref.type === 'local';
   const current = isLocal && ref.current;
   const items: MenuItem[] = [
-    { label: 'Checkout', disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
+    { label: t('Checkout'), disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
     { label: t('New Branch from {0}…', q), action: act('newBranch') },
     { label: t('Compare with Current'), disabled: current, action: act('compare') },
     { label: t('Show in Log'), action: () => setFilter({ branches: [ref.name] }) },

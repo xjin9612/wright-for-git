@@ -6,8 +6,8 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { WorkbenchViewProvider } from './provider';
 import type { ChangedFile, StashInfo } from './shared/protocol';
+import { t } from './i18n';
 
-const t = vscode.l10n.t;
 
 interface RepoNode {
   kind: 'repo';

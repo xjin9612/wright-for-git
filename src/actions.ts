@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
+import { t } from './i18n';
 
 export interface RepoTarget {
   repo: GitRepository;
@@ -12,7 +13,6 @@ export interface RepoTarget {
   state?: RepoState;
 }
 
-const t = vscode.l10n.t;
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -101,7 +101,7 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
   }
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: SYNC_TITLES[action], cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: t(SYNC_TITLES[action]), cancellable: false },
     async (progress) => {
       for (const [i, p] of plan.entries()) {
         progress.report({ message: plan.length > 1 ? `${p.target.name} (${i + 1}/${plan.length})` : p.target.name });
@@ -118,7 +118,7 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
     },
   );
 
-  const summary = t('{0}: {1} succeeded', SYNC_TITLES[action], succeeded);
+  const summary = t('{0}: {1} succeeded', t(SYNC_TITLES[action]), succeeded);
   if (failed.length === 0 && skipped.length === 0) {
     vscode.window.setStatusBarMessage(`$(check) ${summary}`, 4000);
   } else {
@@ -189,7 +189,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
 
   const failed: string[] = [];
   let succeeded = 0;
-  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: force ? 'Force Push' : 'Push', cancellable: false }, async (progress) => {
+  await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: force ? t('Force Push') : t('Push'), cancellable: false }, async (progress) => {
     for (const [i, { target, push, plan }] of work.entries()) {
       progress.report({ message: work.length > 1 ? `${target.name} (${i + 1}/${work.length})` : target.name });
       try {
@@ -246,9 +246,9 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
         const branch = currentBranch(target) ?? 'HEAD';
         const mode = await vscode.window.showQuickPick(
           [
-            { label: 'Soft', description: t('Keep all changes staged'), mode: 'soft' as const },
-            { label: 'Mixed', description: t('Keep changes in the working tree, unstaged (default)'), mode: 'mixed' as const },
-            { label: 'Hard', description: t('Discard all changes — cannot be undone'), mode: 'hard' as const },
+            { label: t('Soft'), description: t('Keep all changes staged'), mode: 'soft' as const },
+            { label: t('Mixed'), description: t('Keep changes in the working tree, unstaged (default)'), mode: 'mixed' as const },
+            { label: t('Hard'), description: t('Discard all changes — cannot be undone'), mode: 'hard' as const },
           ],
           { placeHolder: t('Reset {0} to {1}', branch, label) },
         );
@@ -510,7 +510,7 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
     case 'rebase': {
       const eligible = targets.filter((x) => x.state?.head.branch && x.state.head.branch !== (first.type === 'local' ? name : ''));
       if (eligible.length === 0) {
-        void vscode.window.showWarningMessage(t('No repository has a current branch to {0} into.', action));
+        void vscode.window.showWarningMessage(action === 'merge' ? t('No repository has a current branch to merge into.') : t('No repository has a current branch to rebase.'));
         return;
       }
       const ok = action === 'merge' ? t('Merge') : t('Rebase');

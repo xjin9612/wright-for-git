@@ -12,6 +12,7 @@ import { mapLimit } from './util';
 import { combineChanges } from './shared/combine';
 import { promises as fsp } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
+import { currentBundle, currentLanguage, t } from './i18n';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -219,7 +220,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
     await this.ensureDiscovered();
     if (this.entries.length === 0) {
-      this.post({ type: 'repos', states: [], generation: this.generation, message: vscode.l10n.t('No Git repository found in the workspace.') });
+      this.post({ type: 'repos', states: [], generation: this.generation, message: t('No Git repository found in the workspace.') });
       this.view.description = undefined;
       return;
     }
@@ -258,7 +259,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       const s = visible[0].state;
       this.view.description = `${visible[0].name} · ${s?.head.branch ?? `detached ${s?.head.hash?.slice(0, 8) ?? ''}`}`;
     } else {
-      this.view.description = vscode.l10n.t('{0} repositories', visible.length);
+      this.view.description = t('{0} repositories', visible.length);
     }
   }
 
@@ -351,7 +352,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'copy':
           await vscode.env.clipboard.writeText(m.text);
-          vscode.window.setStatusBarMessage(vscode.l10n.t('Copied: {0}', m.text), 2000);
+          vscode.window.setStatusBarMessage(t('Copied: {0}', m.text), 2000);
           break;
         case 'selectRepository':
           await this.selectRepository();
@@ -406,7 +407,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         }
       }
     } catch (e) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('Git command failed: {0}', errorMessage(e)));
+      void vscode.window.showErrorMessage(t('Git command failed: {0}', errorMessage(e)));
     }
   }
 
@@ -441,7 +442,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     // 由 git 判斷所屬 repo（巢狀時為最內層）與相對路徑；經過 symlink／junction／subst 也正確
     const located = await GitRepository.locate(this.gitPath, dir);
     if (!located) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('{0} is not inside a Git repository.', path.basename(fsPath)));
+      void vscode.window.showInformationMessage(t('{0} is not inside a Git repository.', path.basename(fsPath)));
       return;
     }
     const known = this.find(located.repo.root);
@@ -454,13 +455,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   async selectRepository(): Promise<void> {
     await this.ensureDiscovered();
     if (this.entries.length === 0) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('No Git repository found in the workspace.'));
+      void vscode.window.showInformationMessage(t('No Git repository found in the workspace.'));
       return;
     }
     const visible = new Set(this.visibleEntries().map((e) => e.key));
     const picks = await vscode.window.showQuickPick(
       this.entries.map((e) => ({ label: e.name, description: e.repo.root, picked: visible.has(e.key), root: e.repo.root })),
-      { placeHolder: vscode.l10n.t('Select repositories to show'), canPickMany: true },
+      { placeHolder: t('Select repositories to show'), canPickMany: true },
     );
     if (!picks || picks.length === 0) return;
     await this.showRepositories(picks.map((p) => p.root));
@@ -624,7 +625,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     if (!nav || !this.isNavDiffActive()) return;
     const next = nav.index + delta;
     if (next < 0 || next >= nav.files.length) {
-      vscode.window.setStatusBarMessage(delta > 0 ? vscode.l10n.t('Last changed file') : vscode.l10n.t('First changed file'), 2000);
+      vscode.window.setStatusBarMessage(delta > 0 ? t('Last changed file') : t('First changed file'), 2000);
       return;
     }
     nav.index = next;
@@ -727,18 +728,18 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
     if (plans.length === 0) return;
 
-    const ok = vscode.l10n.t('Checkout');
+    const ok = t('Checkout');
     const label = plans[0].label;
     if (isTag) {
       const answer = await vscode.window.showWarningMessage(
-        vscode.l10n.t('Checkout tag {0}? This will put the repository in detached HEAD state.', label),
+        t('Checkout tag {0}? This will put the repository in detached HEAD state.', label),
         { modal: true, detail: plans.map((p) => p.entry.name).join('\n') },
         ok,
       );
       if (answer !== ok) return;
     } else if (plans.length > 1) {
       const answer = await vscode.window.showInformationMessage(
-        vscode.l10n.t('Checkout {0} in {1} repositories?', label, plans.length),
+        t('Checkout {0} in {1} repositories?', label, plans.length),
         { modal: true, detail: plans.map((p) => p.entry.name).join('\n') },
         ok,
       );
@@ -750,9 +751,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private async checkoutRevision(root: string, hash: string): Promise<void> {
     const entry = this.find(root);
     if (!entry) return;
-    const ok = vscode.l10n.t('Checkout');
+    const ok = t('Checkout');
     const answer = await vscode.window.showWarningMessage(
-      vscode.l10n.t('Checkout revision {0}? This will put the repository in detached HEAD state.', hash.slice(0, 8)),
+      t('Checkout revision {0}? This will put the repository in detached HEAD state.', hash.slice(0, 8)),
       { modal: true, detail: entry.name },
       ok,
     );
@@ -762,7 +763,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private async runCheckouts(plans: { entry: RepoEntry; target: string; track: boolean }[], label: string): Promise<void> {
     const failures: string[] = [];
     await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Checking out {0}…', label) },
+      { location: vscode.ProgressLocation.Notification, title: t('Checking out {0}…', label) },
       async () => {
         for (const p of plans) {
           try {
@@ -773,11 +774,16 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         }
       },
     );
-    if (failures.length > 0) void vscode.window.showErrorMessage(vscode.l10n.t('Checkout failed: {0}', failures.join('\n')));
+    if (failures.length > 0) void vscode.window.showErrorMessage(t('Checkout failed: {0}', failures.join('\n')));
     await this.refresh(true);
   }
 
   // ---------- html ----------
+
+  /** 介面語言變更：重新產生 webview（篩選、版面等狀態由 webview 的 state 保存） */
+  reloadWebview(): void {
+    if (this.view) this.view.webview.html = this.renderHtml(this.view.webview);
+  }
 
   private renderHtml(webview: vscode.Webview): string {
     const nonce = makeNonce();
@@ -791,9 +797,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       `script-src 'nonce-${nonce}'`,
     ].join('; ');
     // 目前語系的翻譯（英文時為空）；跳脫 '<' 避免提早結束 script 區塊
-    const l10nJson = JSON.stringify(vscode.l10n.bundle ?? {}).replace(/</g, '\\u003c');
+    const l10nJson = JSON.stringify(currentBundle() ?? {}).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
-<html lang="${vscode.env.language}">
+<html lang="${currentLanguage()}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">

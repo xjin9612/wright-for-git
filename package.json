@@ -392,6 +392,21 @@
             "__pycache__"
           ],
           "description": "%config.scanExclude%"
+        },
+        "gitWorkbench.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "zh-tw"
+          ],
+          "enumDescriptions": [
+            "%config.language.auto%",
+            "English",
+            "繁體中文"
+          ],
+          "default": "auto",
+          "description": "%config.language%"
         }
       }
     },

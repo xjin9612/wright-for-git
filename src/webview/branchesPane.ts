@@ -3,7 +3,7 @@ import type { RepoState } from '../shared/protocol';
 import { mergeRefs, naturalCompare, type MergedRef } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, icon, iconButton, type IconName } from './dom';
-import { t } from './l10n';
+import { plural, t } from './l10n';
 
 interface Row {
   key: string;
@@ -167,7 +167,7 @@ export class BranchesPane {
       kind: 'ref',
       ref: r,
       track: trackText(r),
-      extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : `${r.roots.length} repos`,
+      extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : plural(r.roots.length, "{0} repo", "{0} repos"),
       extraTitle: multi ? r.roots.map((x) => nameOf.get(x) ?? x).join('\n') : undefined,
       expandable: false,
       expanded: false,
@@ -194,7 +194,7 @@ export class BranchesPane {
             kind: 'ref',
             ref: r,
             track: trackText(r),
-            extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : `${r.roots.length} repos`,
+            extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : plural(r.roots.length, "{0} repo", "{0} repos"),
             extraTitle: multi ? r.roots.map((x) => nameOf.get(x) ?? x).join('\n') : undefined,
             expandable: false,
             expanded: false,
@@ -422,7 +422,7 @@ export class BranchesPane {
 /** 領先／落後顯示文字：「↑2 ↓3」；upstream 已刪除時顯示「gone」 */
 function trackText(r: MergedRef): string | undefined {
   if (r.type !== 'local') return undefined;
-  if (r.gone) return 'gone';
+  if (r.gone) return t('gone');
   const parts: string[] = [];
   if (r.ahead) parts.push(`↑${r.ahead}`);
   if (r.behind) parts.push(`↓${r.behind}`);

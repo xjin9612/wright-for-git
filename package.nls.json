@@ -29,5 +29,7 @@
   "command.stash.branch": "Unstash as Branch…",
   "command.stash.openFile": "Show Diff",
   "command.diff.previousFile": "Previous Changed File",
-  "command.diff.nextFile": "Next Changed File"
+  "command.diff.nextFile": "Next Changed File",
+  "config.language": "Language of the Git Workbench panel, dialogs and messages. Command names and settings always follow the VS Code display language.",
+  "config.language.auto": "Follow the VS Code display language"
 }
