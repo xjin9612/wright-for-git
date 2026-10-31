@@ -143,6 +143,42 @@ export class StashTree implements vscode.TreeDataProvider<Node> {
   }
 }
 
+/** 儲藏變更：選擇範圍（已追蹤／含未追蹤／保留暫存）與說明；成功回傳 true */
+export async function stashChanges(repo: GitRepository): Promise<boolean> {
+  const mode = await vscode.window.showQuickPick(
+    [
+      { label: t('Tracked files'), description: t('Modified and staged files'), untracked: false, keepIndex: false },
+      { label: t('Include untracked files'), description: '--include-untracked', untracked: true, keepIndex: false },
+      { label: t('Keep staged changes'), description: t('Stash everything but leave the index as is (--keep-index)'), untracked: false, keepIndex: true },
+    ],
+    { placeHolder: t('What to stash') },
+  );
+  if (!mode) return false;
+  if (!(await repo.hasChanges(mode.untracked))) {
+    void vscode.window.showInformationMessage(t('There are no local changes to stash.'));
+    return false;
+  }
+  const message = await vscode.window.showInputBox({ title: t('Stash Changes'), prompt: t('Message (optional)') });
+  if (message === undefined) return false;
+  try {
+    await repo.stashPush(message, mode.untracked, mode.keepIndex);
+    vscode.window.setStatusBarMessage(`$(check) ${t('Changes stashed')}`, 4000);
+    return true;
+  } catch (e) {
+    void vscode.window.showErrorMessage(errorMessage(e));
+    return false;
+  }
+}
+
+/** 開啟儲藏中某個檔案的 diff（儲藏當時的 HEAD ↔ 儲藏內容；未追蹤檔案左側為空） */
+export async function openStashFile(root: string, stash: StashInfo, file: ChangedFile & { untracked?: boolean }, viewColumn?: vscode.ViewColumn): Promise<void> {
+  const base = stash.parents[0];
+  const left = file.untracked || file.status === 'A' ? revisionUri(root, '', file.path) : revisionUri(root, base, file.oldPath ?? file.path);
+  const rightRef = file.untracked ? stash.parents[2] : file.status === 'D' ? '' : stash.hash;
+  const right = revisionUri(root, rightRef, file.path);
+  await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(file.path)} (${stash.ref})`, { preview: true, viewColumn });
+}
+
 export function registerStash(context: vscode.ExtensionContext, provider: WorkbenchViewProvider): StashTree {
   const tree = new StashTree(provider);
   const view = vscode.window.createTreeView(StashTree.viewId, { treeDataProvider: tree, showCollapseAll: true });
@@ -241,38 +277,12 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
       }
       const repo = root ? provider.getRepository(root) : undefined;
       if (!repo) return;
-      const mode = await vscode.window.showQuickPick(
-        [
-          { label: t('Tracked files'), description: t('Modified and staged files'), untracked: false, keepIndex: false },
-          { label: t('Include untracked files'), description: '--include-untracked', untracked: true, keepIndex: false },
-          { label: t('Keep staged changes'), description: t('Stash everything but leave the index as is (--keep-index)'), untracked: false, keepIndex: true },
-        ],
-        { placeHolder: t('What to stash') },
-      );
-      if (!mode) return;
-      if (!(await repo.hasChanges(mode.untracked))) {
-        void vscode.window.showInformationMessage(t('There are no local changes to stash.'));
-        return;
+      if (await stashChanges(repo)) {
+        tree.refresh();
+        await provider.refresh(true);
       }
-      const message = await vscode.window.showInputBox({ title: t('Stash Changes'), prompt: t('Message (optional)') });
-      if (message === undefined) return;
-      try {
-        await repo.stashPush(message, mode.untracked, mode.keepIndex);
-        vscode.window.setStatusBarMessage(`$(check) ${t('Changes stashed')}`, 4000);
-      } catch (e) {
-        void vscode.window.showErrorMessage(errorMessage(e));
-      }
-      tree.refresh();
-      await provider.refresh(true);
     }),
-    vscode.commands.registerCommand('gitWorkbench.stash.openFile', async (node: FileNode) => {
-      const { stash, file, root } = node;
-      const base = stash.parents[0];
-      const left = file.untracked || file.status === 'A' ? revisionUri(root, '', file.path) : revisionUri(root, base, file.oldPath ?? file.path);
-      const rightRef = file.untracked ? stash.parents[2] : file.status === 'D' ? '' : stash.hash;
-      const right = revisionUri(root, rightRef, file.path);
-      await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(file.path)} (${stash.ref})`, { preview: true });
-    }),
+    vscode.commands.registerCommand('gitWorkbench.stash.openFile', (node: FileNode) => openStashFile(node.root, node.stash, node.file)),
   );
   return tree;
 }

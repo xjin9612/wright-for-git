@@ -6,6 +6,7 @@ import { RevisionFileSystem, SCHEME } from './diffProvider';
 import { registerLaunchers } from './sidebar';
 import { registerStash, type StashTree } from './stashView';
 import { initI18n, resetI18n } from './i18n';
+import { registerExplorerCommands } from './explorerCommands';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   initI18n(context);
@@ -59,6 +60,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (e) {
     console.error('[Git Workbench] stash view init failed:', e);
   }
+  registerExplorerCommands(context, provider, () => stashTree?.refresh());
 }
 
 export function deactivate(): void {

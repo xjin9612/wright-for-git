@@ -150,6 +150,13 @@ export type ToExtension =
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
   /** 在編輯器分頁開啟 Push 對話框 */
   | { type: 'openPushPanel'; roots: string[]; branch?: string; upTo?: { root: string; hash: string } }
+  /** 取消儲藏對話框 */
+  | { type: 'unstashLoad'; requestId: number }
+  | { type: 'unstashFiles'; requestId: number; root: string; hash: string }
+  | { type: 'unstashApply'; root: string; hash: string; pop: boolean; index: boolean; branch?: string }
+  | { type: 'unstashDrop'; root: string; hash: string }
+  | { type: 'unstashClear'; root: string }
+  | { type: 'openStashDiff'; root: string; hash: string; file: ChangedFile & { untracked?: boolean } }
   /** 編輯器分頁的對話框要求關閉 */
   | { type: 'closeDialog' }
   /** 面板內確認框的結果 */
@@ -234,6 +241,8 @@ export type ToWebview =
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string; files: ChangedFile[] }
   /** started：已開始推送（對話框關閉）；cancelled：使用者在確認框取消 */
   | { type: 'pushStatus'; requestId: number; status: 'started' | 'cancelled' }
+  | { type: 'unstashData'; requestId: number; repos: { root: string; name: string; stashes: StashInfo[] }[] }
+  | { type: 'unstashFiles'; requestId: number; root: string; hash: string; files: (ChangedFile & { untracked?: boolean })[] }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */

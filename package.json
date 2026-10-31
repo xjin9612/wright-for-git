@@ -185,6 +185,21 @@
         "title": "%command.diff.nextFile%",
         "category": "Git Workbench",
         "icon": "$(arrow-down)"
+      },
+      {
+        "command": "gitWorkbench.compareWithRef",
+        "title": "%command.compareWithRef%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.stashChangesIn",
+        "title": "%command.stashChangesIn%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.unstash",
+        "title": "%command.unstash%",
+        "category": "Git Workbench"
       }
     ],
     "menus": {
@@ -222,7 +237,7 @@
       ],
       "explorer/context": [
         {
-          "command": "gitWorkbench.showHistory",
+          "submenu": "gitWorkbench.explorer",
           "group": "7_modification@90"
         }
       ],
@@ -343,6 +358,24 @@
           "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
           "group": "navigation@-98"
         }
+      ],
+      "gitWorkbench.explorer": [
+        {
+          "command": "gitWorkbench.showHistory",
+          "group": "1_history@1"
+        },
+        {
+          "command": "gitWorkbench.compareWithRef",
+          "group": "1_history@2"
+        },
+        {
+          "command": "gitWorkbench.stashChangesIn",
+          "group": "2_stash@1"
+        },
+        {
+          "command": "gitWorkbench.unstash",
+          "group": "2_stash@2"
+        }
       ]
     },
     "configuration": {
@@ -432,6 +465,12 @@
         "key": "ctrl+alt+pageup",
         "mac": "cmd+alt+pageup",
         "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "gitWorkbench.explorer",
+        "label": "%submenu.explorer%"
       }
     ]
   },

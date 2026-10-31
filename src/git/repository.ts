@@ -430,6 +430,11 @@ export class GitRepository {
     await this.run(['stash', 'drop', ref]);
   }
 
+  /** 刪除所有 stash */
+  async stashClear(): Promise<void> {
+    await this.run(['stash', 'clear']);
+  }
+
   /** 從 stash 建立 branch（以 stash 當時的 commit 為起點），成功後刪除該 stash */
   async stashBranch(name: string, ref: string): Promise<void> {
     this.assertStash(ref);

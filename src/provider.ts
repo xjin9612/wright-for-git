@@ -423,30 +423,43 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   /**
    * 顯示某個檔案或資料夾的歷史：Paths 篩選到它所屬的 repository 與相對路徑。
    */
-  async showHistory(uri: vscode.Uri | undefined): Promise<void> {
-    const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-    if (!target || target.scheme !== 'file') return;
+  /** 找出檔案或資料夾所屬的 repository（巢狀時為最內層）與相對路徑；不在 repo 內時提示並回傳 undefined */
+  async locateUri(uri: vscode.Uri): Promise<{ repo: GitRepository; rel: string; isDir: boolean } | undefined> {
     await this.ensureDiscovered();
-    const fsPath = target.fsPath;
+    const fsPath = uri.fsPath;
     let isDir = false;
     try {
-      isDir = (await vscode.workspace.fs.stat(target)).type === vscode.FileType.Directory;
+      isDir = (await vscode.workspace.fs.stat(uri)).type === vscode.FileType.Directory;
     } catch {
-      // 檔案可能已刪除，仍以所在資料夾查詢歷史
+      // 檔案可能已刪除，仍以所在資料夾判斷
     }
     const dir = isDir ? fsPath : path.dirname(fsPath);
-    // 由 git 判斷所屬 repo（巢狀時為最內層）與相對路徑；經過 symlink／junction／subst 也正確
+    // 由 git 判斷所屬 repo 與相對路徑；經過 symlink／junction／subst 也正確
     const located = await GitRepository.locate(this.gitPath, dir);
     if (!located) {
       void vscode.window.showInformationMessage(t('{0} is not inside a Git repository.', path.basename(fsPath)));
-      return;
+      return undefined;
     }
     const known = this.find(located.repo.root);
     const entry = known ?? (await this.addRepository(located.repo));
     if (!known) await this.refresh(true);
     const rel = (located.prefix + (isDir ? '' : path.basename(fsPath))).replace(/\/+$/, '');
-    await this.applyFilter({ roots: [entry.repo.root], paths: rel ? [rel] : [], branches: [], text: '', users: [] }, true);
+    return { repo: entry.repo, rel, isDir };
   }
+
+  async showHistory(uri: vscode.Uri | undefined): Promise<void> {
+    const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+    if (!target || target.scheme !== 'file') return;
+    const loc = await this.locateUri(target);
+    if (!loc) return;
+    await this.applyFilter({ roots: [loc.repo.root], paths: loc.rel ? [loc.rel] : [], branches: [], text: '', users: [] }, true);
+  }
+
+  /** 取得指定 repo 的操作目標（含最新狀態） */
+  async targetOf(root: string): Promise<RepoTarget | undefined> {
+    return (await this.freshTargets([root]))[0];
+  }
+
 
   async selectRepository(): Promise<void> {
     await this.ensureDiscovered();

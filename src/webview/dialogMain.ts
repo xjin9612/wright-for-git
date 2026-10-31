@@ -2,17 +2,18 @@
 import type { ToWebview } from '../shared/protocol';
 import { showConfirm } from './confirmDialog';
 import { handlePushMessage, openPushDialog } from './pushDialog';
+import { handleUnstashMessage, openUnstashDialog } from './unstashDialog';
 import { post } from './vscodeApi';
 
-interface DialogConfig {
-  kind: 'push';
-  args: { roots: string[]; branch?: string; upTo?: { root: string; hash: string } };
-}
+type DialogConfig =
+  | { kind: 'push'; args: { roots: string[]; branch?: string; upTo?: { root: string; hash: string } } }
+  | { kind: 'unstash'; args: { root?: string } };
 
 const node = document.getElementById('dialog-config');
 const config = node?.textContent ? (JSON.parse(node.textContent) as DialogConfig | null) : null;
 document.body.classList.add('dialog-page');
 
+if (config?.kind === 'unstash') openUnstashDialog(config.args.root);
 if (config?.kind === 'push') {
   openPushDialog({
     ...config.args,
@@ -28,6 +29,10 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'pushCommitFiles':
     case 'pushStatus':
       handlePushMessage(m);
+      break;
+    case 'unstashData':
+    case 'unstashFiles':
+      handleUnstashMessage(m);
       break;
     case 'confirm':
       showConfirm(m);
