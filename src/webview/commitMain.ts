@@ -522,8 +522,17 @@ function select(r: Row, add: boolean, range: boolean): void {
     selected.add(r.key);
   }
   focusKey = r.key;
-  render();
+  updateSelection();
   tree.focus();
+}
+
+/** 只更新選取／焦點樣式，不重繪整棵樹（大量未追蹤檔案時重繪很慢） */
+function updateSelection(): void {
+  for (const div of tree.querySelectorAll<HTMLElement>('.tree-row')) {
+    const key = div.dataset.key ?? '';
+    div.classList.toggle('selected', selected.has(key));
+    div.classList.toggle('focused', key === focusKey);
+  }
 }
 
 /** 選取的列對應的檔案（群組列代表底下所有檔案） */
