@@ -1,0 +1,298 @@
+/* Git Workbench webview：全部顏色取自 VS Code 主題變數 */
+:root {
+  --row-h: 22px;
+  --border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+  --muted: var(--vscode-descriptionForeground);
+  --hover: var(--vscode-list-hoverBackground);
+  --sel-bg: var(--vscode-list-inactiveSelectionBackground);
+  --sel-fg: var(--vscode-list-inactiveSelectionForeground, inherit);
+  --sel-focus-bg: var(--vscode-list-activeSelectionBackground);
+  --sel-focus-fg: var(--vscode-list-activeSelectionForeground, inherit);
+  --label-branch: var(--vscode-gitDecoration-addedResourceForeground, #73c991);
+  --label-remote: var(--vscode-charts-purple, #b180d7);
+  --label-tag: var(--vscode-descriptionForeground);
+  --label-current: var(--vscode-charts-yellow, #e2c08d);
+  --col-author: 120px;
+  --col-date: 136px;
+  --col-hash: 74px;
+
+  /* 變更狀態（IntelliJ 慣例：新增綠、修改藍、刪除灰） */
+  --st-added: #73bd79;
+  --st-modified: #70aeff;
+  --st-deleted: #868a91;
+  --st-conflict: #e06c75;
+
+  /* Conventional Commits 類型色 */
+  --cc-feat: #73bd79;
+  --cc-fix: #e5a05b;
+  --cc-docs: #70aeff;
+  --cc-refactor: #c48ae6;
+  --cc-perf: #dcc35c;
+  --cc-test: #4fc1c1;
+  --cc-style: #e48ab8;
+  --cc-chore: #9aa0a8;
+  --cc-revert: #f07178;
+}
+body.vscode-light, body.vscode-high-contrast-light {
+  --st-added: #1d7d2a;
+  --st-modified: #1e5fc2;
+  --st-deleted: #8c8f96;
+  --st-conflict: #c62828;
+  --cc-feat: #1d7d2a;
+  --cc-fix: #b25400;
+  --cc-docs: #1e5fc2;
+  --cc-refactor: #7b2fa8;
+  --cc-perf: #8a6d00;
+  --cc-test: #00796b;
+  --cc-style: #ad1457;
+  --cc-chore: #6b6f76;
+  --cc-revert: #c62828;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+  user-select: none;
+}
+
+button { font: inherit; color: inherit; }
+
+.workbench {
+  display: grid;
+  grid-template-rows: 100%;
+  height: 100vh;
+  min-height: 0;
+}
+.workbench > * { min-width: 0; min-height: 0; }
+
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+
+/* ---------- 共用元件 ---------- */
+.icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: none; }
+.icon svg { display: block; }
+
+.icon-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0; border: none; border-radius: 4px;
+  background: transparent; color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  cursor: pointer; flex: none;
+}
+.icon-button:hover { background: var(--vscode-toolbar-hoverBackground, var(--hover)); }
+.icon-button:focus-visible, .chip:focus-visible, .toggle-button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+
+.toolbar-spacer { flex: 1; }
+.toolbar-sep { width: 14px; height: 1px; background: var(--border); margin: 4px auto; }
+
+.text-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--vscode-input-foreground); font: inherit; padding: 0 2px; height: 22px;
+}
+.text-input::placeholder { color: var(--vscode-input-placeholderForeground); }
+
+.search-box {
+  display: flex; align-items: center; gap: 2px; height: 26px; padding: 0 4px;
+  border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 3px;
+  background: var(--vscode-input-background); color: var(--muted);
+}
+.search-box:focus-within { border-color: var(--vscode-focusBorder); }
+
+.toggle-button {
+  height: 20px; min-width: 22px; padding: 0 4px; border: 1px solid transparent; border-radius: 3px;
+  background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-family: var(--vscode-editor-font-family, monospace);
+}
+.toggle-button:hover { background: var(--vscode-inputOption-hoverBackground, var(--hover)); }
+.toggle-button.on {
+  color: var(--vscode-inputOption-activeForeground, var(--vscode-foreground));
+  background: var(--vscode-inputOption-activeBackground, rgba(0, 120, 212, 0.3));
+  border-color: var(--vscode-inputOption-activeBorder, transparent);
+}
+
+.splitter { background: transparent; position: relative; z-index: 3; }
+.splitter-vertical { cursor: col-resize; border-left: 1px solid var(--border); }
+.splitter-horizontal { cursor: row-resize; height: 4px; flex: none; border-top: 1px solid var(--border); }
+.splitter:hover, .splitter.active { background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder)); }
+
+/* ---------- 樹 ---------- */
+.tree { overflow: auto; outline: none; flex: 1; min-height: 0; padding: 2px 0; }
+.tree-row {
+  display: flex; align-items: center; gap: 4px; height: var(--row-h); padding-right: 8px;
+  white-space: nowrap; cursor: pointer;
+}
+.tree-row:hover { background: var(--hover); }
+.tree-row.selected { background: var(--sel-bg); color: var(--sel-fg); }
+.tree:focus .tree-row.selected { background: var(--sel-focus-bg); color: var(--sel-focus-fg); }
+.tree-row .twisty { width: 16px; color: var(--muted); }
+.tree-row > .icon { color: var(--vscode-icon-foreground, var(--muted)); }
+.tree-label { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+/* 空間不足時先縮淡色說明，名稱優先完整顯示 */
+.tree-count { color: var(--muted); font-size: 0.92em; margin-left: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1000 auto; min-width: 0; }
+.empty-text { color: var(--muted); padding: 12px; }
+
+/* ---------- 左欄 ---------- */
+.pane-restore { border-right: 1px solid var(--border); padding-top: 4px; display: flex; justify-content: center; }
+.branches-pane { display: flex; height: 100%; }
+.vertical-toolbar {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px;
+  border-right: 1px solid var(--border); width: 28px; flex: none;
+}
+.branches-main { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 4px 0 0; }
+.branches-main .search-box { margin: 0 6px 4px; }
+.branch-tree .icon.favorite { color: var(--vscode-charts-yellow, #e2c08d); }
+.branch-tree .icon.current { color: var(--label-current); }
+.branch-tree .tree-row.current .tree-label { font-weight: 600; }
+
+/* ---------- 中欄 ---------- */
+.log-pane { display: flex; flex-direction: column; height: 100%; min-width: 0; position: relative; }
+.filter-bar {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px; flex: none;
+  border-bottom: 1px solid var(--border); overflow: hidden;
+}
+.log-search { width: 280px; min-width: 140px; flex: 0 1 280px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 6px; border-radius: 3px;
+  color: var(--muted); cursor: pointer; white-space: nowrap; max-width: 260px; flex: none;
+}
+.chip:hover, .chip.open { background: var(--hover); }
+.chip.active { color: var(--vscode-foreground); }
+.chip .chip-value { overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.chip .chip-caret { color: var(--muted); }
+.chip .chip-clear { display: none; width: 18px; height: 18px; }
+.chip.active .chip-clear { display: inline-flex; }
+.chip.active .chip-caret { display: none; }
+
+.progress { height: 2px; flex: none; overflow: hidden; position: relative; }
+.progress.active::after {
+  content: ''; position: absolute; top: 0; left: -30%; width: 30%; height: 100%;
+  background: var(--vscode-progressBar-background, #0e70c0); animation: progress 1.2s linear infinite;
+}
+@keyframes progress { to { left: 100%; } }
+
+.log-warning {
+  flex: none; padding: 3px 8px; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12));
+  border-bottom: 1px solid var(--border);
+}
+.log-table { position: relative; flex: 1; min-height: 0; container-type: inline-size; }
+/* 面板太窄時自動隱藏次要欄位，確保 subject 可讀 */
+@container (max-width: 560px) { .cell-date, .cell-hash { display: none; } }
+@container (max-width: 400px) { .cell-author { display: none; } }
+.log-viewport { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; outline: none; }
+.log-graph { position: sticky; top: 0; left: 0; display: block; z-index: 2; pointer-events: none; }
+.log-spacer { width: 1px; }
+.log-rows { position: absolute; top: 0; left: 0; right: 0; }
+.log-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); pointer-events: none; padding: 16px; text-align: center; white-space: pre-wrap;
+}
+
+.log-row {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--row-h);
+  display: flex; align-items: center; white-space: nowrap; cursor: default;
+}
+.log-row:hover { background: var(--hover); }
+.log-row.selected { background: var(--sel-bg); color: var(--sel-fg); }
+.log-viewport:focus .log-row.selected { background: var(--sel-focus-bg); color: var(--sel-focus-fg); }
+.log-row.is-mine .cell-subject-text { font-weight: 600; }
+.log-row.is-merge .cell-subject-text, .log-row.is-merge .cell-author { color: var(--muted); }
+
+.cc-type { font-weight: 600; }
+.cc-scope, .cc-colon { color: var(--muted); }
+.cc-breaking { color: var(--cc-revert); font-weight: 700; }
+.cc-feat { color: var(--cc-feat); }
+.cc-fix { color: var(--cc-fix); }
+.cc-docs { color: var(--cc-docs); }
+.cc-refactor { color: var(--cc-refactor); }
+.cc-perf { color: var(--cc-perf); }
+.cc-test { color: var(--cc-test); }
+.cc-style { color: var(--cc-style); }
+.cc-build, .cc-ci, .cc-chore { color: var(--cc-chore); }
+.cc-revert { color: var(--cc-revert); }
+.log-viewport:focus .log-row.selected .cc-type,
+.log-viewport:focus .log-row.selected .cc-scope,
+.log-viewport:focus .log-row.selected .cc-colon { color: inherit; }
+
+.cell { overflow: hidden; text-overflow: ellipsis; padding: 0 8px 0 4px; flex: none; }
+.cell-subject { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding-right: 8px; }
+.cell-subject-text { flex: 1 1 auto; min-width: 40px; overflow: hidden; text-overflow: ellipsis; }
+.cell-labels { flex: 0 1 auto; display: flex; gap: 6px; overflow: hidden; min-width: 0; max-width: 55%; justify-content: flex-end; }
+.cell-author { width: var(--col-author); }
+.cell-date { width: var(--col-date); font-variant-numeric: tabular-nums; }
+.cell-hash { width: var(--col-hash); font-family: var(--vscode-editor-font-family, monospace); font-size: 0.92em; color: var(--muted); }
+.log-row.selected .cell-hash { color: inherit; }
+.hide-author .cell-author, .hide-date .cell-date, .hide-hash .cell-hash { display: none; }
+
+.ref-label {
+  display: inline-flex; align-items: center; gap: 2px; min-width: 18px; max-width: 260px;
+  font-size: 0.92em; color: var(--label-branch);
+}
+.ref-label .icon { width: 14px; height: 14px; }
+.ref-label .icon svg { width: 14px; height: 14px; }
+.ref-label .ref-text { overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; unicode-bidi: plaintext; }
+.ref-label.kind-remote { color: var(--label-remote); }
+.ref-label.kind-tag { color: var(--label-tag); }
+.ref-label.kind-head, .ref-label.current { color: var(--label-current); }
+.log-row.selected .ref-label { color: inherit; }
+
+/* ---------- 右欄 ---------- */
+.details-pane { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+.details-files { display: flex; flex-direction: column; min-height: 60px; flex: 0 0 55%; }
+.pane-toolbar { display: flex; align-items: center; gap: 2px; padding: 4px 6px; flex: none; border-bottom: 1px solid var(--border); height: 35px; }
+.file-tree.loading { opacity: 0.6; }
+.status-A, .status-C { color: var(--st-added); }
+.status-M, .status-T, .status-R { color: var(--st-modified); }
+.status-D { color: var(--st-deleted); }
+.status-U { color: var(--st-conflict); }
+.tree-row.selected .tree-label { color: inherit; }
+
+.details-info { flex: 1; min-height: 40px; overflow: auto; padding: 10px 12px; user-select: text; line-height: 1.5; }
+.details-message { margin-bottom: 10px; }
+.details-subject { font-family: var(--vscode-editor-font-family, monospace); font-weight: 600; white-space: pre-wrap; word-break: break-word; }
+.details-body { font-family: var(--vscode-editor-font-family, monospace); margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 0.95em; }
+.details-meta, .details-branches { margin-top: 2px; word-break: break-word; }
+.details-refs { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+.details-refs .ref-label { max-width: none; }
+.details-refs .ref-label .ref-text { direction: ltr; }
+.details-branches { margin-top: 4px; }
+.link { color: var(--vscode-textLink-foreground); text-decoration: none; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.hash-link { font-family: var(--vscode-editor-font-family, monospace); }
+
+/* ---------- 彈出框與選單 ---------- */
+.picker, .context-menu {
+  position: fixed; z-index: 100; display: flex; flex-direction: column;
+  background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-quickInput-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-widget-border, var(--border)); border-radius: 4px;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
+}
+.picker { padding: 6px; gap: 4px; }
+.picker-input {
+  resize: none; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-focusBorder); border-radius: 3px; padding: 3px 6px; outline: none;
+}
+.picker-hint { color: var(--muted); font-size: 0.88em; padding: 0 2px 2px; }
+.picker-list { overflow: auto; min-height: 0; flex: 1; }
+.picker-item { display: flex; align-items: center; gap: 6px; height: var(--row-h); padding: 0 6px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+.picker-item:hover, .picker-item.active { background: var(--vscode-quickInputList-focusBackground, var(--hover)); color: var(--vscode-quickInputList-focusForeground, inherit); }
+.picker-check { width: 16px; display: inline-flex; flex: none; }
+.picker-value { overflow: hidden; text-overflow: ellipsis; }
+.picker-icon { color: var(--muted); }
+.picker-detail { color: var(--muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; margin-left: auto; padding-left: 12px; }
+.picker-empty { color: var(--muted); padding: 4px 8px; }
+
+.context-menu { padding: 4px 0; min-width: 200px; }
+.menu-item { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 16px 0 6px; cursor: pointer; white-space: nowrap; }
+.menu-item:hover { background: var(--vscode-menu-selectionBackground, var(--sel-focus-bg)); color: var(--vscode-menu-selectionForeground, inherit); }
+.menu-check { width: 16px; display: inline-flex; }
+.menu-sep { height: 1px; margin: 4px 0; background: var(--vscode-menu-separatorBackground, var(--border)); }

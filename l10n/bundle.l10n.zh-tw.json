@@ -1,0 +1,15 @@
+{
+  "No Git repository found in the workspace.": "工作區中找不到 Git repository。",
+  "Checking out {0}…": "正在 checkout {0}…",
+  "Checkout failed: {0}": "Checkout 失敗：{0}",
+  "Checkout tag {0}? This will put the repository in detached HEAD state.": "要 checkout tag {0} 嗎？repository 會進入 detached HEAD 狀態。",
+  "Checkout revision {0}? This will put the repository in detached HEAD state.": "要 checkout {0} 嗎？repository 會進入 detached HEAD 狀態。",
+  "Checkout": "Checkout",
+  "Copied: {0}": "已複製：{0}",
+  "Git command failed: {0}": "Git 指令失敗：{0}",
+  "{0} is not inside a Git repository.": "{0} 不在 Git repository 中。",
+  "Show Git Log (Alt+9)": "顯示 Git Log（Alt+9）",
+  "{0} repositories": "{0} 個 repository",
+  "Select repositories to show": "選擇要顯示的 repository",
+  "Checkout {0} in {1} repositories?": "要在 {1} 個 repository checkout {0} 嗎？"
+}

@@ -1,0 +1,14 @@
+# 統一以 LF 存放文字檔；Windows 上 checkout 也維持 LF（esbuild／tsc／node 皆支援）
+* text=auto eol=lf
+
+# Windows 批次檔需要 CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 二進位檔
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.vsix binary
+*.zip binary

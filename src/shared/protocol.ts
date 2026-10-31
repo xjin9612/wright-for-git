@@ -1,0 +1,129 @@
+// Extension 與 Webview 之間共用的資料型別與訊息協定
+
+export interface CommitInfo {
+  hash: string;
+  parents: string[];
+  author: string;
+  authorEmail: string;
+  /** Unix 秒 */
+  authorTime: number;
+  committer: string;
+  committerEmail: string;
+  /** Unix 秒；多 repo 合併排序用 */
+  commitTime: number;
+  subject: string;
+  /** 所屬 repository 在 RepoState 清單中的索引（由 extension 填入） */
+  repo: number;
+}
+
+export type RefType = 'local' | 'remote' | 'tag';
+
+export interface RefInfo {
+  /** 完整名稱，如 refs/heads/main */
+  name: string;
+  /** 短名稱，如 main、origin/main、v1.0 */
+  short: string;
+  type: RefType;
+  /** 指向的 commit（tag 已 peel） */
+  hash: string;
+  /** remote ref 所屬的 remote 名稱 */
+  remote?: string;
+  /** remote ref 去掉 remote 前綴後的 branch 名稱 */
+  remoteBranch?: string;
+  /** local branch 的 upstream 短名稱 */
+  upstream?: string;
+}
+
+export interface HeadInfo {
+  hash?: string;
+  /** 目前 branch 短名稱；detached 時為 undefined */
+  branch?: string;
+}
+
+export interface RepoState {
+  root: string;
+  /** 顯示名稱：相對工作區資料夾的路徑（巢狀 repo 如 api-server/libs/x） */
+  name: string;
+  head: HeadInfo;
+  refs: RefInfo[];
+  remotes: string[];
+  userName?: string;
+  userEmail?: string;
+}
+
+export interface LogFilter {
+  text: string;
+  regex: boolean;
+  matchCase: boolean;
+  /** ref 名稱（完整名稱或 HEAD）；空陣列表示全部 */
+  branches: string[];
+  /** 作者（子字串比對） */
+  users: string[];
+  /** 路徑（相對 repo 根目錄，'/' 分隔）；空陣列表示不限 */
+  paths: string[];
+  /** 只顯示這些 repository（root 路徑）；空陣列表示全部 */
+  roots: string[];
+}
+
+export const EMPTY_FILTER: LogFilter = { text: '', regex: false, matchCase: false, branches: [], users: [], paths: [], roots: [] };
+
+export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'U' | 'X';
+
+export interface ChangedFile {
+  status: FileStatus;
+  path: string;
+  /** rename／copy 的原路徑 */
+  oldPath?: string;
+}
+
+export interface CommitDetails {
+  root: string;
+  hash: string;
+  parents: string[];
+  author: string;
+  authorEmail: string;
+  authorTime: number;
+  committer: string;
+  committerEmail: string;
+  commitTime: number;
+  message: string;
+  files: ChangedFile[];
+}
+
+export interface UserInfo {
+  name: string;
+  email: string;
+  count: number;
+}
+
+/** Webview → Extension */
+export type ToExtension =
+  | { type: 'ready' }
+  /** generation：送出時 webview 持有的 repos 版本；與 extension 不一致時忽略（新的 repos 訊息已在路上） */
+  | { type: 'loadLog'; requestId: number; generation: number; filter: LogFilter }
+  | { type: 'selectCommit'; root: string; hash: string }
+  | { type: 'containingBranches'; root: string; hash: string }
+  | { type: 'openDiff'; root: string; hash: string; parent?: string; file: ChangedFile }
+  /** 在 roots 中所有擁有此 ref 的 repository checkout */
+  | { type: 'checkout'; ref: string; roots: string[] }
+  | { type: 'checkoutRevision'; root: string; hash: string }
+  | { type: 'requestUsers' }
+  | { type: 'requestPaths'; root: string }
+  | { type: 'refresh' }
+  | { type: 'copy'; text: string }
+  | { type: 'selectRepository' };
+
+/** Extension → Webview */
+export type ToWebview =
+  /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */
+  | { type: 'repos'; states: RepoState[]; generation: number; message?: string }
+  /** warnings：部分 repo 讀取失敗時的訊息（只在 done 時帶） */
+  | { type: 'logBatch'; requestId: number; commits: CommitInfo[]; done: boolean; graph: boolean; warnings?: string[] }
+  | { type: 'logError'; requestId: number; message: string }
+  | { type: 'details'; details: CommitDetails }
+  | { type: 'detailsError'; root: string; hash: string; message: string }
+  | { type: 'containing'; root: string; hash: string; branches: string[] }
+  | { type: 'users'; users: UserInfo[] }
+  | { type: 'paths'; root: string; paths: string[] }
+  /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */
+  | { type: 'applyFilter'; filter: Partial<LogFilter> };

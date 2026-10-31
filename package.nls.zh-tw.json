@@ -1,0 +1,19 @@
+{
+  "displayName": "Git Workbench",
+  "description": "IntelliJ 風格的 Git Log：Branches 樹、Commit Graph、篩選與 Commit 詳情整合在同一個面板。",
+  "container.title": "Git",
+  "view.log": "Log",
+  "command.refresh": "重新整理",
+  "command.selectRepository": "選擇 Repository",
+  "command.show": "顯示 Git Log",
+  "config.maxCommits": "Log 最多載入的 commit 數量（所有 repository 合計）。",
+  "config.autoRefresh": "branch、tag 或 HEAD 變動時自動重新整理 Log。",
+  "command.showHistory": "顯示 Git 歷史",
+  "container.activity": "Git Workbench",
+  "view.repositories": "Repositories",
+  "welcome.repositories": "找不到 Git repository。\n[顯示 Git Log](command:gitWorkbench.show)",
+  "command.openRepository": "只顯示此 Repository",
+  "config.scanDepth": "在每個工作區資料夾底下往下掃描幾層來尋找 Git repository（0 = 只看工作區資料夾本身）。",
+  "config.scanExclude": "掃描 repository 時略過的資料夾名稱。",
+  "command.showAllRepositories": "顯示全部 Repository"
+}

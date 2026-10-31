@@ -1,0 +1,44 @@
+# 推送版本 tag（例如 v1.0.0）時自動發佈：
+# 檢查版本 → 型別檢查與測試 → 打包 .vsix → 以 CHANGELOG 對應段落建立 GitHub Release 並附上 .vsix
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 檢查版本並取出 Release 說明
+        run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
+
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run package
+
+      - name: 建立 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 版本含 '-'（例如 v1.1.0-beta.1）時標為 pre-release
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" ./*.vsix \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            "${flags[@]}"

@@ -1,0 +1,245 @@
+{
+  "name": "vscode-git-workbench",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "1.0.0",
+  "publisher": "xjin9612",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xjin9612/vscode-git-workbench.git"
+  },
+  "homepage": "https://github.com/xjin9612/vscode-git-workbench#readme",
+  "bugs": {
+    "url": "https://github.com/xjin9612/vscode-git-workbench/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization"
+  ],
+  "keywords": [
+    "git",
+    "log",
+    "graph",
+    "branches",
+    "history"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "l10n": "./l10n",
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "gitWorkbench",
+          "title": "%container.title%",
+          "icon": "media/activity.svg"
+        }
+      ],
+      "activitybar": [
+        {
+          "id": "gitWorkbenchBar",
+          "title": "%container.activity%",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitWorkbench": [
+        {
+          "type": "webview",
+          "id": "gitWorkbench.log",
+          "name": "%view.log%"
+        }
+      ],
+      "gitWorkbenchBar": [
+        {
+          "id": "gitWorkbench.repositories",
+          "name": "%view.repositories%",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitWorkbench.refresh",
+        "title": "%command.refresh%",
+        "category": "Git Workbench",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitWorkbench.selectRepository",
+        "title": "%command.selectRepository%",
+        "category": "Git Workbench",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "gitWorkbench.show",
+        "title": "%command.show%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.showHistory",
+        "title": "%command.showHistory%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.openRepository",
+        "title": "%command.openRepository%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.refreshRepositories",
+        "title": "%command.refresh%",
+        "category": "Git Workbench",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitWorkbench.showAllRepositories",
+        "title": "%command.showAllRepositories%",
+        "category": "Git Workbench",
+        "icon": "$(check-all)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitWorkbench.showAllRepositories",
+          "when": "view == gitWorkbench.repositories",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitWorkbench.selectRepository",
+          "when": "view == gitWorkbench.log",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitWorkbench.refresh",
+          "when": "view == gitWorkbench.log",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitWorkbench.refreshRepositories",
+          "when": "view == gitWorkbench.repositories",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "gitWorkbench.showHistory",
+          "group": "7_modification@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "gitWorkbench.showHistory",
+          "when": "resourceScheme == file",
+          "group": "2_files@90"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "gitWorkbench.showHistory",
+          "when": "resourceScheme == file",
+          "group": "9_cutcopypaste@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "gitWorkbench.showHistory",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "gitWorkbench.openRepository",
+          "when": "false"
+        },
+        {
+          "command": "gitWorkbench.refreshRepositories",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Git Workbench",
+      "properties": {
+        "gitWorkbench.maxCommits": {
+          "type": "number",
+          "default": 50000,
+          "minimum": 100,
+          "description": "%config.maxCommits%",
+          "maximum": 200000
+        },
+        "gitWorkbench.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.autoRefresh%"
+        },
+        "gitWorkbench.scanDepth": {
+          "type": "number",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "%config.scanDepth%"
+        },
+        "gitWorkbench.scanExclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            "target",
+            "build",
+            "dist",
+            "out",
+            "bin",
+            "obj",
+            "vendor",
+            "coverage",
+            ".idea",
+            ".vscode",
+            ".gradle",
+            ".mvn",
+            ".next",
+            ".venv",
+            "venv",
+            "__pycache__"
+          ],
+          "description": "%config.scanExclude%"
+        }
+      }
+    },
+    "viewsWelcome": [
+      {
+        "view": "gitWorkbench.repositories",
+        "contents": "%welcome.repositories%"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "gitWorkbench.show",
+        "key": "alt+9"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p src/webview",
+    "test": "node esbuild.mjs --tests && node --test \"out/test/*.test.js\"",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "package": "npx --yes @vscode/vsce@3 package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "~22.20.5",
+    "@types/vscode": "~1.90.0",
+    "esbuild": "~0.28.2",
+    "typescript": "~5.9.3"
+  }
+}
