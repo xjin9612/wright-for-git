@@ -148,6 +148,10 @@ export type ToExtension =
   | { type: 'pushPreview'; requestId: number; roots: string[]; branch?: string; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
   /** Push 對話框中點選 commit：取得變更檔案 */
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
+  /** 在編輯器分頁開啟 Push 對話框 */
+  | { type: 'openPushPanel'; roots: string[]; branch?: string; upTo?: { root: string; hash: string } }
+  /** 編輯器分頁的對話框要求關閉 */
+  | { type: 'closeDialog' }
   /** 面板內確認框的結果 */
   | { type: 'confirmResult'; id: number; ok: boolean }
   /** Push 對話框確認 */
@@ -232,7 +236,5 @@ export type ToWebview =
   | { type: 'pushStatus'; requestId: number; status: 'started' | 'cancelled' }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
-  /** 由指令開啟 Push 對話框 */
-  | { type: 'openPush' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */
   | { type: 'applyFilter'; filter: Partial<LogFilter> };

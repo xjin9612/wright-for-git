@@ -6,7 +6,7 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
 import { t } from './i18n';
-import { confirm } from './dialogs';
+import { confirm, type ConfirmHost } from './dialogs';
 
 export interface RepoTarget {
   repo: GitRepository;
@@ -152,7 +152,7 @@ export async function buildPushPlans(targets: RepoTarget[], upTo?: { root: strin
  * 依對話框確認的目標推送。force 時再以 modal 確認一次（改寫遠端歷史無法復原）。
  * @returns false：使用者在確認框取消
  */
-export async function runPush(entries: { target: RepoTarget; push: PushTarget }[], force: boolean, tags: boolean, onStarted: () => void): Promise<boolean> {
+export async function runPush(entries: { target: RepoTarget; push: PushTarget }[], force: boolean, tags: boolean, onStarted: () => void, host?: ConfirmHost): Promise<boolean> {
   // 送出前重新計算，確保與目前狀態一致（對話框開著時可能有其他操作）
   const plans = await buildPushPlans(
     entries.map((e) => e.target),
@@ -183,7 +183,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
       '',
       t('Uses --force-with-lease: the push is rejected instead of overwriting if the remote has commits you have not fetched.'),
     ].join('\n');
-    if (!(await confirm(t('Force push {0} branch(es)? Remote history will be rewritten.', work.length), { detail, ok, kind: 'danger' }))) return false;
+    if (!(await confirm(t('Force push {0} branch(es)? Remote history will be rewritten.', work.length), { detail, ok, kind: 'danger' }, host))) return false;
   }
   onStarted();
 

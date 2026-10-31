@@ -14,6 +14,8 @@ export interface PushDialogOptions {
   /** Push All up to Here：只推到這個 commit */
   upTo?: { root: string; hash: string };
   onOpenDiff: (root: string, hash: string, parent: string | undefined, file: ChangedFile) => void;
+  /** 開在編輯器分頁：填滿整頁、沒有遮罩；關閉時通知 extension 關掉分頁 */
+  embedded?: boolean;
 }
 
 type DialogMessage = Extract<ToWebview, { type: 'pushPreview' | 'pushCommitFiles' | 'pushStatus' }>;
@@ -109,7 +111,7 @@ class PushDialog {
         el('div', { className: 'split-button' }, this.pushButton, this.caretButton),
       ),
     );
-    this.overlay = el('div', { className: 'modal-overlay' }, dialog);
+    this.overlay = el('div', { className: `modal-overlay${opts.embedded ? ' embedded' : ''}` }, dialog);
     // 點遮罩不關閉（避免誤觸），只有 Cancel／Esc 會關閉
     document.body.append(this.overlay);
     document.addEventListener('keydown', this.onKey, true);
@@ -123,6 +125,7 @@ class PushDialog {
     document.removeEventListener('keydown', this.onKey, true);
     this.overlay.remove();
     if (current === this) current = undefined;
+    if (this.opts.embedded) post({ type: 'closeDialog' });
   }
 
   onMessage(m: DialogMessage): void {

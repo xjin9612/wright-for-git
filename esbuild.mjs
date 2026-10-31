@@ -43,6 +43,14 @@ const targets = args.has('--tests')
         format: 'iife',
         target: 'es2022',
       },
+      {
+        ...common,
+        entryPoints: ['src/webview/dialogMain.ts'],
+        outfile: 'dist/dialog.js',
+        platform: 'browser',
+        format: 'iife',
+        target: 'es2022',
+      },
     ];
 
 if (watch) {

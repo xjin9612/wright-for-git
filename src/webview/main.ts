@@ -8,7 +8,6 @@ import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, showMe
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { showConfirm } from './confirmDialog';
 import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
-import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { t } from './l10n';
 import { loadState, post, saveState } from './vscodeApi';
@@ -90,7 +89,6 @@ let users: UserInfo[] | undefined;
 let usersPicker: { refresh: () => void } | undefined;
 const dirsByRoot = new Map<string, string[]>();
 const dirsRequested = new Set<string>();
-let openPushWhenReady = false;
 
 /** 目前 Paths（repo）篩選下要顯示的 repository */
 function visibleRepos(): RepoState[] {
@@ -206,12 +204,7 @@ const viewButton = iconButton('eye', t('View options'), () => showViewMenu());
 const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
 /** Push 一律先開對話框確認；upTo 為「Push All up to Here」 */
 const openPush = (upTo?: { root: string; hash: string }, branch?: { name: string; roots: string[] }) =>
-  openPushDialog({
-    roots: upTo ? [upTo.root] : (branch?.roots ?? visibleRepos().map((r) => r.root)),
-    branch: branch?.name,
-    upTo,
-    onOpenDiff: (root, hash, parent, file) => post({ type: 'openDiff', root, hash, parent, file }),
-  });
+  post({ type: 'openPushPanel', roots: upTo ? [upTo.root] : (branch?.roots ?? visibleRepos().map((r) => r.root)), branch: branch?.name, upTo });
 const syncGroup = el(
   'div',
   { className: 'toolbar-group' },
@@ -1002,10 +995,6 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       table.setRepos(repos);
       details.setRepos(repos);
       renderChips();
-      if (openPushWhenReady) {
-        openPushWhenReady = false;
-        openPush();
-      }
       // repo 清單沒變（只是 refs／HEAD 更新）時保留捲動位置
       loadLog(before === repos.map((r) => r.root).join('\n') && commits.length > 0);
       break;
@@ -1054,18 +1043,8 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       dirsByRoot.set(m.root, m.paths);
       refreshPathsDialog();
       break;
-    case 'pushPreview':
-    case 'pushCommitFiles':
-    case 'pushStatus':
-      handlePushMessage(m);
-      break;
     case 'confirm':
       showConfirm(m);
-      break;
-    case 'openPush':
-      // repos 還沒到（webview 剛建立）時，等 repos 訊息後再開
-      if (repos.length > 0) openPush();
-      else openPushWhenReady = true;
       break;
     case 'applyFilter':
       if (m.filter.text !== undefined) searchInput.value = m.filter.text;

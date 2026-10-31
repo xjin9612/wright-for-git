@@ -13,7 +13,8 @@ import { combineChanges } from './shared/combine';
 import { promises as fsp, statSync } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
-import { confirm, setWebviewConfirm, type ConfirmOptions } from './dialogs';
+import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
+import { DialogPanels } from './dialogPanel';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -56,9 +57,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private dirtyWhileHidden = false;
   /** webview 尚未就緒時暫存的篩選（例如從檔案總管觸發「顯示 Git 歷史」） */
   private pendingFilter?: Partial<LogFilter>;
-  private pendingOpenPush = false;
-  private confirmSeq = 0;
-  private readonly pendingConfirms = new Map<number, (ok: boolean) => void>();
+  /** Log 面板內的確認框 */
+  private readonly confirms = new ConfirmHost(
+    (msg) => this.post(msg),
+    () => t('Cancel'),
+  );
+  /** 開在編輯器分頁的對話框（Push 等） */
+  readonly dialogs = new DialogPanels(this);
   /** 最近一次從詳情開啟的 diff 所屬的檔案清單（diff 內切換上一個／下一個檔案） */
   private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number; right?: string } | undefined;
   private readonly disposables: vscode.Disposable[] = [];
@@ -293,12 +298,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       this.disposables,
     );
     // 面板可見時，確認框顯示在面板內
-    setWebviewConfirm((message, opts) => (this.view?.visible ? this.confirmInPanel(message, opts) : Promise.resolve(undefined)));
+    setWebviewConfirm((message, opts) => (this.view?.visible ? this.confirms.request(message, opts) : Promise.resolve(undefined)));
     view.onDidDispose(() => {
       this.view = undefined;
       setWebviewConfirm(undefined);
-      for (const resolve of this.pendingConfirms.values()) resolve(false);
-      this.pendingConfirms.clear();
+      this.confirms.cancelAll();
       this.logAbort?.abort();
     });
   }
@@ -310,20 +314,12 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private async onMessage(m: ToExtension): Promise<void> {
     try {
       switch (m.type) {
-        case 'confirmResult': {
-          const resolve = this.pendingConfirms.get(m.id);
-          this.pendingConfirms.delete(m.id);
-          resolve?.(m.ok);
+        case 'confirmResult':
+          this.confirms.resolve(m.id, m.ok);
           break;
-        }
         case 'ready':
           // webview 重新載入時，尚未回覆的確認框視為取消
-          for (const resolve of this.pendingConfirms.values()) resolve(false);
-          this.pendingConfirms.clear();
-          if (this.pendingOpenPush) {
-            this.pendingOpenPush = false;
-            this.post({ type: 'openPush' });
-          }
+          this.confirms.cancelAll();
           if (this.pendingFilter) {
             this.post({ type: 'applyFilter', filter: this.pendingFilter });
             this.pendingFilter = undefined;
@@ -377,31 +373,14 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'sync':
           await this.sync(m.action, m.roots);
           break;
-        case 'pushPreview': {
-          const plans = await buildPushPlans(await this.freshTargets(m.roots), m.upTo, m.overrides, m.branch);
-          // 依 webview 傳入的順序排列
-          plans.sort((a, b) => m.roots.indexOf(a.root) - m.roots.indexOf(b.root));
-          this.post({ type: 'pushPreview', requestId: m.requestId, plans });
+        case 'pushPreview':
+        case 'pushCommitFiles':
+        case 'pushConfirm':
+          await this.handlePushMessage(m, (msg) => this.post(msg));
           break;
-        }
-        case 'pushCommitFiles': {
-          const e = this.find(m.root);
-          if (!e || !isHash(m.hash)) break;
-          const parents = (await e.repo.exec(['rev-list', '--parents', '-n1', m.hash])).trim().split(' ').slice(1);
-          this.post({ type: 'pushCommitFiles', requestId: m.requestId, root: m.root, hash: m.hash, files: await e.repo.getChangedFiles(m.hash, parents) });
+        case 'openPushPanel':
+          this.dialogs.openPush({ roots: m.roots, branch: m.branch, upTo: m.upTo });
           break;
-        }
-        case 'pushConfirm': {
-          const targets = await this.freshTargets(m.targets.map((x) => x.root));
-          const entries = m.targets.flatMap((push) => {
-            const target = targets.find((t) => pathKey(t.repo.root) === pathKey(push.root));
-            return target ? [{ target, push }] : [];
-          });
-          const started = await runPush(entries, m.force, m.tags, () => this.post({ type: 'pushStatus', requestId: m.requestId, status: 'started' }));
-          if (!started) this.post({ type: 'pushStatus', requestId: m.requestId, status: 'cancelled' });
-          await this.refresh(true);
-          break;
-        }
         case 'refAction': {
           const targets = (await this.freshTargets(m.roots)).filter((x) => x.state?.refs.some((r) => r.name === m.ref));
           await runRefAction(m.action, m.ref, targets);
@@ -684,7 +663,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   /** @returns 右側（修改後）的 URI 字串，用來辨識這個 diff 分頁 */
-  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile): Promise<string | undefined> {
+  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile, viewColumn?: vscode.ViewColumn): Promise<string | undefined> {
     const e = this.find(root);
     if (!e) return undefined;
     // 多選合併的變更自帶左右兩側的 revision
@@ -694,7 +673,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const right = revisionUri(e.repo.root, rightRef, file.path);
     const short = (h: string) => (h ? h.slice(0, 8) : '∅');
     const title = `${path.basename(file.path)} (${short(leftRef)} ↔ ${short(rightRef)})`;
-    await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true });
+    await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true, viewColumn });
     return right.toString();
   }
 
@@ -717,9 +696,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   /** 開啟 Push 對話框（webview 尚未建立時，等 ready 後再開） */
   async openPush(): Promise<void> {
-    if (this.view) this.post({ type: 'openPush' });
-    else this.pendingOpenPush = true;
-    await vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`);
+    await this.ensureDiscovered();
+    this.dialogs.openPush({ roots: this.visibleRoots() });
   }
 
   // ---------- checkout ----------
@@ -784,22 +762,59 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     await this.refresh(true);
   }
 
-  // ---------- html ----------
+  // ---------- Push 對話框（Log 面板或編輯器分頁共用） ----------
 
-  private confirmInPanel(message: string, opts: ConfirmOptions): Promise<boolean> {
-    const id = ++this.confirmSeq;
-    return new Promise<boolean>((resolve) => {
-      this.pendingConfirms.set(id, resolve);
-      this.post({ type: 'confirm', id, message, detail: opts.detail, ok: opts.ok, cancel: t('Cancel'), kind: opts.kind ?? 'warning' });
-    });
+  /** 處理 Push 對話框的訊息；reply 送回發出訊息的 webview；host 為該 webview 的確認框 */
+  async handlePushMessage(m: Extract<ToExtension, { type: 'pushPreview' | 'pushCommitFiles' | 'pushConfirm' }>, reply: (msg: ToWebview) => void, host?: ConfirmHost): Promise<void> {
+    if (m.type === 'pushPreview') {
+      const plans = await buildPushPlans(await this.freshTargets(m.roots), m.upTo, m.overrides, m.branch);
+      // 依 webview 傳入的順序排列
+      plans.sort((a, b) => m.roots.indexOf(a.root) - m.roots.indexOf(b.root));
+      reply({ type: 'pushPreview', requestId: m.requestId, plans });
+    } else if (m.type === 'pushCommitFiles') {
+      const e = this.find(m.root);
+      if (!e || !isHash(m.hash)) return;
+      const parents = (await e.repo.exec(['rev-list', '--parents', '-n1', m.hash])).trim().split(' ').slice(1);
+      reply({ type: 'pushCommitFiles', requestId: m.requestId, root: m.root, hash: m.hash, files: await e.repo.getChangedFiles(m.hash, parents) });
+    } else {
+      const targets = await this.freshTargets(m.targets.map((x) => x.root));
+      const entries = m.targets.flatMap((push) => {
+        const target = targets.find((x) => pathKey(x.repo.root) === pathKey(push.root));
+        return target ? [{ target, push }] : [];
+      });
+      const started = await runPush(entries, m.force, m.tags, () => reply({ type: 'pushStatus', requestId: m.requestId, status: 'started' }), host);
+      if (!started) reply({ type: 'pushStatus', requestId: m.requestId, status: 'cancelled' });
+      await this.refresh(true);
+    }
   }
+
+  get extensionUri(): vscode.Uri {
+    return this.context.extensionUri;
+  }
+
+  /** 從編輯器分頁的對話框開 diff（開在對話框旁邊，不蓋掉對話框） */
+  async openDiffFromDialog(root: string, hash: string, parent: string | undefined, file: ChangedFile): Promise<void> {
+    await this.openDiff(root, hash, parent, file, vscode.ViewColumn.Beside);
+  }
+
+  /** 目前 Paths 篩選下可見的 repository root */
+  visibleRoots(): string[] {
+    return this.visibleEntries().map((e) => e.repo.root);
+  }
+
+  /** 開在編輯器分頁的對話框用的 HTML（同一份樣式與翻譯） */
+  dialogHtml(webview: vscode.Webview, config: unknown): string {
+    return this.renderHtml(webview, { script: 'dialog.js', config });
+  }
+
+  // ---------- html ----------
 
   /** 介面語言變更：重新產生 webview（篩選、版面等狀態由 webview 的 state 保存） */
   reloadWebview(): void {
     if (this.view) this.view.webview.html = this.renderHtml(this.view.webview);
   }
 
-  private renderHtml(webview: vscode.Webview): string {
+  private renderHtml(webview: vscode.Webview, page: { script: string; config?: unknown } = { script: 'webview.js' }): string {
     const nonce = makeNonce();
     // 加上檔案時間當版本參數：同版本號重新安裝時，避免 webview 沿用快取的舊檔
     const stamp = (rel: string[]) => {
@@ -809,7 +824,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         return '0';
       }
     };
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js')).with({ query: `v=${stamp(['dist', 'webview.js'])}` });
+    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', page.script)).with({ query: `v=${stamp(['dist', page.script])}` });
     const style = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.css')).with({ query: `v=${stamp(['media', 'webview.css'])}` });
     const csp = [
       "default-src 'none'",
@@ -832,6 +847,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 <body>
 <div id="app"></div>
 <script type="application/json" id="l10n-bundle">${l10nJson}</script>
+<script type="application/json" id="dialog-config">${JSON.stringify(page.config ?? null).replace(/</g, '\\u003c')}</script>
 <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
