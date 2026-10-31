@@ -3,7 +3,12 @@ import type { ChangedFile, CommitDetails, HeadInfo, RefInfo, RepoState } from '.
 import { buildLabels } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, formatDate, icon, iconButton, makeSplitter } from './dom';
+import { fileIcon } from './fileIcons';
 import { renderLabel } from './logTable';
+
+function fileName(p: string): string {
+  return p.slice(p.lastIndexOf('/') + 1);
+}
 
 export interface DetailsCallbacks {
   /** 開啟 diff：單一 commit 時 parent 取自真正的 parent（不受路徑篩選改寫影響）；多選時 file 自帶 left／right */
@@ -14,6 +19,8 @@ export interface DetailsCallbacks {
   onRequestContaining: (root: string, hash: string) => void;
   onCollapsePane: () => void;
   onSplitChange: (ratio: number) => void;
+  /** 樹狀／平鋪切換 */
+  onFlatChange?: (flat: boolean) => void;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -62,16 +69,28 @@ export class DetailsPane {
   private containing: { root: string; hash: string; branches: string[] } | undefined;
   private showAllBranches = false;
   private splitRatio: number;
+  private flat: boolean;
+  private readonly flatButton: HTMLButtonElement;
 
   constructor(
     private readonly cb: DetailsCallbacks,
     splitRatio: number | undefined,
+    flat = false,
   ) {
     this.splitRatio = splitRatio ?? 0.55;
+    this.flat = flat;
+    this.flatButton = iconButton('list-flat', 'Show as list', () => {
+      this.flat = !this.flat;
+      this.syncFlatButton();
+      cb.onFlatChange?.(this.flat);
+      this.renderFiles();
+    });
+    this.syncFlatButton();
     const toolbar = el(
       'div',
       { className: 'pane-toolbar' },
       iconButton('diff', 'Show diff (Enter)', () => this.openSelected()),
+      this.flatButton,
       el('div', { className: 'toolbar-spacer' }),
       iconButton('expand-all', 'Expand all', () => {
         this.collapsed.clear();
@@ -102,6 +121,12 @@ export class DetailsPane {
     this.element = el('div', { className: 'details-pane' }, this.filesSection, splitter, this.info);
     this.applySplit();
     this.renderEmpty('Select a commit to view changes');
+  }
+
+  private syncFlatButton(): void {
+    this.flatButton.classList.toggle('on', this.flat);
+    this.flatButton.title = this.flat ? 'Group by directory' : 'Show as list';
+    this.flatButton.setAttribute('aria-pressed', String(this.flat));
   }
 
   private applySplit(): void {
@@ -222,7 +247,13 @@ export class DetailsPane {
           }
         }
       };
-      walk(buildTree(g.files, (f) => f.path), 1);
+      if (this.flat) {
+        // 平鋪：檔名在前、所在目錄淡色顯示在後
+        const sorted = [...g.files].sort((a, b) => fileName(a.path).localeCompare(fileName(b.path)) || a.path.localeCompare(b.path));
+        for (const f of sorted) rows.push({ key: `${g.root}\u0000${f.path}`, root: g.root, depth: 1, label: fileName(f.path), file: f, expanded: false, expandable: false });
+      } else {
+        walk(buildTree(g.files, (f) => f.path), 1);
+      }
     }
     return rows;
   }
@@ -244,9 +275,10 @@ export class DetailsPane {
         'div',
         { className: `tree-row${r.key === this.selectedFile ? ' selected' : ''}`, title, attrs: { role: 'treeitem' } },
         twisty,
-        icon(f ? 'file' : r.depth === 0 ? 'repo' : 'folder'),
+        f ? fileIcon(f.path) : icon(r.depth === 0 ? 'repo' : 'folder'),
         el('span', { className: `tree-label${f ? ` status-${f.status}` : ''}`, text: r.label }),
         r.count !== undefined ? el('span', { className: 'tree-count', text: `${r.count} ${r.count === 1 ? 'file' : 'files'}` }) : null,
+        f && this.flat && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
         f?.oldPath ? el('span', { className: 'tree-count', text: `← ${f.oldPath}` }) : null,
       );
       row.style.paddingLeft = `${4 + r.depth * 14}px`;

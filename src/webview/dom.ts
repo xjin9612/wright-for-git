@@ -35,6 +35,7 @@ const ICONS = {
   tag: '<path d="M2 2.5h5.5l6.5 6.5-5 5-6.5-6.5z"/><circle cx="5" cy="5.5" r="1"/>',
   star: '<path d="M8 1.8l1.9 4 4.3.5-3.2 2.9.9 4.3L8 11.3l-3.9 2.2.9-4.3-3.2-2.9 4.3-.5z" fill="currentColor"/>',
   'star-outline': '<path d="M8 1.8l1.9 4 4.3.5-3.2 2.9.9 4.3L8 11.3l-3.9 2.2.9-4.3-3.2-2.9 4.3-.5z"/>',
+  'list-flat': '<path d="M5 4h9M5 8h9M5 12h9"/><circle cx="2.5" cy="4" r=".6" fill="currentColor"/><circle cx="2.5" cy="8" r=".6" fill="currentColor"/><circle cx="2.5" cy="12" r=".6" fill="currentColor"/>',
   refresh: '<path d="M13.2 8.5A5.2 5.2 0 1 1 11.6 4.3"/><path d="M12.5 1.8v3h-3"/>',
   'expand-all': '<path d="M4 3l4 3 4-3M4 10l4 3 4-3"/>',
   'collapse-all': '<path d="M4 6l4-3 4 3M4 13l4-3 4 3"/>',

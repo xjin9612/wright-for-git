@@ -25,6 +25,8 @@ interface Persisted {
   onlyFavorites?: boolean;
   /** Author／Date／Hash 欄寬 */
   widths?: Partial<ColumnWidths>;
+  /** 變更檔案以平鋪清單顯示 */
+  flatFiles?: boolean;
   /** 額外的 Log 分頁（各自保留篩選）；第 0 個為主分頁 */
   tabs?: LogTab[];
   activeTab?: number;
@@ -52,6 +54,7 @@ const ui: Persisted = {
   onlyFavorites: saved?.onlyFavorites,
   widths: saved?.widths,
   tabs: saved?.tabs,
+  flatFiles: saved?.flatFiles,
   activeTab: saved?.activeTab,
 };
 // 分頁：第 0 個為主分頁，ui.filter 永遠是目前分頁的篩選
@@ -147,8 +150,13 @@ const details = new DetailsPane(
       ui.split = ratio;
       persist();
     },
+    onFlatChange: (flat) => {
+      ui.flatFiles = flat;
+      persist();
+    },
   },
   ui.split,
+  ui.flatFiles,
 );
 
 // ---------- 篩選列 ----------

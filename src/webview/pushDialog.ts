@@ -3,6 +3,7 @@
 // Push 按鈕的下拉選單提供 Force Push。推送前一定經過這個對話框，避免誤觸。
 import type { ChangedFile, PushCommit, PushPlan, PushTarget, ToWebview } from '../shared/protocol';
 import { clear, el, formatDate, icon, showMenu } from './dom';
+import { fileIcon } from './fileIcons';
 import { post } from './vscodeApi';
 
 export interface PushDialogOptions {
@@ -338,7 +339,7 @@ class PushDialog {
       const row = el(
         'div',
         { className: 'tree-row', title: `${STATUS_TEXT[f.status] ?? f.status}: ${f.oldPath ? `${f.oldPath} → ` : ''}${f.path}\nDouble-click to show the diff` },
-        icon('file'),
+        fileIcon(f.path),
         el('span', { className: `tree-label status-${f.status}`, text: name }),
         dir ? el('span', { className: 'tree-count', text: dir }) : null,
       );
