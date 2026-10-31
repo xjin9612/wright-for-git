@@ -209,6 +209,8 @@ export type ToWebview =
   /** warnings：部分 repo 讀取失敗時的訊息（只在 done 時帶） */
   | { type: 'logBatch'; requestId: number; commits: CommitInfo[]; done: boolean; graph: boolean; warnings?: string[] }
   | { type: 'logError'; requestId: number; message: string }
+  /** 文字／User 篩選的簡化 graph：[repo 索引, hash, 簡化後的 parent] */
+  | { type: 'logGraph'; requestId: number; parents: [number, string, string[]][] }
   | { type: 'details'; details: CommitDetails }
   | { type: 'detailsError'; root: string; hash: string; message: string }
   | { type: 'multiDetails'; requestId: number; groups: { root: string; files: ChangedFile[] }[] }

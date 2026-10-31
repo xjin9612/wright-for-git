@@ -492,6 +492,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     };
 
     const errors: string[] = [];
+    /** 篩選結果（非 graph 模式時用來計算簡化 graph） */
+    const matched = targets.map(() => new Set<string>());
     await mapLimit(targets, 8, async (t, i) => {
       const index = t.index;
       try {
@@ -499,7 +501,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           t.filter,
           max,
           (commits) => {
-            for (const c of commits) c.repo = index;
+            for (const c of commits) {
+              c.repo = index;
+              if (!graph) matched[i].add(c.hash);
+            }
             merger.push(i, commits);
             flush(false);
           },
@@ -520,6 +525,29 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       return;
     }
     this.post({ type: 'logBatch', requestId, commits: [], done: true, graph, warnings: errors.length > 0 ? errors : undefined });
+    if (!graph && flushed > 0 && flushed < max && !abort.signal.aborted) await this.sendSimplifiedGraph(requestId, targets, matched, max, abort.signal);
+  }
+
+  /** 篩選結果顯示後，再計算簡化 graph 讓結果之間可以畫出連線 */
+  private async sendSimplifiedGraph(
+    requestId: number,
+    targets: { index: number; filter: LogFilter; hasHead: boolean }[],
+    matched: Set<string>[],
+    max: number,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const parents: [number, string, string[]][] = [];
+    try {
+      await mapLimit(targets, 4, async (t, i) => {
+        if (matched[i].size === 0) return;
+        const map = await this.entries[t.index]?.repo.simplifiedParents(t.filter, matched[i], max, signal, t.hasHead);
+        if (!map) return;
+        for (const [hash, ps] of map) parents.push([t.index, hash, ps]);
+      });
+    } catch {
+      return; // 取消或失敗時維持沒有連線的顯示
+    }
+    if (!signal.aborted && this.logAbort?.signal === signal) this.post({ type: 'logGraph', requestId, parents });
   }
 
   private async sendDetails(root: string, hash: string): Promise<void> {

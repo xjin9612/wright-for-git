@@ -45,7 +45,18 @@ export interface LogTableCallbacks {
   /** 多選（Ctrl／Shift）：indices 依列順序排列，至少兩筆 */
   onMultiSelect: (indices: number[]) => void;
   onContextMenu: (index: number, x: number, y: number) => void;
+  /** 拖曳調整欄寬結束 */
+  onColumnWidths?: (widths: ColumnWidths) => void;
 }
+
+export interface ColumnWidths {
+  author: number;
+  date: number;
+  hash: number;
+}
+
+export const DEFAULT_WIDTHS: ColumnWidths = { author: 120, date: 136, hash: 74 };
+const COLS = ['author', 'date', 'hash'] as const;
 
 interface RowView {
   root: HTMLDivElement;
@@ -80,6 +91,8 @@ export class LogTable {
   private highlights: Highlights;
   private frame = 0;
   private heldScroll: number | undefined;
+  private widths: ColumnWidths = { ...DEFAULT_WIDTHS };
+  private readonly handles = new Map<(typeof COLS)[number], HTMLDivElement>();
 
   constructor(
     private readonly cb: LogTableCallbacks,
@@ -94,6 +107,12 @@ export class LogTable {
     this.viewport = el('div', { className: 'log-viewport', attrs: { tabindex: '0', role: 'grid', 'aria-label': 'Commits' } }, this.canvas, this.spacer, this.rowsLayer);
     this.overlay = el('div', { className: 'log-overlay hidden' });
     this.element = el('div', { className: 'log-table' }, this.viewport, this.overlay);
+    for (const col of COLS) {
+      const h = el('div', { className: 'col-resizer', title: `Drag to resize the ${col} column (double-click to reset)` });
+      this.attachResizer(h, col);
+      this.handles.set(col, h);
+      this.element.append(h);
+    }
 
     this.viewport.addEventListener('scroll', () => this.schedule());
     new ResizeObserver(() => this.schedule()).observe(this.viewport);
@@ -120,6 +139,57 @@ export class LogTable {
       this.cb.onContextMenu(idx, e.clientX, e.clientY);
     });
     this.applyColumns();
+  }
+
+  setColumnWidths(w: Partial<ColumnWidths> | undefined): void {
+    this.widths = { ...DEFAULT_WIDTHS, ...w };
+    for (const col of COLS) this.element.style.setProperty(`--col-${col}`, `${this.widths[col]}px`);
+    this.schedule();
+  }
+
+  /** 欄位左緣的拖曳把手：欄位靠右排列，往左拖變寬 */
+  private attachResizer(h: HTMLDivElement, col: (typeof COLS)[number]): void {
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      const startX = e.clientX;
+      const start = this.widths[col];
+      h.classList.add('active');
+      const move = (ev: PointerEvent) => {
+        this.widths[col] = Math.max(40, Math.min(480, Math.round(start - (ev.clientX - startX))));
+        this.element.style.setProperty(`--col-${col}`, `${this.widths[col]}px`);
+        this.schedule();
+      };
+      const up = () => {
+        h.classList.remove('active');
+        h.removeEventListener('pointermove', move);
+        h.removeEventListener('pointerup', up);
+        h.removeEventListener('pointercancel', up);
+        this.cb.onColumnWidths?.({ ...this.widths });
+      };
+      h.addEventListener('pointermove', move);
+      h.addEventListener('pointerup', up);
+      h.addEventListener('pointercancel', up);
+    });
+    h.addEventListener('dblclick', () => {
+      this.widths[col] = DEFAULT_WIDTHS[col];
+      this.element.style.setProperty(`--col-${col}`, `${this.widths[col]}px`);
+      this.schedule();
+      this.cb.onColumnWidths?.({ ...this.widths });
+    });
+  }
+
+  /** 依目前可見的欄位放置拖曳把手（欄位可能因面板太窄或設定而隱藏） */
+  private placeResizers(): void {
+    const row = this.pool.find((v) => v.root.style.display !== 'none');
+    const base = this.element.getBoundingClientRect().left;
+    for (const col of COLS) {
+      const h = this.handles.get(col)!;
+      const cell = row?.[col];
+      const visible = !!cell && cell.offsetWidth > 0;
+      h.style.display = visible ? '' : 'none';
+      if (visible) h.style.left = `${cell!.getBoundingClientRect().left - base - 3}px`;
+    }
   }
 
   private indexFromEvent(e: MouseEvent): number | undefined {
@@ -356,6 +426,7 @@ export class LogTable {
     }
 
     this.drawGraph(first, st, vh, vw, graphWidth, graphLeft, frame, multi);
+    this.placeResizers();
   }
 
   private createRow(): RowView {

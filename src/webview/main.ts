@@ -5,7 +5,7 @@ import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
 import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
-import { LogTable, type Columns, type Highlights } from './logTable';
+import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { loadState, post, saveState } from './vscodeApi';
@@ -23,6 +23,8 @@ interface Persisted {
   /** Branches 的我的最愛（完整 ref 名稱）；未設定時預設為 main／master */
   favorites?: string[];
   onlyFavorites?: boolean;
+  /** Author／Date／Hash 欄寬 */
+  widths?: Partial<ColumnWidths>;
   /** 選取的 commit：`${root}|${hash}` */
   selectedHash?: string;
 }
@@ -41,6 +43,7 @@ const ui: Persisted = {
   selectedHash: saved?.selectedHash,
   favorites: saved?.favorites,
   onlyFavorites: saved?.onlyFavorites,
+  widths: saved?.widths,
 };
 const persist = debounce(() => saveState(ui), 200);
 
@@ -104,11 +107,17 @@ const table = new LogTable(
   {
     onSelect: (i) => onCommitSelected(i),
     onMultiSelect: (indices) => onCommitsSelected(indices),
+    onColumnWidths: (w) => {
+      ui.widths = w;
+      persist();
+    },
     onContextMenu: (i, x, y) => showContextMenu(i, x, y),
   },
   ui.columns,
   ui.highlights,
 );
+
+table.setColumnWidths(ui.widths);
 
 const details = new DetailsPane(
   {
@@ -814,6 +823,15 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     }
     case 'logBatch':
       onBatch(m);
+      break;
+    case 'logGraph':
+      if (m.requestId === requestId) {
+        // 以簡化後的 parent 重建 graph；commit 本身的 parents 保留（右鍵操作與 diff 需要真正的 parent）
+        const map = new Map(m.parents.map(([repo, hash, ps]) => [`${repo}:${hash}`, ps]));
+        graph = new MultiGraph(true);
+        graph.add(commits.map((c) => ({ ...c, parents: map.get(`${c.repo}:${c.hash}`) ?? [] })));
+        table.setData(commits, graph);
+      }
       break;
     case 'logError':
       if (m.requestId === requestId) {

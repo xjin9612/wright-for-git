@@ -107,3 +107,24 @@ test('非 git 資料夾回傳 undefined', async () => {
   const dir = mkdtempSync(require('node:path').join(tmpdir(), 'nogit-'));
   assert.equal(await GitRepository.open('git', dir), undefined);
 });
+
+test('simplifiedParents：篩選結果之間以最近的符合祖先相連', async () => {
+  const r = makeRepo();
+  const a = r.commit('feat: a');
+  r.commit('chore: x');
+  const b = r.commit('feat: b');
+  r.git('checkout', '-q', '-b', 'side', a);
+  r.commit('chore: y');
+  const c = r.commit('feat: c');
+  r.git('checkout', '-q', 'main');
+  r.git('merge', '-q', '--no-ff', '-m', 'chore: merge', 'side');
+  const d = r.commit('feat: d');
+  const repo = (await GitRepository.open('git', r.dir))!;
+  const map = (await repo.simplifiedParents(EMPTY_FILTER, new Set([a, b, c, d]), 1000))!;
+  assert.deepEqual(map.get(a), []);
+  assert.deepEqual(map.get(b), [a]);
+  assert.deepEqual(map.get(c), [a]);
+  // d 經過 merge commit（不符合）連到 b 與 c
+  assert.deepEqual(new Set(map.get(d)), new Set([b, c]));
+  assert.equal(await repo.simplifiedParents(EMPTY_FILTER, new Set([a]), 2), undefined, '超過上限時不計算');
+});

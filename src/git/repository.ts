@@ -334,6 +334,40 @@ export class GitRepository {
     await this.run(message ? ['tag', '-a', '-m', message, name, target] : ['tag', name, target]);
   }
 
+  /**
+   * 文字／User 篩選時的簡化 graph：對每個符合的 commit 找出「最近的符合祖先」當作 parent
+   * （不經過其他符合的 commit），讓篩選結果仍可畫出分支連線（對應 IntelliJ 篩選下的虛線連線）。
+   * @param matched 符合篩選的 commit
+   * @returns hash → 簡化後的 parent；超過 maxCount 而無法判斷時回傳 undefined
+   */
+  async simplifiedParents(filter: LogFilter, matched: ReadonlySet<string>, maxCount: number, signal?: AbortSignal, hasHead = true): Promise<Map<string, string[]> | undefined> {
+    const args = buildLogArgs({ ...filter, text: '', users: [] }, maxCount + 1, { hasHead }).map((a) => (a.startsWith('--format=') ? '--format=%H %P' : a));
+    const out = await this.run(args, signal);
+    const lines = out.split('\n').filter(Boolean);
+    if (lines.length > maxCount) return undefined;
+    const CAP = 4;
+    const frontier = new Map<string, string[]>();
+    const result = new Map<string, string[]>();
+    const union = (parents: string[]): string[] => {
+      if (parents.length === 1) return frontier.get(parents[0]) ?? [];
+      const set = new Set<string>();
+      for (const p of parents) for (const f of frontier.get(p) ?? []) if (set.size < CAP) set.add(f);
+      return [...set];
+    };
+    // 由舊到新（parent 先於 child）
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const [hash, ...parents] = lines[i].split(' ');
+      const reach = union(parents);
+      if (matched.has(hash)) {
+        result.set(hash, reach);
+        frontier.set(hash, [hash]);
+      } else {
+        frontier.set(hash, reach);
+      }
+    }
+    return result;
+  }
+
   // ---------- Stash ----------
 
   private assertStash(ref: string): void {
