@@ -4,7 +4,7 @@ import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type 
 import { mergeRefs } from '../shared/refs';
 import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
-import { debounce, el, icon, iconButton, makeSplitter, showMenu } from './dom';
+import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu } from './dom';
 import { LogTable, type Columns, type Highlights } from './logTable';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
@@ -150,6 +150,8 @@ const syncGroup = el(
   iconButton('push', 'Push…', () => openPush()),
 );
 const progress = el('div', { className: 'progress' });
+/** 目前 branch 不在 Branch 篩選中時的提示列（對應 IntelliJ 的「HEAD is not in filter」） */
+const headHint = el('div', { className: 'log-hint hidden' });
 const warningBar = el('div', { className: 'log-warning hidden' });
 
 /** 部分 repo 讀取失敗時，在表格上方顯示提示（其餘 repo 照常顯示） */
@@ -173,7 +175,7 @@ const filterBar = el(
   viewButton,
 );
 
-const logPane = el('div', { className: 'log-pane' }, filterBar, progress, warningBar, table.element);
+const logPane = el('div', { className: 'log-pane' }, filterBar, progress, headHint, warningBar, table.element);
 
 // ---------- 版面 ----------
 const leftSplitter = makeSplitter(
@@ -280,6 +282,32 @@ function renderChips(): void {
   regexToggle.sync();
   caseToggle.sync();
   branches.setSelectedRef(f.branches.length === 1 ? f.branches[0] : undefined);
+  renderHeadHint();
+}
+
+/** Branch 篩選有值、但沒有包含 HEAD 或任一可見 repo 的目前 branch 時，提示並提供一鍵加入 */
+function renderHeadHint(): void {
+  const f = ui.filter;
+  const current = visibleRepos()
+    .map((r) => r.head.branch)
+    .filter((b): b is string => !!b)
+    .map((b) => `refs/heads/${b}`);
+  const missing = f.branches.length > 0 && !f.branches.includes('HEAD') && !current.some((c) => f.branches.includes(c));
+  clear(headHint);
+  headHint.classList.toggle('hidden', !missing);
+  if (!missing) return;
+  const names = [...new Set(visibleRepos().map((r) => r.head.branch ?? 'detached HEAD'))].join(', ');
+  const add = el('a', { className: 'link', text: 'Show HEAD', attrs: { href: '#' } });
+  add.addEventListener('click', (e) => {
+    e.preventDefault();
+    setFilter({ branches: [...f.branches, 'HEAD'] });
+  });
+  const all = el('a', { className: 'link', text: 'Show all branches', attrs: { href: '#' } });
+  all.addEventListener('click', (e) => {
+    e.preventDefault();
+    setFilter({ branches: [] });
+  });
+  headHint.append(icon('head'), el('span', { text: `The current branch (${names}) is not in the filter.` }), add, all);
 }
 
 function openBranchPicker(): void {
