@@ -206,7 +206,7 @@ export interface PushPlan {
   problem?: 'detached' | 'noRemote' | 'notAncestor' | 'error';
   message?: string;
 }
-export type RefAction = 'newBranch' | 'rename' | 'delete' | 'merge' | 'rebase' | 'compare' | 'update' | 'pushTag';
+export type RefAction = 'newBranch' | 'rename' | 'delete' | 'merge' | 'rebase' | 'compare' | 'compareWorkingTree' | 'update' | 'pushTag';
 export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'newTag' | 'compareLocal';
 
 /** Extension → Webview */

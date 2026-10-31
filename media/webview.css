@@ -439,3 +439,6 @@ select.push-remote {
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 16px 14px; }
 .button.danger { background: var(--vscode-statusBarItem-errorBackground, #c72e0f); color: var(--vscode-statusBarItem-errorForeground, #fff); }
 .button.danger:hover { filter: brightness(1.1); }
+
+.icon-button:disabled { opacity: 0.35; cursor: default; }
+.icon-button:disabled:hover { background: transparent; }

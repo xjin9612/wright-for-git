@@ -306,20 +306,7 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
         return;
       }
       case 'compareLocal': {
-        const files = await repo.diffWithWorkingTree(hash);
-        if (files.length === 0) {
-          void vscode.window.showInformationMessage(t('No differences between {0} and the working tree.', short(hash)));
-          return;
-        }
-        const pick = await vscode.window.showQuickPick(
-          files.map((f) => ({ label: path.basename(f.path), description: f.oldPath ? `${f.oldPath} → ${f.path}` : f.path, detail: undefined, file: f })),
-          { placeHolder: t('{0} file(s) differ between {1} and the working tree', files.length, short(hash)), matchOnDescription: true },
-        );
-        if (!pick) return;
-        const f = pick.file;
-        const left = revisionUri(repo.root, f.status === 'A' ? '' : hash, f.oldPath ?? f.path);
-        const right = f.status === 'D' ? revisionUri(repo.root, '', f.path) : vscode.Uri.file(path.join(repo.root, f.path));
-        await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(f.path)} (${short(hash)} ↔ ${t('Working Tree')})`);
+        await compareWithWorkingTree(target, hash, short(hash));
         return;
       }
     }
@@ -348,6 +335,27 @@ export async function runCommitsAction(action: 'cherryPick' | 'revert', target: 
   } catch (e) {
     void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
   }
+}
+
+/** 列出 revision 與目前工作區不同的檔案，選一個開 diff（左：revision，右：工作區檔案） */
+export async function compareWithWorkingTree(target: RepoTarget, hash: string, label: string, pathFilter?: string): Promise<void> {
+  const { repo } = target;
+  const files = (await repo.diffWithWorkingTree(hash)).filter((f) => !pathFilter || f.path === pathFilter || f.path.startsWith(`${pathFilter}/`) || f.oldPath === pathFilter);
+  if (files.length === 0) {
+    void vscode.window.showInformationMessage(t('No differences between {0} and the working tree.', label));
+    return;
+  }
+  const open = async (f: (typeof files)[number]) => {
+    const left = revisionUri(repo.root, f.status === 'A' ? '' : hash, f.oldPath ?? f.path);
+    const right = f.status === 'D' ? revisionUri(repo.root, '', f.path) : vscode.Uri.file(path.join(repo.root, f.path));
+    await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(f.path)} (${label} ↔ ${t('Working Tree')})`);
+  };
+  if (files.length === 1 && pathFilter === files[0].path) return open(files[0]);
+  const pick = await vscode.window.showQuickPick(
+    files.map((f) => ({ label: path.basename(f.path), description: f.oldPath ? `${f.oldPath} → ${f.path}` : f.path, file: f })),
+    { placeHolder: t('{0} file(s) differ between {1} and the working tree', files.length, label), matchOnDescription: true },
+  );
+  if (pick) await open(pick.file);
 }
 
 // ---------- Branch／Tag 操作 ----------
@@ -538,6 +546,14 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
         each((target) => (target.state?.remotes.includes(remote) ? target.repo.pushTag(remote, name) : Promise.resolve())),
       );
       done(t('Pushed tag {0} to {1}', name, remote));
+      return;
+    }
+    case 'compareWorkingTree': {
+      const target = await pickTarget(targets);
+      if (!target) return;
+      const ref = refIn(target, refName);
+      if (!ref) return;
+      await compareWithWorkingTree(target, ref.hash, name);
       return;
     }
     case 'compare': {

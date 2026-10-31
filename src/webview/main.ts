@@ -2,7 +2,7 @@
 import { MultiGraph } from '../shared/multiGraph';
 import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RefAction, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
 import { mergeRefs, type MergedRef } from '../shared/refs';
-import { BranchesPane } from './branchesPane';
+import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
 import { DetailsPane } from './detailsPane';
 import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
@@ -32,6 +32,8 @@ interface Persisted {
   /** 額外的 Log 分頁（各自保留篩選）；第 0 個為主分頁 */
   tabs?: LogTab[];
   activeTab?: number;
+  /** Branches 的分組與顯示選項 */
+  branchOptions?: Partial<BranchOptions>;
   /** 選取的 commit：`${root}|${hash}` */
   selectedHash?: string;
 }
@@ -55,6 +57,7 @@ const ui: Persisted = {
   favorites: saved?.favorites,
   onlyFavorites: saved?.onlyFavorites,
   widths: saved?.widths,
+  branchOptions: saved?.branchOptions,
   tabs: saved?.tabs,
   flatFiles: saved?.flatFiles,
   activeTab: saved?.activeTab,
@@ -103,7 +106,11 @@ const branches = new BranchesPane(
   {
     onSelect: (ref) => setFilter({ branches: [ref] }),
     onCheckout: (ref, roots) => post({ type: 'checkout', ref, roots }),
-    onRefresh: () => post({ type: 'refresh' }),
+    onToolbarAction: (action, ref) => onBranchToolbar(action, ref),
+    onOptionsChange: (options) => {
+      ui.branchOptions = options;
+      persist();
+    },
     onFetch: () => sync('fetch'),
     onContextMenu: (ref, x, y) => showRefMenu(ref, x, y),
     onCollapsePane: () => setPaneVisible('left', false),
@@ -120,6 +127,7 @@ const branches = new BranchesPane(
   ui.expanded,
   ui.favorites,
   ui.onlyFavorites,
+  ui.branchOptions,
 );
 
 const table = new LogTable(
@@ -798,6 +806,43 @@ function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
   ]);
 }
 
+/** Branches 直式工具列的操作 */
+function onBranchToolbar(action: BranchToolbarAction, ref: MergedRef | undefined): void {
+  if (action === 'newBranch' && !ref) {
+    // 沒有選取：從目前分支（或 detached HEAD）建立
+    const vis = visibleRepos();
+    const branch = vis.find((r) => r.head.branch)?.head.branch;
+    if (branch) {
+      post({ type: 'refAction', action: 'newBranch', ref: `refs/heads/${branch}`, roots: vis.filter((r) => r.head.branch === branch).map((r) => r.root) });
+    } else {
+      const st = vis.find((r) => r.head.hash);
+      if (st?.head.hash) post({ type: 'commitAction', action: 'newBranch', root: st.root, hash: st.head.hash, parents: [], subject: 'HEAD' });
+    }
+    return;
+  }
+  if (!ref) return;
+  if (action === 'navigate') {
+    navigateToRef(ref);
+    return;
+  }
+  post({ type: 'refAction', action, ref: ref.name, roots: ref.roots });
+}
+
+/** 在記錄中選取分支的最新 commit（不改變篩選）；目前篩選下看不到時提示 */
+function navigateToRef(ref: MergedRef): void {
+  for (const root of ref.roots) {
+    const repoIdx = repos.findIndex((r) => r.root === root);
+    const hash = repos[repoIdx]?.refs.find((r) => r.name === ref.name)?.hash;
+    const idx = hash ? keyIndex.get(`${repoIdx}:${hash}`) : undefined;
+    if (idx !== undefined) {
+      table.select(idx, true, 'center');
+      table.focus();
+      return;
+    }
+  }
+  setWarnings([t('{0} is not in the current log (check the filters).', ref.short)]);
+}
+
 /** Branches 右鍵選單（對應 IntelliJ 的 branch 選單；同名 branch 跨 repo 一次處理） */
 function showRefMenu(ref: MergedRef, x: number, y: number): void {
   const act = (action: RefAction) => () => post({ type: 'refAction', action, ref: ref.name, roots: ref.roots });
@@ -809,6 +854,7 @@ function showRefMenu(ref: MergedRef, x: number, y: number): void {
     { label: t('Checkout'), disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
     { label: t('New Branch from {0}…', q), action: act('newBranch') },
     { label: t('Compare with Current'), disabled: current, action: act('compare') },
+    { label: t('Show Diff with Working Tree'), action: act('compareWorkingTree') },
     { label: t('Show in Log'), action: () => setFilter({ branches: [ref.name] }) },
     { label: t('Show in New Tab'), action: () => openTab({ branches: [ref.name], roots: ui.filter.roots }) },
     '-',
