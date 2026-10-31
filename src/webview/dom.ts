@@ -1,4 +1,5 @@
 // DOM 小工具與 SVG 圖示（不使用前端框架）
+import { t } from './l10n';
 
 type Child = Node | string | null | undefined | false;
 
@@ -152,7 +153,7 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
     if (it.star) {
       const star = it.star;
       check.classList.add('menu-star');
-      check.title = star.on ? 'Remove from favorites' : 'Add to favorites';
+      check.title = star.on ? t('Remove from Favorites') : t('Add to Favorites');
       const paint = () => {
         clear(check);
         check.append(icon(star.on ? 'star' : 'star-outline', star.on ? 'favorite' : ''));
