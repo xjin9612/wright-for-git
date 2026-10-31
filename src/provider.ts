@@ -56,7 +56,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private pendingFilter?: Partial<LogFilter>;
   private pendingOpenPush = false;
   /** 最近一次從詳情開啟的 diff 所屬的檔案清單（diff 內切換上一個／下一個檔案） */
-  private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number } | undefined;
+  private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number; right?: string } | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   /** repository 清單、HEAD／refs 或 repo 篩選變動時觸發（供側邊欄 Repositories 更新） */
@@ -65,7 +65,25 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly gitPath: string,
-  ) {}
+  ) {
+    // diff 內切換檔案的按鈕只在「從 Log 開啟的那個 diff」是目前分頁時顯示
+    const tabs = vscode.window.tabGroups;
+    if (tabs) this.disposables.push(tabs.onDidChangeTabs(() => this.updateDiffNavContext()), tabs.onDidChangeTabGroups(() => this.updateDiffNavContext()));
+  }
+
+  /** 目前分頁是否為最近一次從 Log 開啟的 diff（無法判斷分頁時視為是） */
+  private isNavDiffActive(): boolean {
+    const nav = this.diffNav;
+    if (!nav?.right) return false;
+    const tabs = vscode.window.tabGroups;
+    if (!tabs) return true;
+    const input = tabs.activeTabGroup?.activeTab?.input;
+    return input instanceof vscode.TabInputTextDiff && input.modified.toString() === nav.right;
+  }
+
+  private updateDiffNavContext(): void {
+    void vscode.commands.executeCommand('setContext', 'gitWorkbench.diffNav', this.isNavDiffActive());
+  }
 
   // ---------- repository 清單 ----------
 
@@ -316,8 +334,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         }
         case 'openDiff':
           this.diffNav = m.files && m.files.length > 1 ? { root: m.root, hash: m.hash, parent: m.parent, files: m.files, index: m.files.findIndex((f) => f.path === m.file.path) } : undefined;
-          void vscode.commands.executeCommand('setContext', 'gitWorkbench.diffNav', !!this.diffNav);
-          await this.openDiff(m.root, m.hash, m.parent, m.file);
+          {
+            const right = await this.openDiff(m.root, m.hash, m.parent, m.file);
+            if (this.diffNav) this.diffNav.right = right;
+            this.updateDiffNavContext();
+          }
           break;
         case 'checkout':
           await this.checkoutRef(m.ref, m.roots);
@@ -600,7 +621,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   /** diff 視窗中切換到上一個／下一個變更檔案 */
   async navigateDiff(delta: 1 | -1): Promise<void> {
     const nav = this.diffNav;
-    if (!nav) return;
+    if (!nav || !this.isNavDiffActive()) return;
     const next = nav.index + delta;
     if (next < 0 || next >= nav.files.length) {
       vscode.window.setStatusBarMessage(delta > 0 ? vscode.l10n.t('Last changed file') : vscode.l10n.t('First changed file'), 2000);
@@ -608,7 +629,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
     nav.index = next;
     const file = nav.files[next];
-    await this.openDiff(nav.root, file.right ?? nav.hash, file.left ?? nav.parent, file);
+    nav.right = await this.openDiff(nav.root, file.right ?? nav.hash, file.left ?? nav.parent, file);
+    this.updateDiffNavContext();
     vscode.window.setStatusBarMessage(`${next + 1}/${nav.files.length} ${file.path}`, 2500);
   }
 
@@ -625,7 +647,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         const e = this.find(root);
         if (!e) continue;
         // webview 依列順序（新到舊）送來，合併時要由舊到新
-        const ordered = [...list].reverse();
+        // 值來自 webview：只接受 hash
+        const ordered = [...list].reverse().filter((c) => isHash(c.hash) && c.parents.every(isHash));
         const changes = await mapLimit(ordered, 4, async (c) => ({
           hash: c.hash,
           parent: c.parents[0],
@@ -639,9 +662,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
   }
 
-  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile): Promise<void> {
+  /** @returns 右側（修改後）的 URI 字串，用來辨識這個 diff 分頁 */
+  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile): Promise<string | undefined> {
     const e = this.find(root);
-    if (!e) return;
+    if (!e) return undefined;
     // 多選合併的變更自帶左右兩側的 revision
     const leftRef = file.left !== undefined ? file.left : file.status === 'A' || !parent ? '' : parent;
     const rightRef = file.right !== undefined ? file.right : file.status === 'D' ? '' : hash;
@@ -650,6 +674,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const short = (h: string) => (h ? h.slice(0, 8) : '∅');
     const title = `${path.basename(file.path)} (${short(leftRef)} ↔ ${short(rightRef)})`;
     await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true });
+    return right.toString();
   }
 
   // ---------- 同步 ----------

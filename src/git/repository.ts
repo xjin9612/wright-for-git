@@ -137,6 +137,8 @@ export class GitRepository {
 
   /** 相對第一個 parent 的變更（merge commit 與 IntelliJ 預設一致，顯示對第一個 parent 的差異） */
   async getChangedFiles(hash: string, parents: readonly string[], signal?: AbortSignal): Promise<ChangedFile[]> {
+    // 值可能來自 webview：只接受 hash，避免 `--output=…` 之類的選項注入
+    if (!isHash(hash) || !parents.every(isHash)) throw new GitError(`Invalid revision: ${hash}`, null, '');
     const args =
       parents.length === 0
         ? ['diff-tree', '-r', '-M', '--root', '--no-commit-id', '--name-status', '-z', hash]
@@ -228,7 +230,9 @@ export class GitRepository {
       src = opts.upTo;
     }
     const tracking = `refs/remotes/${remote}/${remoteBranch}`;
-    plan.isNew = (await this.tryRun(['rev-parse', '-q', '--verify', tracking])) === undefined;
+    const trackingHash = (await this.tryRun(['rev-parse', '-q', '--verify', tracking]))?.trim();
+    plan.isNew = !trackingHash;
+    plan.trackingHash = trackingHash ?? '';
     // 新 branch：遠端任何 branch 都還沒有的 commit 才算要推的
     const range = plan.isNew ? [src, '--not', '--remotes'] : [src, '--not', tracking];
     plan.total = Number((await this.run(['rev-list', '--count', ...range])).trim()) || 0;
@@ -250,13 +254,20 @@ export class GitRepository {
    * src 為 refs/heads/<branch> 或 commit hash（Push All up to Here）。
    * force 一律使用 --force-with-lease：遠端若有本機沒看過的 commit 就拒絕，不提供無保護的 --force。
    */
-  async pushTo(remote: string, src: string, remoteBranch: string, opts: { force?: boolean; tags?: boolean; setUpstream?: boolean } = {}): Promise<void> {
+  /**
+   * @param opts.force 搭配 lease：預覽時看到的遠端 commit（'' 表示遠端不應該有這個 branch）。
+   *   遠端若已不是這個 commit（例如對話框開著時有人推了新 commit 又被 fetch 進來）就拒絕，避免覆蓋沒看過的 commit。
+   */
+  async pushTo(remote: string, src: string, remoteBranch: string, opts: { force?: boolean; lease?: string; tags?: boolean; setUpstream?: boolean } = {}): Promise<void> {
     await this.assertRemote(remote);
     if (!(await this.isValidRefName(remoteBranch, 'branch'))) throw new GitError(`Invalid branch name: ${remoteBranch}`, null, '');
     const isBranch = src.startsWith('refs/heads/') && (await this.isValidRefName(src.slice('refs/heads/'.length), 'branch'));
     if (!isBranch && !isHash(src)) throw new GitError(`Invalid push source: ${src}`, null, '');
     const args = ['push'];
-    if (opts.force) args.push('--force-with-lease');
+    if (opts.force) {
+      if (opts.lease !== undefined && opts.lease !== '' && !isHash(opts.lease)) throw new GitError(`Invalid lease: ${opts.lease}`, null, '');
+      args.push(opts.lease !== undefined ? `--force-with-lease=refs/heads/${remoteBranch}:${opts.lease}` : '--force-with-lease');
+    }
     if (opts.tags) args.push('--follow-tags');
     // upstream 只能為 branch 設定，推送單一 commit 時不設
     if (opts.setUpstream && isBranch) args.push('--set-upstream');
@@ -315,7 +326,8 @@ export class GitRepository {
 
   /** 名稱是否為合法的 branch／tag 名稱（交給 git check-ref-format 判斷） */
   async isValidRefName(name: string, kind: 'branch' | 'tag'): Promise<boolean> {
-    if (!name || name.startsWith('-')) return false;
+    // @{-N} 會被 check-ref-format --branch 展開成先前的 branch，不能當作名稱
+    if (!name || name.startsWith('-') || name.includes('@{')) return false;
     const args = kind === 'branch' ? ['check-ref-format', '--branch', name] : ['check-ref-format', `refs/tags/${name}`];
     return (await this.tryRun(args)) !== undefined;
   }

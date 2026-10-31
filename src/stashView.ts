@@ -148,12 +148,19 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
 
   const repoOf = (node: StashNode): GitRepository | undefined => provider.getRepository(node.root);
   /** 執行 stash 操作後重新整理（log 的 refs 不受影響，但工作區可能變了） */
-  const run = async (node: StashNode, fn: (repo: GitRepository) => Promise<void>, success: string) => {
+  const run = async (node: StashNode, fn: (repo: GitRepository, ref: string) => Promise<void>, success: (ref: string) => string) => {
     const repo = repoOf(node);
     if (!repo) return;
+    // stash@{n} 會隨其他 stash 的新增／刪除而位移：以 hash 找出目前的編號，找不到就不動作
+    const current = (await repo.listStashes().catch(() => [])).find((x) => x.hash === node.stash.hash);
+    if (!current) {
+      void vscode.window.showWarningMessage(t('{0}: this stash no longer exists.', node.repoName));
+      tree.refresh();
+      return;
+    }
     try {
-      await fn(repo);
-      vscode.window.setStatusBarMessage(`$(check) ${success}`, 4000);
+      await fn(repo, current.ref);
+      vscode.window.setStatusBarMessage(`$(check) ${success(current.ref)}`, 4000);
     } catch (e) {
       const msg = errorMessage(e);
       // apply／pop 衝突：git 已把衝突寫進工作區，stash 仍保留
@@ -175,7 +182,15 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
     return n?.kind === 'stash' ? n : undefined;
   };
 
-  const sync = () => tree.rewatch(provider.repositoryList());
+  // 只有 repository 清單改變時才重建 watcher（onDidChange 在每次 refs／HEAD 變動都會觸發）
+  let watchedKey = '';
+  const sync = () => {
+    const repos = provider.repositoryList();
+    const key = repos.map((r) => r.root).join('\n');
+    if (key === watchedKey) return;
+    watchedKey = key;
+    tree.rewatch(repos);
+  };
   sync();
 
   context.subscriptions.push(
@@ -185,15 +200,15 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
     vscode.commands.registerCommand('gitWorkbench.stash.refresh', () => tree.refresh()),
     vscode.commands.registerCommand('gitWorkbench.stash.apply', async (arg?: unknown) => {
       const n = stashNode(arg);
-      if (n) await run(n, (r) => r.stashApply(n.stash.ref), t('Applied {0}', n.stash.ref));
+      if (n) await run(n, (r, ref) => r.stashApply(ref), (ref) => t('Applied {0}', ref));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.applyIndex', async (arg?: unknown) => {
       const n = stashNode(arg);
-      if (n) await run(n, (r) => r.stashApply(n.stash.ref, { index: true }), t('Applied {0}', n.stash.ref));
+      if (n) await run(n, (r, ref) => r.stashApply(ref, { index: true }), (ref) => t('Applied {0}', ref));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.pop', async (arg?: unknown) => {
       const n = stashNode(arg);
-      if (n) await run(n, (r) => r.stashApply(n.stash.ref, { pop: true }), t('Popped {0}', n.stash.ref));
+      if (n) await run(n, (r, ref) => r.stashApply(ref, { pop: true }), (ref) => t('Popped {0}', ref));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.drop', async (arg?: unknown) => {
       const n = stashNode(arg);
@@ -204,15 +219,8 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
         { modal: true, detail: `${n.repoName}\n${n.stash.message}` },
         ok,
       );
-      // 用 hash 再確認一次對應的 stash@{n}（確認框開著時清單可能變動）
       if (answer !== ok) return;
-      const repo = repoOf(n);
-      const current = (await repo?.listStashes())?.find((s) => s.hash === n.stash.hash);
-      if (!current) {
-        tree.refresh();
-        return;
-      }
-      await run({ ...n, stash: current }, (r) => r.stashDrop(current.ref), t('Dropped {0}', current.ref));
+      await run(n, (r, ref) => r.stashDrop(ref), (ref) => t('Dropped {0}', ref));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.branch', async (arg?: unknown) => {
       const n = stashNode(arg);
@@ -223,7 +231,7 @@ export function registerStash(context: vscode.ExtensionContext, provider: Workbe
         prompt: t('Creates the branch at the commit the stash was made on, applies the stash there and drops it.'),
         validateInput: async (v) => (!v.trim() || (await repo.isValidRefName(v.trim(), 'branch')) ? undefined : t('Not a valid branch name.')),
       });
-      if (name?.trim()) await run(n, (r) => r.stashBranch(name.trim(), n.stash.ref), t('Created and checked out {0}', name.trim()));
+      if (name?.trim()) await run(n, (r, ref) => r.stashBranch(name.trim(), ref), () => t('Created and checked out {0}', name.trim()));
     }),
     vscode.commands.registerCommand('gitWorkbench.stash.save', async () => {
       const repos = await provider.repositories();

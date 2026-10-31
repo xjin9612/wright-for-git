@@ -165,6 +165,8 @@ export interface PushTarget {
   remote: string;
   remoteBranch: string;
   upTo?: string;
+  /** 對話框預覽時看到的遠端 commit（'' 為新 branch）；送出時若已改變就拒絕 force push */
+  expected?: string;
 }
 
 export interface PushCommit {
@@ -188,6 +190,8 @@ export interface PushPlan {
   hasUpstream: boolean;
   /** 遠端還沒有這個 branch */
   isNew: boolean;
+  /** 預覽時遠端 branch 的 commit（remote-tracking ref；新 branch 為 ''）；force push 以此為 lease */
+  trackingHash?: string;
   /** 只推到這個 commit 為止 */
   upTo?: string;
   /** 要推的 commit（新到舊，最多 limit 筆） */

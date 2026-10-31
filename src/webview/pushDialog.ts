@@ -189,7 +189,7 @@ class PushDialog {
     if (!this.canPush()) return;
     const targets: PushTarget[] = this.plans
       .filter((p) => pushable(p) && this.checked.has(p.root))
-      .map((p) => ({ root: p.root, branch: p.branch, remote: p.remote!, remoteBranch: p.remoteBranch!, upTo: p.upTo }));
+      .map((p) => ({ root: p.root, branch: p.branch, remote: p.remote!, remoteBranch: p.remoteBranch!, upTo: p.upTo, expected: p.trackingHash }));
     this.busy = true;
     this.updateButtons();
     this.confirmRequest = nextRequest++;

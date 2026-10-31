@@ -336,3 +336,25 @@ test('多個 commit 一次 cherry-pick／revert', async () => {
   assert.match(a.git('log', '--format=%s', '-2'), /Revert "two"\nRevert "one"|Revert "one"/);
   await assert.rejects(repo.cherryPickMany(['--abort']));
 });
+
+test('審查修正：選項注入、@{-N} 名稱、force push 的 lease 綁定預覽時的遠端 commit', async () => {
+  const { a, b } = remoteSetup();
+  const repo = (await GitRepository.open('git', a.dir))!;
+  const head = a.git('rev-parse', 'HEAD');
+  await assert.rejects(repo.getChangedFiles(head, ['--output=/tmp/x']), /Invalid revision/);
+  assert.equal(await repo.isValidRefName('@{-1}', 'branch'), false);
+
+  // 預覽時遠端為 X；之後別人推了 Y 並被 fetch 進來 → 以 X 為 lease 的 force push 必須被拒絕
+  a.commit('mine', { 'm.txt': '1' });
+  const plan = await repo.getPushPlan();
+  const seen = plan.trackingHash!;
+  b('pull', '-q');
+  b('commit', '-q', '--allow-empty', '-m', 'theirs');
+  b('push', '-q');
+  await repo.fetch();
+  await assert.rejects(repo.pushTo('origin', 'refs/heads/main', 'main', { force: true, lease: seen }));
+  assert.match(b('log', '-1', '--format=%s', 'origin/main'), /theirs/);
+  // 以最新的遠端 commit 為 lease 才會成功
+  const fresh = (await repo.getPushPlan()).trackingHash!;
+  await repo.pushTo('origin', 'refs/heads/main', 'main', { force: true, lease: fresh });
+});

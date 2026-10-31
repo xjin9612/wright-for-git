@@ -269,5 +269,7 @@
   "Branch": "Branch",
   "User": "作者",
   "Paths": "路徑",
-  "Date": "日期"
+  "Date": "日期",
+  "{0}: the remote branch changed after the dialog was opened. Review the push again.": "{0}：對話框開啟後遠端 branch 已變更，請重新檢視要推送的內容。",
+  "{0}: this stash no longer exists.": "{0}：這個 stash 已不存在。"
 }

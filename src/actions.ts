@@ -22,26 +22,41 @@ function short(hash: string): string {
   return hash.slice(0, 8);
 }
 
-/** 失敗後若有進行中的 cherry-pick／revert／merge／rebase，提示到原始檔控制解決衝突或中止 */
-async function handleConflict(target: RepoTarget): Promise<boolean> {
-  const op = await target.repo.operationInProgress();
-  if (!op) return false;
+type Operation = 'cherry-pick' | 'revert' | 'merge' | 'rebase';
+
+/**
+ * 執行可能產生衝突的操作：只有「這次操作才開始」的 cherry-pick／revert／merge／rebase 才視為衝突；
+ * 原本就在進行中的操作（使用者正在解衝突）不會被誤判，也不會提供中止它的按鈕。
+ * @returns 發生衝突時回傳進行中的操作；其他錯誤照常丟出
+ */
+async function withConflictCheck(target: RepoTarget, fn: () => Promise<void>): Promise<Operation | undefined> {
+  const before = await target.repo.operationInProgress();
+  try {
+    await fn();
+    return undefined;
+  } catch (e) {
+    const op = before ? undefined : await target.repo.operationInProgress();
+    if (op) return op;
+    throw e;
+  }
+}
+
+/** 提示到原始檔控制解決衝突，或中止這次操作（不等待使用者回應，避免卡住進度通知） */
+function promptConflict(target: RepoTarget, op: Operation): void {
   const openScm = t('Open Source Control');
   const abort = t('Abort {0}', op);
-  const answer = await vscode.window.showWarningMessage(
-    t('{0}: {1} stopped because of conflicts. Resolve them in Source Control, then continue or abort.', target.name, op),
-    openScm,
-    abort,
-  );
-  if (answer === openScm) await vscode.commands.executeCommand('workbench.view.scm');
-  else if (answer === abort) {
-    try {
-      await target.repo.abortOperation(op);
-    } catch (e) {
-      void vscode.window.showErrorMessage(errorMessage(e));
-    }
-  }
-  return true;
+  void vscode.window
+    .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them in Source Control, then continue or abort.', target.name, op), openScm, abort)
+    .then(async (answer) => {
+      if (answer === openScm) await vscode.commands.executeCommand('workbench.view.scm');
+      else if (answer === abort) {
+        try {
+          await target.repo.abortOperation(op);
+        } catch (e) {
+          void vscode.window.showErrorMessage(errorMessage(e));
+        }
+      }
+    });
 }
 
 function currentBranch(target: RepoTarget): string | undefined {
@@ -91,12 +106,13 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
       for (const [i, p] of plan.entries()) {
         progress.report({ message: plan.length > 1 ? `${p.target.name} (${i + 1}/${plan.length})` : p.target.name });
         try {
-          if (action === 'fetch') await p.target.repo.fetch();
-          else await p.target.repo.pull();
-          succeeded++;
+          const op = await withConflictCheck(p.target, () => (action === 'fetch' ? p.target.repo.fetch() : p.target.repo.pull()));
+          if (op) {
+            failed.push(t('{0}: conflicts', p.target.name));
+            promptConflict(p.target, op);
+          } else succeeded++;
         } catch (e) {
-          if (action === 'pull' && (await handleConflict(p.target))) failed.push(t('{0}: conflicts', p.target.name));
-          else failed.push(`${p.target.name}: ${errorMessage(e)}`);
+          failed.push(`${p.target.name}: ${errorMessage(e)}`);
         }
       }
     },
@@ -121,7 +137,7 @@ export async function buildPushPlans(targets: RepoTarget[], upTo?: { root: strin
   return Promise.all(
     targets.map(async (target): Promise<PushPlan> => {
       const o = overrides.find((x) => x.root === target.repo.root);
-      const hash = upTo && upTo.root === target.repo.root ? upTo.hash : undefined;
+      const hash = o?.upTo ?? (upTo && upTo.root === target.repo.root ? upTo.hash : undefined);
       try {
         return { ...(await target.repo.getPushPlan({ branch: o?.branch ?? branch, upTo: hash, remote: o?.remote, remoteBranch: o?.remoteBranch })), name: target.name };
       } catch (e) {
@@ -142,10 +158,17 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
     undefined,
     entries.map((e) => e.push),
   );
-  const work = entries.map((e, i) => ({ ...e, plan: plans[i] })).filter(({ plan, target }) => {
-    if (!plan.problem) return true;
-    void vscode.window.showWarningMessage(t('{0}: cannot push ({1})', target.name, plan.message ?? plan.problem));
-    return false;
+  const work = entries.map((e, i) => ({ ...e, plan: plans[i] })).filter(({ plan, target, push }) => {
+    if (plan.problem) {
+      void vscode.window.showWarningMessage(t('{0}: cannot push ({1})', target.name, plan.message ?? plan.problem));
+      return false;
+    }
+    // 對話框開著時遠端 branch 變了（例如自動 fetch 抓到別人的新 commit）：force push 會覆蓋沒看過的 commit，先擋下
+    if (force && push.expected !== undefined && plan.trackingHash !== push.expected) {
+      void vscode.window.showWarningMessage(t('{0}: the remote branch changed after the dialog was opened. Review the push again.', target.name));
+      return false;
+    }
+    return true;
   });
   if (work.length === 0) {
     onStarted();
@@ -172,7 +195,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
       try {
         const src = push.upTo ?? `refs/heads/${plan.branch}`;
         // 第一次推送（沒有 upstream）且推整個 branch 時，一併設定 upstream
-        await target.repo.pushTo(push.remote, src, push.remoteBranch, { force, tags, setUpstream: !plan.hasUpstream && !push.upTo });
+        await target.repo.pushTo(push.remote, src, push.remoteBranch, { force, lease: force ? (push.expected ?? plan.trackingHash) : undefined, tags, setUpstream: !plan.hasUpstream && !push.upTo });
         succeeded++;
       } catch (e) {
         failed.push(`${target.name}: ${errorMessage(e)}`);
@@ -206,23 +229,17 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
       case 'cherryPick': {
         const mainline = await pickMainline(parents);
         if (mainline === null) return;
-        try {
-          await repo.cherryPick(hash, mainline);
-          vscode.window.setStatusBarMessage(`$(check) ${t('Cherry-picked {0}', label)}`, 4000);
-        } catch (e) {
-          if (!(await handleConflict(target))) throw e;
-        }
+        const op = await withConflictCheck(target, () => repo.cherryPick(hash, mainline));
+        if (op) promptConflict(target, op);
+        else vscode.window.setStatusBarMessage(`$(check) ${t('Cherry-picked {0}', label)}`, 4000);
         return;
       }
       case 'revert': {
         const mainline = await pickMainline(parents);
         if (mainline === null) return;
-        try {
-          await repo.revert(hash, mainline);
-          vscode.window.setStatusBarMessage(`$(check) ${t('Reverted {0}', label)}`, 4000);
-        } catch (e) {
-          if (!(await handleConflict(target))) throw e;
-        }
+        const op = await withConflictCheck(target, () => repo.revert(hash, mainline));
+        if (op) promptConflict(target, op);
+        else vscode.window.setStatusBarMessage(`$(check) ${t('Reverted {0}', label)}`, 4000);
         return;
       }
       case 'reset': {
@@ -331,11 +348,11 @@ export async function runCommitsAction(action: 'cherryPick' | 'revert', target: 
   if (answer !== ok) return;
   try {
     const hashes = commits.map((c) => c.hash);
-    if (action === 'cherryPick') await target.repo.cherryPickMany(hashes);
-    else await target.repo.revertMany(hashes);
-    vscode.window.setStatusBarMessage(`$(check) ${action === 'cherryPick' ? t('Cherry-picked {0} commits', commits.length) : t('Reverted {0} commits', commits.length)}`, 4000);
+    const op = await withConflictCheck(target, () => (action === 'cherryPick' ? target.repo.cherryPickMany(hashes) : target.repo.revertMany(hashes)));
+    if (op) promptConflict(target, op);
+    else vscode.window.setStatusBarMessage(`$(check) ${action === 'cherryPick' ? t('Cherry-picked {0} commits', commits.length) : t('Reverted {0} commits', commits.length)}`, 4000);
   } catch (e) {
-    if (!(await handleConflict(target))) void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
+    void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
   }
 }
 
@@ -369,19 +386,29 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
   if (!first) return;
   const name = first.short;
   const failures: string[] = [];
+  /** 只有 merge／rebase／update（pull）可能留下衝突 */
+  const mayConflict = action === 'merge' || action === 'rebase' || action === 'update';
+  const conflicts: { target: RepoTarget; op: Operation }[] = [];
   /** 依序對每個 repo 執行；失敗時收集訊息，最後一次顯示 */
   const each = async (fn: (target: RepoTarget, ref: RefInfo) => Promise<void>, list = targets) => {
     for (const target of list) {
       const ref = refIn(target, refName);
       if (!ref) continue;
       try {
-        await fn(target, ref);
+        if (mayConflict) {
+          const op = await withConflictCheck(target, () => fn(target, ref));
+          if (op) conflicts.push({ target, op });
+        } else {
+          await fn(target, ref);
+        }
       } catch (e) {
-        if (!(await handleConflict(target))) failures.push(targets.length > 1 ? `${target.name}: ${errorMessage(e)}` : errorMessage(e));
+        failures.push(targets.length > 1 ? `${target.name}: ${errorMessage(e)}` : errorMessage(e));
       }
     }
   };
   const done = (msg: string) => {
+    for (const c of conflicts) promptConflict(c.target, c.op);
+    if (conflicts.length > 0 && failures.length === 0) return;
     if (failures.length > 0) void vscode.window.showErrorMessage(failures.join('\n'));
     else vscode.window.setStatusBarMessage(`$(check) ${msg}`, 4000);
   };
