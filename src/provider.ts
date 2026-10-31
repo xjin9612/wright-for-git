@@ -12,7 +12,7 @@ import { mapLimit } from './util';
 import { combineChanges } from './shared/combine';
 import { ModuleResolver } from './modules';
 import { promises as fsp, statSync } from 'node:fs';
-import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
+import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type IssueLinkRule, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
 import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { DialogPanels } from './dialogPanel';
@@ -256,7 +256,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     if (!force && !changed) return;
     const states = this.entries.map((e) => e.state ?? { root: e.repo.root, name: e.name, head: {}, refs: [], remotes: [] });
     this.updateDescription();
-    this.post({ type: 'repos', states, generation: this.generation });
+    this.post({ type: 'repos', states, generation: this.generation, issueLinks: issueLinkRules() });
     this.changeEmitter.fire();
   }
 
@@ -363,6 +363,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'refresh':
           await this.rediscover(true);
+          break;
+        case 'openExternal':
+          if (/^https?:\/\//i.test(m.url)) await vscode.env.openExternal(vscode.Uri.parse(m.url));
           break;
         case 'copy':
           await vscode.env.clipboard.writeText(m.text);
@@ -939,4 +942,11 @@ function makeNonce(): string {
   let s = '';
   for (let i = 0; i < 32; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
   return s;
+}
+
+/** 設定 gitWorkbench.issueLinks；未設定時，GitHub／GitLab 等遠端的 #123 自動連到 issue */
+function issueLinkRules(): IssueLinkRule[] {
+  const custom = vscode.workspace.getConfiguration('gitWorkbench').get<IssueLinkRule[]>('issueLinks', []);
+  const valid = custom.filter((r) => r && typeof r.pattern === 'string' && typeof r.url === 'string' && /^https?:\/\/|^\{repo\}/.test(r.url));
+  return valid.length > 0 ? valid : [{ pattern: '#(\\d+)', url: '{repo}/issues/$1' }];
 }

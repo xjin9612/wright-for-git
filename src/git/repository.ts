@@ -14,6 +14,7 @@ import {
   parseRefs,
   parseShortlog,
   parseStatusV2,
+  remoteWebUrl,
   parseFileDiff,
   patchPath,
   REF_FORMAT,
@@ -62,7 +63,7 @@ export class GitRepository {
   }
 
   async getState(): Promise<RepoState> {
-    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail, operation] = await Promise.all([
+    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail, operation, originUrl] = await Promise.all([
       this.tryRun(['remote']),
       this.run(['for-each-ref', `--format=${REF_FORMAT}`, 'refs/heads', 'refs/remotes', 'refs/tags']),
       this.tryRun(['rev-parse', '--verify', '--quiet', 'HEAD']),
@@ -70,6 +71,7 @@ export class GitRepository {
       this.tryRun(['config', 'user.name']),
       this.tryRun(['config', 'user.email']),
       this.operationInProgress().catch(() => undefined),
+      this.tryRun(['remote', 'get-url', 'origin']),
     ]);
     const remotes = (remotesOut ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
     return {
@@ -81,6 +83,7 @@ export class GitRepository {
       userName: userName?.trim() || undefined,
       userEmail: userEmail?.trim() || undefined,
       operation,
+      webUrl: remoteWebUrl(originUrl?.trim()),
     };
   }
 

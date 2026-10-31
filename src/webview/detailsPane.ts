@@ -5,6 +5,7 @@ import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, formatDate, icon, iconButton, makeSplitter, showMenu } from './dom';
 import { plural, t } from './l10n';
 import { fileIcon } from './fileIcons';
+import { linkify } from './issueLinks';
 import { renderLabel } from './logTable';
 
 function fileName(p: string): string {
@@ -446,7 +447,12 @@ export class DetailsPane {
 
     const [subject, ...body] = d.message.split('\n');
     this.info.append(
-      el('div', { className: 'details-message' }, el('div', { className: 'details-subject', text: subject }), body.join('\n').trim() ? el('pre', { className: 'details-body', text: body.join('\n').replace(/^\n+/, '') }) : null),
+      el(
+        'div',
+        { className: 'details-message' },
+        el('div', { className: 'details-subject' }, linkify(subject, this.state?.webUrl)),
+        body.join('\n').trim() ? el('pre', { className: 'details-body' }, linkify(body.join('\n').replace(/^\n+/, ''), this.state?.webUrl)) : null,
+      ),
       meta,
       ...[committed, refsLine].filter((n): n is HTMLDivElement => n !== null),
       branchesLine,

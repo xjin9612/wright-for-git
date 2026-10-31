@@ -29,5 +29,9 @@
   "command.unstash": "取消儲藏…",
   "submenu.explorer": "Git Workbench",
   "view.commit": "提交",
-  "command.showCommit": "顯示提交視窗"
+  "command.showCommit": "顯示提交視窗",
+  "config.issueLinks": "將提交訊息中的 issue 編號轉成連結。每條規則包含正規表示式 `pattern` 與連結 `url`，`url` 可使用 `$0`、`$1`… 以及 `{repo}`（`origin` 的網頁網址）。例如：`{ \"pattern\": \"PROJ-\\\\d+\", \"url\": \"https://jira.example.com/browse/$0\" }`。未設定時，`#123` 會連到 GitHub／GitLab 上的 issue。",
+  "config.issueLinks.pattern": "要比對的正規表示式",
+  "config.issueLinks.url": "連結網址；$0 為整段比對結果，$1… 為群組，{repo} 為 origin 的網頁網址",
+  "command.toggleBlame": "切換 Git Blame 標註"
 }

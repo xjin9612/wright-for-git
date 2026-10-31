@@ -37,6 +37,8 @@ export interface Highlights {
   mine: boolean;
   /** merge commit 淡化 */
   merges: boolean;
+  /** 選取 commit 時突顯它的路徑（first-parent 祖先），其他線條淡化 */
+  path?: boolean;
 }
 
 /** 解析 Conventional Commits 前綴：type(scope)!: */
@@ -97,6 +99,10 @@ export class LogTable {
   private frame = 0;
   private heldScroll: number | undefined;
   private widths: ColumnWidths = { ...DEFAULT_WIDTHS };
+  /** 選取 commit 的 first-parent 路徑（列索引）；空集合表示不突顯 */
+  private pathRows = new Set<number>();
+  /** `${repo}:${hash}` → 列索引（計算路徑用，隨資料增加） */
+  private indexByKey = new Map<string, number>();
   /** 多 repo 時左側顯示 repo 名稱欄（否則只是一條色條） */
   private repoNames = false;
   private stripWidth = STRIP_WIDTH;
@@ -233,6 +239,7 @@ export class LogTable {
 
   setHighlights(h: Highlights): void {
     this.highlights = h;
+    this.computePath();
     this.invalidateRows();
   }
 
@@ -272,7 +279,10 @@ export class LogTable {
   }
 
   setData(commits: CommitInfo[], graph: GraphModel): void {
+    if (commits !== this.commits || commits.length < this.indexByKey.size) this.indexByKey = new Map();
+    for (let i = this.indexByKey.size; i < commits.length; i++) this.indexByKey.set(`${commits[i].repo}:${commits[i].hash}`, i);
     this.commits = commits;
+    if (this.selected >= 0) this.computePath();
     this.graph = graph;
     this.spacer.style.height = `${commits.length * ROW_HEIGHT}px`;
     if (this.heldScroll !== undefined && commits.length * ROW_HEIGHT >= this.heldScroll + this.viewport.clientHeight) this.releaseScroll();
@@ -288,11 +298,25 @@ export class LogTable {
     return this.selected;
   }
 
+  /** 選取 commit 的 first-parent 祖先路徑 */
+  private computePath(): void {
+    this.pathRows = new Set();
+    if (!this.highlights.path || this.selected < 0 || this.multi.size > 0) return;
+    let i: number | undefined = this.selected;
+    while (i !== undefined && !this.pathRows.has(i)) {
+      this.pathRows.add(i);
+      const c: CommitInfo | undefined = this.commits[i];
+      const parent: string | undefined = c?.parents[0];
+      i = parent ? this.indexByKey.get(`${c.repo}:${parent}`) : undefined;
+    }
+  }
+
   select(index: number, notify: boolean, scroll: 'nearest' | 'center' | 'none' = 'nearest'): void {
     if (index < 0 || index >= this.commits.length) return;
     this.selected = index;
     this.anchor = index;
     this.multi.clear();
+    this.computePath();
     this.scrollToIndex(index, scroll);
     this.schedule();
     if (notify) this.cb.onSelect(index);
@@ -343,12 +367,14 @@ export class LogTable {
       return;
     }
     this.multi = set;
+    this.pathRows = new Set();
     this.schedule();
     this.cb.onMultiSelect(this.selectedIndices);
   }
 
   clearSelection(): void {
     this.selected = -1;
+    this.pathRows = new Set();
     this.anchor = -1;
     this.multi.clear();
     this.schedule();
@@ -529,6 +555,8 @@ export class LogTable {
       ctx.stroke();
     };
 
+    const dimming = this.pathRows.size > 1;
+    const DIM = 0.28;
     /** 名稱欄：同 repo 連續列的範圍，名稱寫在可見部分的第一列 */
     const runs: { repo: number; top: number; bottom: number }[] = [];
     frame.rows.forEach((fr, k) => {
@@ -553,10 +581,21 @@ export class LogTable {
         }
       }
       // 直通線：此 repo 未與節點相連的 lane，以及其他 repo 穿過此列的 lane
+      // 突顯路徑：路徑上的列與連到上一個路徑節點的線維持原樣，其他淡化
+      const dimAll = dimming && !this.pathRows.has(i);
+      ctx.globalAlpha = dimming ? DIM : 1;
       for (const t of fr.through) line(t.color, x(repo, t.lane), y0, x(repo, t.lane), y1);
       for (const o of fr.others) line(o.color, x(o.repo, o.lane), y0, x(o.repo, o.lane), y1);
-      for (const s of row.top) line(s.color, x(repo, s.from), y0, x(repo, s.to), mid);
-      for (const s of row.bottom) line(s.color, x(repo, s.from), mid, x(repo, s.to), y1);
+      ctx.globalAlpha = dimAll ? DIM : 1;
+      for (const s of row.top) {
+        if (dimming && !dimAll) ctx.globalAlpha = s.to === row.col ? 1 : DIM;
+        line(s.color, x(repo, s.from), y0, x(repo, s.to), mid);
+      }
+      for (const s of row.bottom) {
+        if (dimming && !dimAll) ctx.globalAlpha = s.from === row.col ? 1 : DIM;
+        line(s.color, x(repo, s.from), mid, x(repo, s.to), y1);
+      }
+      ctx.globalAlpha = 1;
     });
 
     if (runs.length > 0) {
@@ -577,6 +616,7 @@ export class LogTable {
       const cx = x(repo, row.col);
       const cy = i * ROW_HEIGHT - st + ROW_HEIGHT / 2;
       const c = color(row.color);
+      ctx.globalAlpha = dimming && !this.pathRows.has(i) ? DIM : 1;
       if (this.commits[i]?.hash === this.headOf(repo).hash) {
         // HEAD：挖空圓心（露出列底色，選取列也正確），再畫外環與中心點
         ctx.save();
@@ -600,6 +640,7 @@ export class LogTable {
         ctx.arc(cx, cy, 3.6, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
     });
   }
 }

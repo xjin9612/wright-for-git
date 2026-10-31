@@ -172,6 +172,11 @@
         "command": "gitWorkbench.unstashChanges",
         "title": "%command.unstash%",
         "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.toggleBlame",
+        "title": "%command.toggleBlame%",
+        "category": "Git Workbench"
       }
     ],
     "menus": {
@@ -215,6 +220,11 @@
           "command": "gitWorkbench.showHistory",
           "when": "resourceScheme == file",
           "group": "9_cutcopypaste@90"
+        },
+        {
+          "command": "gitWorkbench.toggleBlame",
+          "when": "resourceScheme == file",
+          "group": "9_cutcopypaste@91"
         }
       ],
       "commandPalette": [
@@ -332,6 +342,28 @@
           ],
           "default": "auto",
           "description": "%config.language%"
+        },
+        "gitWorkbench.issueLinks": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "%config.issueLinks%",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "description": "%config.issueLinks.pattern%"
+              },
+              "url": {
+                "type": "string",
+                "description": "%config.issueLinks.url%"
+              }
+            },
+            "required": [
+              "pattern",
+              "url"
+            ]
+          }
         }
       }
     },

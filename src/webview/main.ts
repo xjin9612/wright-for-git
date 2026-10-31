@@ -7,6 +7,7 @@ import { DetailsPane, type FileGrouping } from './detailsPane';
 import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { showConfirm } from './confirmDialog';
+import { setIssueLinkRules } from './issueLinks';
 import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { t } from './l10n';
@@ -50,7 +51,7 @@ const saved = loadState<Persisted>();
 const ui: Persisted = {
   filter: { ...EMPTY_FILTER, ...saved?.filter },
   columns: saved?.columns ?? { author: true, date: true, hash: true },
-  highlights: { commitType: true, mine: false, merges: true, ...saved?.highlights },
+  highlights: { commitType: true, mine: false, merges: true, path: true, ...saved?.highlights },
   leftWidth: saved?.leftWidth ?? 240,
   rightWidth: saved?.rightWidth ?? 340,
   leftVisible: saved?.leftVisible ?? true,
@@ -978,6 +979,7 @@ function showViewMenu(): void {
     { label: t('Highlight Commit Type'), checked: ui.highlights.commitType, action: toggleHl('commitType') },
     { label: t('Highlight My Commits'), checked: ui.highlights.mine, action: toggleHl('mine') },
     { label: t('Dim Merge Commits'), checked: ui.highlights.merges, action: toggleHl('merges') },
+    { label: t('Highlight Path of Selected Commit'), checked: !!ui.highlights.path, action: toggleHl('path') },
     '-',
     { label: t('New Log Tab'), action: () => openTab({}) },
     '-',
@@ -1009,6 +1011,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       const before = repos.map((r) => r.root).join('\n');
       repos = m.states;
       generation = m.generation;
+      setIssueLinkRules(m.issueLinks);
       if (repos.length === 0) {
         commits = [];
         table.setData([], new MultiGraph(true));

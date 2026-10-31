@@ -109,3 +109,12 @@ test('buildLogArgs：日期篩選', () => {
   const bad = buildLogArgs({ ...EMPTY_FILTER, since: 'x --output=/tmp/a' }, 100);
   assert.ok(!bad.some((a) => a.startsWith('--since')));
 });
+
+test('remoteWebUrl：ssh／https 遠端轉成網頁網址', async () => {
+  const { remoteWebUrl } = await import('../src/git/parsers');
+  assert.equal(remoteWebUrl('git@github.com:alice/demo.git'), 'https://github.com/alice/demo');
+  assert.equal(remoteWebUrl('https://bob@gitlab.example.com/group/sub/demo.git'), 'https://gitlab.example.com/group/sub/demo');
+  assert.equal(remoteWebUrl('ssh://git@host.example.com:2222/team/demo'), 'https://host.example.com/team/demo');
+  assert.equal(remoteWebUrl('/home/alice/remotes/demo.git'), undefined);
+  assert.equal(remoteWebUrl(undefined), undefined);
+});

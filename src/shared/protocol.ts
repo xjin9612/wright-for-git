@@ -55,6 +55,8 @@ export interface RepoState {
   remotes: string[];
   userName?: string;
   userEmail?: string;
+  /** 遠端（origin）的網頁網址，例如 https://github.com/owner/repo；用於 issue 連結 */
+  webUrl?: string;
   /** 進行中的 rebase／merge／cherry-pick／revert（等待解決衝突或 edit） */
   operation?: 'cherry-pick' | 'revert' | 'merge' | 'rebase';
 }
@@ -119,6 +121,12 @@ export interface WorkingChange {
   /** 相對 HEAD 的狀態（A／M／D／R／C／T／U） */
   status: FileStatus;
   kind: ChangeKind;
+}
+
+/** Commit 訊息中的 issue 編號轉連結：pattern 為正規表示式，url 可用 $0、$1… 與 {repo}（遠端網頁網址） */
+export interface IssueLinkRule {
+  pattern: string;
+  url: string;
 }
 
 export type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
@@ -200,6 +208,8 @@ export type ToExtension =
   | { type: 'requestPaths'; root: string }
   | { type: 'refresh' }
   | { type: 'copy'; text: string }
+  /** 開啟外部連結（只接受 http／https） */
+  | { type: 'openExternal'; url: string }
   | { type: 'selectRepository' }
   /** 同步：對 roots 中的 repository 執行 */
   | { type: 'sync'; action: SyncAction; roots: string[] }
@@ -309,7 +319,7 @@ export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'ne
 /** Extension → Webview */
 export type ToWebview =
   /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */
-  | { type: 'repos'; states: RepoState[]; generation: number; message?: string }
+  | { type: 'repos'; states: RepoState[]; generation: number; message?: string; issueLinks?: IssueLinkRule[] }
   /** warnings：部分 repo 讀取失敗時的訊息（只在 done 時帶） */
   | { type: 'logBatch'; requestId: number; commits: CommitInfo[]; done: boolean; graph: boolean; warnings?: string[] }
   | { type: 'logError'; requestId: number; message: string }

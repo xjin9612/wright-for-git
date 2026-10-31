@@ -266,3 +266,16 @@ export function patchPath(patch: string): string | undefined {
   const minus = /^--- a\/(.+)$/m.exec(patch);
   return minus?.[1];
 }
+
+/**
+ * 遠端網址 → 網頁網址：git@github.com:owner/repo.git、ssh://git@host/owner/repo、https://user@host/owner/repo.git
+ * 都轉成 https://host/owner/repo；無法判斷時回傳 undefined。
+ */
+export function remoteWebUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  let m = /^[\w.-]+@([\w.-]+):(.+?)(?:\.git)?\/?$/.exec(url);
+  if (m && !url.includes('://')) return `https://${m[1]}/${m[2]}`;
+  m = /^(?:ssh|git|https?):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/.exec(url);
+  if (m) return `https://${m[1]}/${m[2]}`;
+  return undefined;
+}
