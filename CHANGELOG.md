@@ -11,16 +11,34 @@
 - In multi-repository workspaces, Fetch, Pull and Push cover every repository visible under the Paths filter, one after another, with a single combined summary
 - Local branches show ↑ahead ↓behind their upstream in the Branches tree, or `gone` when the upstream was deleted
 
-### Commit context menu
-- New Branch… and New Tag… (optionally annotated)
-- Cherry-Pick and Revert Commit (asks for the mainline parent on merge commits)
-- Reset Current Branch to Here… (soft / mixed / hard); hard reset asks for confirmation and warns about uncommitted changes
-- Compare with Local: lists files that differ from the working tree and opens the diff
+### Branches
+- Context menu: Checkout, New Branch from…, Compare with Current, Show in Log, Show in New Tab, Merge into Current, Rebase Current onto, Update, Push…, Rename…, Delete, Push Tag…
+- Deleting an unmerged branch asks before forcing; deleting a remote branch or a tag always asks first
+- Same-name branches across repositories are handled in one go
+- Favorites: star a branch to pin it to the top of its group; the ★ toolbar button shows only favorites (`main` / `master` are favorites by default)
+
+### Commit log
+- Select several commits with `Ctrl` / `Shift` (or `Shift+↑↓`, `Ctrl+A`): the right pane shows their combined changes, and the context menu can copy their hashes or cherry-pick / revert them in one go
+- Context menu: New Branch…, New Tag… (optionally annotated), Cherry-Pick, Revert Commit (asks for the mainline parent on merge commits), Reset Current Branch to Here… (soft / mixed / hard; hard asks first and warns about uncommitted changes), Compare with Local
 - On conflicts, offers to open Source Control to resolve them, or to abort
+- Date filter: last 24 hours / 7 / 30 / 90 days / year, or a custom period
+- A hint appears when the Branch filter leaves out the current branch, with one-click Show HEAD / Show all branches
+- Text and User filters now draw a simplified graph that links each result to its nearest matching ancestor
+- Author, Date and Hash columns can be resized by dragging their left edge (double-click to reset)
+- Several log tabs, each with its own filters: 👁 → New Log Tab, or Show in New Tab on a branch
+
+### Stashes
+- New Stashes view in the side bar: list per repository, expand to see the files (including untracked ones), click a file for the diff
+- Apply, Apply with Index, Pop, Drop, Unstash as Branch…; Stash Changes… with an optional message and a choice of tracked only, including untracked, or keeping staged changes
+
+### Changed files
+- Switch between tree and flat list; file-type icons
+- In a diff opened from the log, step to the previous / next changed file from the editor title bar or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`
 
 ### Other
+- The panel UI follows the VS Code display language (English and Traditional Chinese)
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
-- New commands: Git Workbench: Fetch / Pull / Push…
+- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Previous Changed File / Next Changed File
 
 ## 1.0.0
 

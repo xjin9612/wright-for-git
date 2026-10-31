@@ -10,17 +10,20 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
 
 ## Features
 
-- **Branches** — Local / Remote / Tags tree, grouped into folders by `/` (`feature/…`, `fix/…`). Search, jump to the current branch, expand / collapse all. Click a branch to filter the log; double-click to check it out.
+- **Branches** — Local / Remote / Tags tree, grouped into folders by `/` (`feature/…`, `fix/…`). Search, jump to the current branch, expand / collapse all. Click a branch to filter the log; double-click to check it out. Star favorites to pin them (or show only favorites). Context menu: new branch from, compare with current, merge, rebase, update, push, rename, delete, push tag.
 - **Commit log**
   - Commit graph with colored lanes and a HEAD marker
   - Ref labels: matching local and remote branches are merged into one label (`origin & main`), plus tags and detached HEAD
-  - Filters: text or hash (regex and match-case toggles), Branch, User (supports `me`), Paths. Multiple values are separated by `|` or new lines; `Enter` completes, `Ctrl+Enter` applies
+  - Filters: text or hash (regex and match-case toggles), Branch, User (supports `me`), Paths, Date. Multiple values are separated by `|` or new lines; `Enter` completes, `Ctrl+Enter` applies. Text and User filters still draw a simplified graph
+  - Several log tabs, each with its own filters
   - Highlights: Conventional Commits type coloring (`feat`, `fix`, `docs`…), bold for your own commits, dimmed merge commits
-  - Columns: Author (`*` when author ≠ committer), Date, Hash — toggle them from the 👁 menu
+  - Columns: Author (`*` when author ≠ committer), Date, Hash — toggle them from the 👁 menu, drag their edge to resize
   - Virtual scrolling with streamed loading; tested with 100,000 commits
-  - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), compare with the working tree
+  - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), push up to here, compare with the working tree
+  - Multi-select with `Ctrl` / `Shift`: combined changes in the right pane, cherry-pick or revert several commits at once
 - **Sync** — Fetch in the Branches toolbar, Pull and Push in the log toolbar. Push always opens a Push Commits dialog listing what will be pushed; Force Push (`--force-with-lease`) is in the dialog's drop-down. Push All up to Here… pushes only up to a chosen commit. Local branches show ↑ahead ↓behind in the Branches tree
-- **Changed files** — tree with compacted folders and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff.
+- **Changed files** — tree (or flat list) with file-type icons and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff; step to the previous / next file from the diff's title bar.
+- **Stashes** — side-bar view: browse stashes and their files, apply / pop / drop, unstash as a branch, stash changes with a message
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
 - **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path
@@ -40,10 +43,12 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
 | Key | Action |
 |---|---|
 | `↑` `↓` `PageUp` `PageDown` `Home` `End` | Move the selection |
+| `Shift+↑↓`, `Ctrl`/`Shift`+click, `Ctrl+A` | Select several commits |
 | `Ctrl+C` | Copy the selected commit hash |
 | `Ctrl+F` | Focus the search box |
 | `Esc` (in the search box) | Clear the text filter |
 | `Alt+9` (anywhere) | Show the Git log |
+| `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown` (in a diff) | Previous / next changed file |
 
 ## Settings
 

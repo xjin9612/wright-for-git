@@ -41,3 +41,72 @@
 ## 自動重新整理
 - [ ] 在終端機執行 `git checkout`、`git commit`、`git fetch` 後，面板自動更新
 - [ ] 在 VS Code 內建原始檔控制 commit 後，面板自動更新
+
+---
+
+# 下一版新增項目（Unreleased）
+
+> 寫入類操作請用測試 repo 或測試 branch，不要在正式的 main 上測。
+
+## 同步
+- [ ] Fetch 在左側 Branches 直式工具列；按下後狀態列顯示「Fetch: N succeeded」
+- [ ] Log 工具列只剩 Pull 與 Push…（沒有舊的 Push 下拉箭頭）
+- [ ] 本機領先 1～2 筆時按 Push…：對話框列出 `main → origin : main` 與待推 commit；點 commit 右側列出檔案，雙擊檔案開 diff
+- [ ] Esc、取消都只關閉對話框；點對話框外面不會關閉
+- [ ] 按 Push 後對話框關閉、推送成功、↑ 數字歸零
+- [ ] 新 branch：顯示「New」「set upstream」；把目標 branch 名稱改掉再推，遠端 branch 名稱正確且已設定 upstream
+- [ ] 遠端有本機沒有的 commit（另一處推了新 commit 再 Fetch）：對話框顯示黃色警告；Push 被拒並顯示錯誤
+- [ ] 承上，▾ → Force Push（with lease）：跳出確認框；確認後覆蓋遠端
+- [ ] 勾選「推送 tag」：annotated tag 一併推上去
+- [ ] Commit 右鍵「Push 到這裡為止…」：只推到該 commit；選不在目前 branch 上的 commit 顯示「commit 不在目前 branch 上」
+- [ ] Pull：落後遠端時按 Pull，↓ 消失；沒有 upstream 的 repo 會被略過並提示
+- [ ] SSH remote 實際 Push／Pull 一次（有密碼的 key 在沒有 ssh-agent 時可能失敗，請回報訊息）
+- [ ] 命令面板「Git Workbench: Push…」也是開對話框
+
+## Branches 右鍵
+- [ ] Local branch 選單：Checkout、從此新增 Branch、與目前的 branch 比較、在 Log 中顯示、在新分頁中顯示、Merge、Rebase、更新、Push…、重新命名、刪除；目前 branch 的 Checkout／比較／Merge／Rebase／刪除為停用
+- [ ] 從 remote branch 新增 Branch：預設名稱為遠端 branch 名，建立後已追蹤該 remote branch
+- [ ] 與目前的 branch 比較：列出不同的檔案與「各有幾個 commit 不在對方」，選檔案開 diff
+- [ ] Merge 到目前的 branch：成功；衝突時提示「開啟原始檔控制／中止」
+- [ ] Rebase 目前的 branch：成功；衝突時同上，中止後恢復原狀
+- [ ] 更新（非目前 branch）：從 upstream fast-forward，不切換 branch；不能 fast-forward 時顯示錯誤
+- [ ] 重新命名：名稱不合法或已存在時無法送出
+- [ ] 刪除已合併的 branch：直接刪除；未合併：先詢問「仍要刪除」
+- [ ] 刪除 remote branch、刪除 tag：一定先確認
+- [ ] Tag 選單「推送 Tag…」：推到 origin（多個 remote 時可選）
+- [ ] 多 repo 同名 branch：操作會套用到所有擁有該 branch 的 repo，並先列出 repo 確認
+
+## 我的最愛
+- [ ] 預設 main／master 有 ★ 並置頂
+- [ ] 滑鼠移到 branch 列尾出現空心星號，點一下加入我的最愛並置頂；右鍵可移除
+- [ ] 工具列 ★ 按鈕：只顯示我的最愛；再按一次恢復
+- [ ] 重新載入視窗後我的最愛與「只顯示」狀態保留
+
+## Commit Log
+- [ ] Branch 篩選不含目前 branch 時，上方出現藍色提示；「顯示 HEAD」「顯示所有 branch」都有效
+- [ ] 日期篩選：最近 24 小時／7 天／30 天／90 天／一年；選擇區間（從／到）；清除 ✕
+- [ ] 文字或作者篩選時，結果之間有 graph 連線
+- [ ] 拖曳 Author／Date／Hash 欄的左緣調整寬度；雙擊還原；重新載入視窗後保留
+- [ ] 👁 →「新增 Log 分頁」或 Branches 右鍵「在新分頁中顯示」：出現分頁列，各分頁篩選獨立；關閉分頁後回到上一個；只剩一個分頁時分頁列隱藏
+
+## 多選 commit
+- [ ] Ctrl+點選、Shift+點選、Shift+↑↓、Ctrl+A 都能多選
+- [ ] 右欄顯示合併後的變更（多 repo 時分 repo 列出），下方列出選取的 commit，點一下回到單選
+- [ ] 雙擊檔案：diff 為「最舊選取 commit 之前 ↔ 最新選取 commit」
+- [ ] 右鍵：複製 N 個 Revision 編號、複製標題；同一 repo 時可一次 Cherry-Pick／Revert（含 merge commit 時會提示）
+
+## Stash（側邊欄 Stashes）
+- [ ] 標題列「Stash 變更…」：選 repo、選模式（已追蹤／含未追蹤／保留已 stage）、輸入說明 → 出現在清單
+- [ ] 沒有變更時提示「沒有可 stash 的本機變更」
+- [ ] 展開 stash 看到檔案（未追蹤檔案標示「未追蹤」），點檔案開 diff
+- [ ] 行內按鈕 Apply／Pop／刪除；右鍵「套用並還原 Staged 狀態」「從 Stash 建立 Branch…」
+- [ ] Pop 遇到衝突時提示，stash 保留
+- [ ] 在終端機執行 `git stash` 後清單自動更新
+
+## 變更檔案與 Diff
+- [ ] 右欄工具列切換樹狀／平鋪；檔案依類型顯示圖示（TS、JS、{}、M↓…）
+- [ ] 從 Log 開啟 diff 後，編輯器標題列有 ↑↓ 按鈕，可切換上一個／下一個變更檔案；`Ctrl+Alt+PageUp／PageDown` 也可以
+- [ ] 第一個／最後一個檔案時，狀態列提示已到底
+
+## 繁中介面
+- [ ] VS Code 顯示語言為繁體中文時，面板內的按鈕、選單、提示、Push 對話框都是中文；英文時維持英文

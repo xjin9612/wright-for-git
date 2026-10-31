@@ -1,6 +1,6 @@
 # 待辦清單（Roadmap）
 
-已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈）、1.1.0（同步、Commit 右鍵），詳見 CHANGELOG
+已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈）；下一版（CHANGELOG 的 Unreleased）：階段二、階段三全部項目
 
 ---
 
@@ -13,9 +13,9 @@
 | 檔案歷史 | Timeline | ✅ 顯示 Git 歷史 | — |
 | Checkout branch | ✅ | ✅ | — |
 | Fetch／Pull／Push／Sync、ahead/behind | ✅ | ✅ 1.1.0 | — |
-| Branch 建立／改名／刪除／merge／rebase | ✅ | ❌ | 階段二 |
+| Branch 建立／改名／刪除／merge／rebase | ✅ | ✅ | — |
 | Commit 操作：cherry-pick／revert／reset／建 tag | 部分（指令面板） | ✅ 1.1.0 | — |
-| Stash 建立／套用／刪除 | ✅ | ❌ | 階段二 |
+| Stash 建立／套用／刪除 | ✅ | ✅ | — |
 | 變更清單、stage／unstage、discard、commit／amend | ✅ | ❌ | 階段五（評估） |
 | 編輯器行號旁的變更標示、merge 衝突編輯器 | ✅ | ❌ | 沿用內建 |
 | Clone／Init／Remote 管理 | ✅ | ❌ | 沿用內建 |
@@ -29,24 +29,24 @@
 | # | 項目 | 說明 |
 |---|---|---|
 | 2.1 | ✅ 同步（1.1.0） | Fetch 在 Branches 工具列；Pull／Push 在 Log 工具列；Push 先開對話框（待推 commit、檔案、Push tags、下拉 Force Push）；右鍵 Push All up to Here；Branches 樹顯示 ahead／behind（↑↓）；多 repo 時一次對所選 repo 執行 |
-| 2.2 | Branch 右鍵選單 | Checkout、New Branch from…、Rename、Delete、Merge into Current、Rebase Current onto、Compare with Current、Push、Pull |
+| 2.2 | ✅ Branch 右鍵選單 | Checkout、New Branch from…、Rename、Delete、Merge into Current、Rebase Current onto、Compare with Current、Push、Pull |
 | 2.3 | ✅ Commit 右鍵選單（1.1.0） | Cherry-pick、Revert、Reset Current Branch to Here（soft／mixed／hard）、New Branch、New Tag、Compare with Local |
-| 2.4 | Stash | 底部面板新增 Stash 分頁：清單、檢視內容、Apply／Pop／Drop、Stash 目前變更 |
-| 2.5 | 多選 commit | `Ctrl`／`Shift` 多選，右欄顯示合併後的變更 |
-| 2.6 | 篩選提示 | 目前 branch 被 Branch 篩選排除時提示「HEAD 不在篩選中」，一鍵切回 |
-| 2.7 | Date 篩選 | 最近 24 小時／7 天／30 天、自訂區間 |
-| 2.8 | Favorite | 手動標記或取消 ★、置頂、「只顯示 favorite」 |
+| 2.4 | ✅ Stash | 側邊欄 Stashes 檢視：清單、檢視內容、Apply／Pop／Drop、從 Stash 建立 Branch、Stash 目前變更 |
+| 2.5 | ✅ 多選 commit | `Ctrl`／`Shift` 多選，右欄顯示合併後的變更 |
+| 2.6 | ✅ 篩選提示 | 目前 branch 被 Branch 篩選排除時提示「HEAD 不在篩選中」，一鍵切回 |
+| 2.7 | ✅ Date 篩選 | 最近 24 小時／7 天／30 天、自訂區間 |
+| 2.8 | ✅ Favorite | 手動標記或取消 ★、置頂、「只顯示 favorite」 |
 
 ## 階段三：體驗補強
 
 | # | 項目 | 說明 |
 |---|---|---|
-| 3.1 | 欄寬拖曳 | Author、Date、Hash 欄可拖曳調整並記憶 |
-| 3.2 | 篩選下的 graph | 文字／User 篩選時畫簡化連線 |
-| 3.3 | 多個 Log 分頁 | 各分頁保留自己的篩選條件 |
-| 3.4 | Diff 導覽 | diff 內切換上一個／下一個變更檔案 |
-| 3.5 | 檔案樹顯示 | 樹狀／平鋪切換、依檔案類型顯示圖示 |
-| 3.6 | 繁中介面 | Webview 內文字接上 l10n |
+| 3.1 | ✅ 欄寬拖曳 | Author、Date、Hash 欄可拖曳調整並記憶 |
+| 3.2 | ✅ 篩選下的 graph | 文字／User 篩選時畫簡化連線 |
+| 3.3 | ✅ 多個 Log 分頁 | 各分頁保留自己的篩選條件 |
+| 3.4 | ✅ Diff 導覽 | diff 內切換上一個／下一個變更檔案 |
+| 3.5 | ✅ 檔案樹顯示 | 樹狀／平鋪切換、依檔案類型顯示圖示 |
+| 3.6 | ✅ 繁中介面 | Webview 內文字接上 l10n |
 
 ## 階段四：進階
 

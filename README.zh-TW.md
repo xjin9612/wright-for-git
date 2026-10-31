@@ -10,17 +10,20 @@
 
 ## 功能
 
-- **Branches**：Local／Remote／Tags 樹狀顯示，依 `/` 自動分資料夾；搜尋、定位目前 branch、展開／收合；點選即篩選 Log，雙擊 checkout
+- **Branches**：Local／Remote／Tags 樹狀顯示，依 `/` 自動分資料夾；搜尋、定位目前 branch、展開／收合；點選即篩選 Log，雙擊 checkout；星號標記我的最愛並置頂（可只顯示我的最愛）；右鍵：從此新增 branch、與目前 branch 比較、merge、rebase、更新、push、重新命名、刪除、推送 tag
 - **Commit Log**
   - Commit graph（lane 分配與著色、HEAD 標記）
   - Ref 標籤：同名 local／remote 合併顯示（`origin & main`）、tag、detached HEAD
-  - 篩選：文字或 hash（支援 regex、大小寫）、Branch、User（支援 `me`）、Paths；多值以 `|` 或換行分隔，`Enter` 補完、`Ctrl+Enter` 完成
+  - 篩選：文字或 hash（支援 regex、大小寫）、Branch、User（支援 `me`）、Paths、日期；多值以 `|` 或換行分隔，`Enter` 補完、`Ctrl+Enter` 完成；文字／User 篩選時仍會畫出簡化的 graph
+  - 多個 Log 分頁，各自保留篩選條件
   - Highlight：Conventional Commits 類型上色、我的 commit 粗體、merge commit 淡化
-  - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換
+  - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換，拖曳欄位左緣調整寬度
   - 虛擬捲動，串流分批載入
-  - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、與工作區比較
+  - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、Push 到這裡為止、與工作區比較
+  - `Ctrl`／`Shift` 多選：右欄顯示合併後的變更，可一次 cherry-pick 或 revert 多個 commit
 - **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框，列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後
-- **變更檔案**：樹狀（壓縮單一子目錄、檔案數；新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff
+- **變更檔案**：樹狀或平鋪清單，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列可切換上一個／下一個檔案
+- **Stash**：側邊欄檢視 stash 與其中的檔案，Apply／Pop／Drop、從 Stash 建立 Branch、Stash 變更（可填說明）
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
 - 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選
@@ -40,9 +43,11 @@
 | 按鍵 | 動作 |
 |---|---|
 | `↑` `↓` `PageUp` `PageDown` `Home` `End` | 移動選取的 commit |
+| `Shift+↑↓`、`Ctrl`／`Shift`+點選、`Ctrl+A` | 多選 commit |
 | `Ctrl+C` | 複製選取 commit 的 hash |
 | `Ctrl+F` | 聚焦搜尋框 |
 | `Esc`（搜尋框內） | 清除文字篩選 |
+| `Ctrl+Alt+PageUp`／`Ctrl+Alt+PageDown`（diff 中） | 上一個／下一個變更檔案 |
 
 ## 設定
 
