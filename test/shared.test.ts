@@ -88,3 +88,17 @@ test('mergeRefs：同名 branch 合併並記錄所屬 repo', () => {
   assert.equal(byName.get('release')!.current, true);
   assert.deepEqual(byName.get('only-b')!.roots, ['/b']);
 });
+
+test('combineChanges：多選 commit 合併為淨變更', async () => {
+  const { combineChanges } = await import('../src/shared/combine');
+  const r = combineChanges([
+    { hash: 'c1', parent: 'p0', files: [{ status: 'A', path: 'new.txt' }, { status: 'M', path: 'a.txt' }, { status: 'A', path: 'tmp.txt' }] },
+    { hash: 'c2', parent: 'c1', files: [{ status: 'M', path: 'new.txt' }, { status: 'D', path: 'tmp.txt' }, { status: 'R', path: 'b2.txt', oldPath: 'b.txt' }] },
+    { hash: 'c3', parent: 'c2', files: [{ status: 'M', path: 'a.txt' }, { status: 'M', path: 'b2.txt' }] },
+  ]);
+  assert.deepEqual(r, [
+    { status: 'M', path: 'a.txt', left: 'p0', right: 'c3' },
+    { status: 'R', path: 'b2.txt', oldPath: 'b.txt', left: 'c1', right: 'c3' },
+    { status: 'A', path: 'new.txt', left: '', right: 'c2' },
+  ]);
+});

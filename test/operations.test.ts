@@ -320,3 +320,19 @@ test('stash：push（含未追蹤）、list、檔案、apply、pop、drop、bran
   assert.equal(a.git('rev-parse', '--abbrev-ref', 'HEAD'), 'from-stash');
   await assert.rejects(repo.stashDrop('--all'), /Invalid stash/);
 });
+
+test('多個 commit 一次 cherry-pick／revert', async () => {
+  const a = makeRepo();
+  a.commit('init', { 'a.txt': '1\n' });
+  a.git('checkout', '-q', '-b', 'topic');
+  const c1 = a.commit('one', { 'one.txt': '1' });
+  const c2 = a.commit('two', { 'two.txt': '2' });
+  a.git('checkout', '-q', 'main');
+  const repo = (await GitRepository.open('git', a.dir))!;
+  await repo.cherryPickMany([c1, c2]);
+  assert.equal(a.git('log', '--format=%s', '-2'), 'two\none');
+  const [h2, h1] = a.git('log', '--format=%H', '-2').split('\n');
+  await repo.revertMany([h2, h1]);
+  assert.match(a.git('log', '--format=%s', '-2'), /Revert "two"\nRevert "one"|Revert "one"/);
+  await assert.rejects(repo.cherryPickMany(['--abort']));
+});

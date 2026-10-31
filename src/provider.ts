@@ -7,8 +7,9 @@ import { isGraphFilter, isHash } from './git/parsers';
 import { GitRepository } from './git/repository';
 import { builtinRepositoryRoots, onRepositoryChange } from './gitExtension';
 import { revisionUri } from './diffProvider';
-import { buildPushPlans, runCommitAction, runPush, runRefAction, runSync, type RepoTarget } from './actions';
+import { buildPushPlans, runCommitAction, runCommitsAction, runPush, runRefAction, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
+import { combineChanges } from './shared/combine';
 import { promises as fsp } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 
@@ -297,6 +298,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'selectCommit':
           await this.sendDetails(m.root, m.hash);
           break;
+        case 'selectCommits':
+          await this.sendMultiDetails(m.requestId, m.items);
+          break;
         case 'containingBranches':
           await this.sendContaining(m.root, m.hash);
           break;
@@ -358,6 +362,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'refAction': {
           const targets = (await this.freshTargets(m.roots)).filter((x) => x.state?.refs.some((r) => r.name === m.ref));
           await runRefAction(m.action, m.ref, targets);
+          await this.refresh(true);
+          break;
+        }
+        case 'commitsAction': {
+          const [target] = await this.freshTargets([m.root]);
+          if (!target) break;
+          await runCommitsAction(m.action, target, m.commits);
           await this.refresh(true);
           break;
         }
@@ -554,11 +565,39 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return [...merged.values()].sort((a, b) => b.count - a.count);
   }
 
+  /** 多選 commit：每個 repo 各自合併選取 commit 的淨變更 */
+  private async sendMultiDetails(requestId: number, items: { root: string; hash: string; parents: string[] }[]): Promise<void> {
+    this.detailsAbort?.abort();
+    const abort = new AbortController();
+    this.detailsAbort = abort;
+    const byRoot = new Map<string, typeof items>();
+    for (const it of items) byRoot.set(it.root, [...(byRoot.get(it.root) ?? []), it]);
+    const groups: { root: string; files: ChangedFile[] }[] = [];
+    try {
+      for (const [root, list] of byRoot) {
+        const e = this.find(root);
+        if (!e) continue;
+        // webview 依列順序（新到舊）送來，合併時要由舊到新
+        const ordered = [...list].reverse();
+        const changes = await mapLimit(ordered, 4, async (c) => ({
+          hash: c.hash,
+          parent: c.parents[0],
+          files: await e.repo.getChangedFiles(c.hash, c.parents.slice(0, 1), abort.signal),
+        }));
+        groups.push({ root, files: combineChanges(changes) });
+      }
+      if (!abort.signal.aborted) this.post({ type: 'multiDetails', requestId, groups });
+    } catch (err) {
+      if (!abort.signal.aborted) void vscode.window.showErrorMessage(errorMessage(err));
+    }
+  }
+
   private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile): Promise<void> {
     const e = this.find(root);
     if (!e) return;
-    const leftRef = file.status === 'A' || !parent ? '' : parent;
-    const rightRef = file.status === 'D' ? '' : hash;
+    // 多選合併的變更自帶左右兩側的 revision
+    const leftRef = file.left !== undefined ? file.left : file.status === 'A' || !parent ? '' : parent;
+    const rightRef = file.right !== undefined ? file.right : file.status === 'D' ? '' : hash;
     const left = revisionUri(e.repo.root, leftRef, file.oldPath ?? file.path);
     const right = revisionUri(e.repo.root, rightRef, file.path);
     const short = (h: string) => (h ? h.slice(0, 8) : '∅');

@@ -6,8 +6,10 @@ import { clear, el, formatDate, icon, iconButton, makeSplitter } from './dom';
 import { renderLabel } from './logTable';
 
 export interface DetailsCallbacks {
-  /** details：檔案所屬 commit 的詳情（parent 取自真正的 parent，不受路徑篩選改寫影響） */
-  onOpenDiff: (file: ChangedFile, details: CommitDetails) => void;
+  /** 開啟 diff：單一 commit 時 parent 取自真正的 parent（不受路徑篩選改寫影響）；多選時 file 自帶 left／right */
+  onOpenDiff: (root: string, file: ChangedFile, hash: string, parent: string | undefined) => void;
+  /** 多選時點選 commit 清單中的項目 */
+  onPickCommit?: (root: string, hash: string) => void;
   onCopy: (text: string) => void;
   onRequestContaining: (root: string, hash: string) => void;
   onCollapsePane: () => void;
@@ -25,8 +27,18 @@ const STATUS_TEXT: Record<string, string> = {
   X: 'Unknown',
 };
 
+/** 多選時資訊區列出的 commit */
+export interface SelectedCommit {
+  root: string;
+  hash: string;
+  subject: string;
+  author: string;
+  authorTime: number;
+}
+
 interface FileRow {
   key: string;
+  root: string;
   depth: number;
   label: string;
   count?: number;
@@ -41,6 +53,8 @@ export class DetailsPane {
   private readonly info: HTMLElement;
   private readonly filesSection: HTMLElement;
   private details: CommitDetails | null = null;
+  /** 多選模式：各 repo 的合併變更（null 表示單選或尚未載入） */
+  private multi: { commits: SelectedCommit[]; groups: { root: string; files: ChangedFile[] }[] | null } | null = null;
   private states = new Map<string, RepoState>();
   private collapsed = new Set<string>();
   private selectedFile: string | undefined;
@@ -114,6 +128,7 @@ export class DetailsPane {
 
   renderEmpty(text: string): void {
     this.details = null;
+    this.multi = null;
     this.fileList.classList.remove('loading');
     this.rows = [];
     clear(this.fileList);
@@ -125,7 +140,36 @@ export class DetailsPane {
     this.fileList.classList.add('loading');
   }
 
+  /** 多選：先顯示 commit 清單，變更載入後再呼叫 setMultiFiles */
+  showMulti(commits: SelectedCommit[]): void {
+    this.details = null;
+    this.multi = { commits, groups: null };
+    this.selectedFile = undefined;
+    this.fileList.classList.add('loading');
+    this.renderFiles();
+    this.renderInfo();
+  }
+
+  setMultiFiles(groups: { root: string; files: ChangedFile[] }[]): void {
+    if (!this.multi) return;
+    this.multi.groups = groups;
+    this.fileList.classList.remove('loading');
+    this.renderFiles();
+  }
+
+  /** 目前顯示中的檔案群組（單選時只有一組） */
+  private get groups(): { root: string; files: ChangedFile[] }[] {
+    if (this.details) return [{ root: this.details.root, files: this.details.files }];
+    return this.multi?.groups ?? [];
+  }
+
+  private openFile(root: string, file: ChangedFile): void {
+    if (this.details) this.cb.onOpenDiff(root, file, this.details.hash, this.details.parents[0]);
+    else if (file.right !== undefined) this.cb.onOpenDiff(root, file, file.right, file.left);
+  }
+
   setDetails(d: CommitDetails): void {
+    this.multi = null;
     const sameCommit = this.details?.hash === d.hash && this.details.root === d.root;
     this.details = d;
     this.fileList.classList.remove('loading');
@@ -147,33 +191,34 @@ export class DetailsPane {
   // ---------- 檔案樹 ----------
 
   private buildRows(): FileRow[] {
-    const d = this.details;
-    if (!d) return [];
     const rows: FileRow[] = [];
-    const rootKey = '\u0000root';
-    const rootOpen = !this.collapsed.has(rootKey);
-    rows.push({ key: rootKey, depth: 0, label: this.state?.name ?? '', count: d.files.length, expanded: rootOpen, expandable: true });
-    if (!rootOpen) return rows;
-    const walk = (nodes: TreeNode<ChangedFile>[], depth: number) => {
-      for (const n of nodes) {
-        if (n.item) {
-          rows.push({ key: n.item.path, depth, label: n.name, file: n.item, expanded: false, expandable: false });
-        } else {
-          const open = !this.collapsed.has(n.path);
-          rows.push({ key: n.path, depth, label: n.name, count: n.count, expanded: open, expandable: true });
-          if (open) walk(n.children, depth + 1);
+    for (const g of this.groups) {
+      const rootKey = `\u0000root:${g.root}`;
+      const rootOpen = !this.collapsed.has(rootKey);
+      rows.push({ key: rootKey, root: g.root, depth: 0, label: this.states.get(g.root)?.name ?? '', count: g.files.length, expanded: rootOpen, expandable: true });
+      if (!rootOpen) continue;
+      const walk = (nodes: TreeNode<ChangedFile>[], depth: number) => {
+        for (const n of nodes) {
+          if (n.item) {
+            rows.push({ key: `${g.root}\u0000${n.item.path}`, root: g.root, depth, label: n.name, file: n.item, expanded: false, expandable: false });
+          } else {
+            const key = `${g.root}\u0000${n.path}/`;
+            const open = !this.collapsed.has(key);
+            rows.push({ key, root: g.root, depth, label: n.name, count: n.count, expanded: open, expandable: true });
+            if (open) walk(n.children, depth + 1);
+          }
         }
-      }
-    };
-    walk(buildTree(d.files, (f) => f.path), 1);
+      };
+      walk(buildTree(g.files, (f) => f.path), 1);
+    }
     return rows;
   }
 
   private renderFiles(): void {
     this.rows = this.buildRows();
     clear(this.fileList);
-    if (!this.details) return;
-    if (this.details.files.length === 0) {
+    if (!this.details && !this.multi?.groups) return;
+    if (this.groups.every((g) => g.files.length === 0)) {
       this.fileList.append(el('div', { className: 'empty-text', text: 'No changes' }));
       return;
     }
@@ -198,7 +243,7 @@ export class DetailsPane {
         else this.renderFiles();
       });
       row.addEventListener('dblclick', () => {
-        if (f && this.details) this.cb.onOpenDiff(f, this.details);
+        if (f) this.openFile(r.root, f);
       });
       frag.append(row);
     }
@@ -214,7 +259,7 @@ export class DetailsPane {
 
   private openSelected(): void {
     const row = this.rows.find((r) => r.key === this.selectedFile && r.file) ?? this.rows.find((r) => r.file);
-    if (row?.file && this.details) this.cb.onOpenDiff(row.file, this.details);
+    if (row?.file) this.openFile(row.root, row.file);
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -242,7 +287,7 @@ export class DetailsPane {
         if (row?.expandable && row.expanded) this.toggle(row.key, false);
         break;
       case 'Enter':
-        if (row?.file && this.details) this.cb.onOpenDiff(row.file, this.details);
+        if (row?.file) this.openFile(row.root, row.file);
         else if (row?.expandable) this.toggle(row.key);
         break;
       default:
@@ -256,6 +301,10 @@ export class DetailsPane {
   private renderInfo(): void {
     const d = this.details;
     clear(this.info);
+    if (this.multi) {
+      this.renderMultiInfo(this.multi.commits);
+      return;
+    }
     if (!d) return;
     const short = d.hash.slice(0, 8);
     const hashLink = el('a', { className: 'link hash-link', text: short, title: `Copy ${d.hash}`, attrs: { href: '#' } });
@@ -310,5 +359,23 @@ export class DetailsPane {
       ...[committed, refsLine].filter((n): n is HTMLDivElement => n !== null),
       branchesLine,
     );
+  }
+
+  private renderMultiInfo(commits: SelectedCommit[]): void {
+    const repos = new Set(commits.map((c) => c.root)).size;
+    const header = el('div', { className: 'details-subject', text: `${commits.length} commits selected${repos > 1 ? ` in ${repos} repositories` : ''}` });
+    const list = el('div', { className: 'multi-list' });
+    for (const c of commits) {
+      const row = el(
+        'div',
+        { className: 'multi-commit', title: `${c.hash}\n${c.author} · ${formatDate(c.authorTime)}` },
+        el('span', { className: 'hash', text: c.hash.slice(0, 8) }),
+        el('span', { className: 'multi-subject', text: c.subject }),
+        el('span', { className: 'muted', text: c.author }),
+      );
+      row.addEventListener('click', () => this.cb.onPickCommit?.(c.root, c.hash));
+      list.append(row);
+    }
+    this.info.append(el('div', { className: 'details-message' }, header), list);
   }
 }

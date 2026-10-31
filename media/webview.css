@@ -212,6 +212,7 @@ button { font: inherit; color: inherit; }
 .log-row:hover { background: var(--hover); }
 .log-row.selected { background: var(--sel-bg); color: var(--sel-fg); }
 .log-viewport:focus .log-row.selected { background: var(--sel-focus-bg); color: var(--sel-focus-fg); }
+.log-viewport:focus .log-row.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
 .log-row.is-mine .cell-subject-text { font-weight: 600; }
 .log-row.is-merge .cell-subject-text, .log-row.is-merge .cell-author { color: var(--muted); }
 
@@ -375,3 +376,10 @@ select.push-remote {
 .push-idle { padding-left: 10px; margin-top: 6px; }
 .push-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--vscode-panel-border, var(--border)); flex: none; }
 .push-option { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+/* ---------- 多選 commit 的清單 ---------- */
+.multi-list { display: flex; flex-direction: column; padding: 4px 0; }
+.multi-commit { display: flex; gap: 8px; align-items: center; height: 20px; cursor: pointer; white-space: nowrap; }
+.multi-commit:hover { background: var(--hover); }
+.multi-commit .hash { font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); flex: none; }
+.multi-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

@@ -42,6 +42,8 @@ const CC_TYPES = new Set(['feat', 'fix', 'docs', 'refactor', 'perf', 'test', 'st
 
 export interface LogTableCallbacks {
   onSelect: (index: number) => void;
+  /** 多選（Ctrl／Shift）：indices 依列順序排列，至少兩筆 */
+  onMultiSelect: (indices: number[]) => void;
   onContextMenu: (index: number, x: number, y: number) => void;
 }
 
@@ -70,6 +72,10 @@ export class LogTable {
   private refsByKey = new Map<string, RefInfo[]>();
   private states: readonly RepoState[] = [];
   private selected = -1;
+  /** 多選時的所有選取列（含 selected）；單選時為空 */
+  private multi = new Set<number>();
+  /** Shift 範圍選取的起點 */
+  private anchor = -1;
   private columns: Columns;
   private highlights: Highlights;
   private frame = 0;
@@ -94,13 +100,23 @@ export class LogTable {
     this.viewport.addEventListener('keydown', (e) => this.onKey(e));
     this.rowsLayer.addEventListener('mousedown', (e) => {
       const idx = this.indexFromEvent(e);
-      if (idx !== undefined) this.select(idx, true);
+      if (idx === undefined) return;
+      // 右鍵點在已選取的列上：保留多選（右鍵選單作用於整個選取）
+      if (e.button !== 0 && this.isSelected(idx)) return;
+      if (e.button === 0 && e.shiftKey) {
+        e.preventDefault();
+        this.selectRange(this.anchor >= 0 ? this.anchor : idx, idx, e.ctrlKey || e.metaKey);
+      } else if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+        this.toggleIndex(idx);
+      } else {
+        this.select(idx, true);
+      }
     });
     this.rowsLayer.addEventListener('contextmenu', (e) => {
       const idx = this.indexFromEvent(e);
       if (idx === undefined) return;
       e.preventDefault();
-      this.select(idx, true);
+      if (!this.isSelected(idx)) this.select(idx, true);
       this.cb.onContextMenu(idx, e.clientX, e.clientY);
     });
     this.applyColumns();
@@ -185,13 +201,66 @@ export class LogTable {
   select(index: number, notify: boolean, scroll: 'nearest' | 'center' | 'none' = 'nearest'): void {
     if (index < 0 || index >= this.commits.length) return;
     this.selected = index;
+    this.anchor = index;
+    this.multi.clear();
     this.scrollToIndex(index, scroll);
     this.schedule();
     if (notify) this.cb.onSelect(index);
   }
 
+  /** 所有選取列（依列順序） */
+  get selectedIndices(): number[] {
+    if (this.multi.size > 0) return [...this.multi].sort((a, b) => a - b);
+    return this.selected >= 0 ? [this.selected] : [];
+  }
+
+  private isSelected(idx: number): boolean {
+    return this.multi.size > 0 ? this.multi.has(idx) : idx === this.selected;
+  }
+
+  /** 多選上限：避免一次合併過多 commit 的變更 */
+  static readonly MAX_MULTI = 200;
+
+  private selectRange(from: number, to: number, add: boolean): void {
+    const set = add ? new Set(this.selectedIndices) : new Set<number>();
+    const [a, b] = from <= to ? [from, to] : [to, from];
+    for (let i = a; i <= b && set.size < LogTable.MAX_MULTI; i++) set.add(i);
+    this.selected = to;
+    this.applyMulti(set);
+  }
+
+  private toggleIndex(idx: number): void {
+    const set = new Set(this.selectedIndices);
+    if (set.has(idx)) {
+      if (set.size === 1) return;
+      set.delete(idx);
+      this.selected = [...set].sort((a, b) => a - b)[0];
+    } else {
+      if (set.size >= LogTable.MAX_MULTI) return;
+      set.add(idx);
+      this.selected = idx;
+    }
+    this.anchor = idx;
+    this.applyMulti(set);
+  }
+
+  private applyMulti(set: Set<number>): void {
+    this.scrollToIndex(this.selected, 'nearest');
+    if (set.size <= 1) {
+      this.multi.clear();
+      this.schedule();
+      this.cb.onSelect(this.selected);
+      return;
+    }
+    this.multi = set;
+    this.schedule();
+    this.cb.onMultiSelect(this.selectedIndices);
+  }
+
   clearSelection(): void {
     this.selected = -1;
+    this.anchor = -1;
+    this.multi.clear();
     this.schedule();
   }
 
@@ -235,11 +304,20 @@ export class LogTable {
       case 'End':
         next = this.commits.length - 1;
         break;
+      case 'a':
+      case 'A':
+        // Ctrl+A：選取可見範圍內最多 MAX_MULTI 筆
+        if (!(e.ctrlKey || e.metaKey) || this.commits.length === 0) return;
+        e.preventDefault();
+        this.selectRange(0, Math.min(this.commits.length, LogTable.MAX_MULTI) - 1, false);
+        return;
       default:
         return;
     }
     e.preventDefault();
-    this.select(Math.max(0, Math.min(this.commits.length - 1, next)), true);
+    const target = Math.max(0, Math.min(this.commits.length - 1, next));
+    if (e.shiftKey && this.anchor >= 0) this.selectRange(this.anchor, target, false);
+    else this.select(target, true);
   }
 
   private schedule(): void {
@@ -296,7 +374,8 @@ export class LogTable {
     const head = this.headOf(c.repo);
     view.root.style.transform = `translateY(${idx * ROW_HEIGHT}px)`;
     (view.root.firstElementChild as HTMLElement).style.paddingLeft = `${graphWidth}px`;
-    view.root.classList.toggle('selected', idx === this.selected);
+    view.root.classList.toggle('selected', this.isSelected(idx));
+    view.root.classList.toggle('focused', this.multi.size > 0 && idx === this.selected);
     view.root.classList.toggle('is-head', c.hash === head.hash);
     const key = `${c.repo}:${c.hash}`;
     if (view.index === idx && view.root.dataset.key === key) return;

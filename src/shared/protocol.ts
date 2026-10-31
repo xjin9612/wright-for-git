@@ -80,6 +80,9 @@ export interface ChangedFile {
   path: string;
   /** rename／copy 的原路徑 */
   oldPath?: string;
+  /** 多選合併變更時，diff 左右兩側的 revision（'' 表示不存在）；單一 commit 時不填 */
+  left?: string;
+  right?: string;
 }
 
 export interface CommitDetails {
@@ -122,6 +125,8 @@ export type ToExtension =
   | { type: 'loadLog'; requestId: number; generation: number; filter: LogFilter }
   | { type: 'selectCommit'; root: string; hash: string }
   | { type: 'containingBranches'; root: string; hash: string }
+  /** 多選 commit：合併各 repo 選取 commit 的變更；requestId 用來忽略過期回應 */
+  | { type: 'selectCommits'; requestId: number; items: { root: string; hash: string; parents: string[] }[] }
   | { type: 'openDiff'; root: string; hash: string; parent?: string; file: ChangedFile }
   /** 在 roots 中所有擁有此 ref 的 repository checkout */
   | { type: 'checkout'; ref: string; roots: string[] }
@@ -141,6 +146,8 @@ export type ToExtension =
   | { type: 'pushConfirm'; requestId: number; targets: PushTarget[]; force: boolean; tags: boolean }
   /** Branches 右鍵選單的操作：ref 為完整名稱，roots 為擁有此 ref 的 repository */
   | { type: 'refAction'; action: RefAction; ref: string; roots: string[] }
+  /** 多選 commit 的操作：依 commits 的順序逐一執行（同一個 repo） */
+  | { type: 'commitsAction'; action: 'cherryPick' | 'revert'; root: string; commits: { hash: string; parents: string[]; subject: string }[] }
   /** Commit 右鍵選單的操作 */
   | { type: 'commitAction'; action: CommitAction; root: string; hash: string; parents: string[]; subject: string };
 
@@ -201,6 +208,7 @@ export type ToWebview =
   | { type: 'logError'; requestId: number; message: string }
   | { type: 'details'; details: CommitDetails }
   | { type: 'detailsError'; root: string; hash: string; message: string }
+  | { type: 'multiDetails'; requestId: number; groups: { root: string; files: ChangedFile[] }[] }
   | { type: 'containing'; root: string; hash: string; branches: string[] }
   | { type: 'users'; users: UserInfo[] }
   | { type: 'paths'; root: string; paths: string[] }

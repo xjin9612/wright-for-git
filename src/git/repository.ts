@@ -290,6 +290,18 @@ export class GitRepository {
     await this.run(['revert', '--no-edit', ...(mainline ? ['-m', String(mainline)] : []), hash]);
   }
 
+  /** 依序 cherry-pick 多個 commit（由舊到新）；中途衝突時停在該 commit，可續做或中止整個序列 */
+  async cherryPickMany(hashes: string[]): Promise<void> {
+    if (hashes.length === 0 || !hashes.every(isHash)) throw new GitError('Invalid revision', null, '');
+    await this.run(['cherry-pick', ...hashes]);
+  }
+
+  /** 依序 revert 多個 commit（由新到舊） */
+  async revertMany(hashes: string[]): Promise<void> {
+    if (hashes.length === 0 || !hashes.every(isHash)) throw new GitError('Invalid revision', null, '');
+    await this.run(['revert', '--no-edit', ...hashes]);
+  }
+
   async reset(hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<void> {
     if (!isHash(hash)) throw new GitError(`Invalid revision: ${hash}`, null, '');
     await this.run(['reset', `--${mode}`, hash]);

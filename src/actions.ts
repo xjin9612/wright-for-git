@@ -316,6 +316,29 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
   }
 }
 
+/** 多選 commit：一次 cherry-pick／revert（git 依序處理，衝突時停下） */
+export async function runCommitsAction(action: 'cherryPick' | 'revert', target: RepoTarget, commits: { hash: string; parents: string[]; subject: string }[]): Promise<void> {
+  if (commits.some((c) => c.parents.length > 1)) {
+    void vscode.window.showWarningMessage(t('The selection contains merge commits. Cherry-pick or revert them one at a time to choose the mainline parent.'));
+    return;
+  }
+  const ok = action === 'cherryPick' ? t('Cherry-Pick') : t('Revert');
+  const answer = await vscode.window.showInformationMessage(
+    action === 'cherryPick' ? t('Cherry-pick {0} commits onto {1}?', commits.length, currentBranch(target) ?? 'HEAD') : t('Revert {0} commits on {1}?', commits.length, currentBranch(target) ?? 'HEAD'),
+    { modal: true, detail: commits.map((c) => `${short(c.hash)} ${c.subject}`).join('\n') },
+    ok,
+  );
+  if (answer !== ok) return;
+  try {
+    const hashes = commits.map((c) => c.hash);
+    if (action === 'cherryPick') await target.repo.cherryPickMany(hashes);
+    else await target.repo.revertMany(hashes);
+    vscode.window.setStatusBarMessage(`$(check) ${action === 'cherryPick' ? t('Cherry-picked {0} commits', commits.length) : t('Reverted {0} commits', commits.length)}`, 4000);
+  } catch (e) {
+    if (!(await handleConflict(target))) void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
+  }
+}
+
 // ---------- Branch／Tag 操作 ----------
 
 function refIn(target: RepoTarget, refName: string): RefInfo | undefined {

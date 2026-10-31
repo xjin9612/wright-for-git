@@ -91,6 +91,7 @@ const branches = new BranchesPane(
 const table = new LogTable(
   {
     onSelect: (i) => onCommitSelected(i),
+    onMultiSelect: (indices) => onCommitsSelected(indices),
     onContextMenu: (i, x, y) => showContextMenu(i, x, y),
   },
   ui.columns,
@@ -99,7 +100,11 @@ const table = new LogTable(
 
 const details = new DetailsPane(
   {
-    onOpenDiff: (file, d) => post({ type: 'openDiff', root: d.root, hash: d.hash, parent: d.parents[0], file }),
+    onOpenDiff: (root, file, hash, parent) => post({ type: 'openDiff', root, hash, parent, file }),
+    onPickCommit: (root, hash) => {
+      const idx = keyIndex.get(`${repos.findIndex((r) => r.root === root)}:${hash}`);
+      if (idx !== undefined) table.select(idx, true, 'center');
+    },
     onCopy: (text) => post({ type: 'copy', text }),
     onRequestContaining: (root, hash) => post({ type: 'containingBranches', root, hash }),
     onCollapsePane: () => setPaneVisible('right', false),
@@ -542,6 +547,17 @@ function hasActiveFilter(): boolean {
 
 const requestDetails = debounce((root: string, hash: string) => post({ type: 'selectCommit', root, hash }), 60);
 
+let multiRequest = 0;
+
+/** 多選：右欄顯示選取 commit 的合併變更 */
+function onCommitsSelected(indices: number[]): void {
+  requestDetails.cancel();
+  const list = indices.map((i) => commits[i]).filter((c): c is CommitInfo => !!c && !!repos[c.repo]);
+  details.showMulti(list.map((c) => ({ root: repos[c.repo].root, hash: c.hash, subject: c.subject, author: c.author, authorTime: c.authorTime })));
+  multiRequest++;
+  post({ type: 'selectCommits', requestId: multiRequest, items: list.map((c) => ({ root: repos[c.repo].root, hash: c.hash, parents: c.parents })) });
+}
+
 function onCommitSelected(index: number): void {
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
@@ -554,6 +570,11 @@ function onCommitSelected(index: number): void {
 
 // ---------- 選單 ----------
 function showContextMenu(index: number, x: number, y: number): void {
+  const selected = table.selectedIndices.map((i) => commits[i]).filter((c): c is CommitInfo => !!c);
+  if (selected.length > 1) {
+    showMultiMenu(selected, x, y);
+    return;
+  }
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
   if (!c || !root) return;
@@ -572,6 +593,21 @@ function showContextMenu(index: number, x: number, y: number): void {
     { label: 'Push All up to Here…', action: () => openPush({ root, hash: c.hash }) },
     '-',
     { label: 'Compare with Local', action: act('compareLocal') },
+  ]);
+}
+
+/** 多選時的右鍵選單：複製、依序 cherry-pick／revert（限同一個 repo） */
+function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
+  const sameRepo = selected.every((c) => c.repo === selected[0].repo);
+  const root = repos[selected[0].repo]?.root;
+  // 依列順序為新到舊；cherry-pick 由舊到新套用，revert 由新到舊
+  const items = (order: CommitInfo[]) => order.map((c) => ({ hash: c.hash, parents: c.parents, subject: c.subject }));
+  showMenu(x, y, [
+    { label: `Copy ${selected.length} Revision Numbers`, action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
+    { label: 'Copy Subjects', action: () => post({ type: 'copy', text: selected.map((c) => c.subject).join('\n') }) },
+    '-',
+    { label: `Cherry-Pick ${selected.length} Commits`, disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) }) },
+    { label: `Revert ${selected.length} Commits`, disabled: !sameRepo, action: () => root && post({ type: 'commitsAction', action: 'revert', root, commits: items(selected) }) },
   ]);
 }
 
@@ -705,6 +741,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       if (c && c.hash === m.hash && repos[c.repo]?.root === m.root) details.renderEmpty(m.message);
       break;
     }
+    case 'multiDetails':
+      if (m.requestId === multiRequest) details.setMultiFiles(m.groups);
+      break;
     case 'containing':
       details.setContaining(m.root, m.hash, m.branches);
       break;
