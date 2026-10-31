@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { ConfirmHost, confirm } from './dialogs';
 import { t } from './i18n';
 import type { WorkbenchViewProvider } from './provider';
-import type { DiffHunk, ToExtension, ToWebview } from './shared/protocol';
+import type { DiffHunk, RebaseCommit, ToExtension, ToWebview } from './shared/protocol';
 import { openStashFile } from './stashView';
 
 export interface PushDialogArgs {
@@ -16,7 +16,8 @@ export interface PushDialogArgs {
 export type DialogConfig =
   | { kind: 'push'; args: PushDialogArgs }
   | { kind: 'unstash'; args: { root?: string } }
-  | { kind: 'hunks'; args: { root: string; path: string; hunks: DiffHunk[]; selected: number[] } };
+  | { kind: 'hunks'; args: { root: string; path: string; hunks: DiffHunk[]; selected: number[] } }
+  | { kind: 'rebase'; args: { root: string; base: string; branch?: string; commits: RebaseCommit[] } };
 
 type Reply = (msg: ToWebview) => void;
 type Handler = (m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void) => Promise<void>;
@@ -43,6 +44,43 @@ export class DialogPanels {
     const name = filePath.slice(filePath.lastIndexOf('/') + 1);
     this.open('hunks', t('Select Changes: {0}', name), { kind: 'hunks', args: { root, path: filePath, hunks, selected } }, async (m) => {
       if (m.type === 'hunksSelect') await onApply(m.selected);
+    });
+  }
+
+  /** 互動式 rebase：從 hash（含）到 HEAD */
+  async openRebase(root: string, hash: string): Promise<void> {
+    const repo = this.provider.getRepository(root);
+    if (!repo) return;
+    let info: Awaited<ReturnType<typeof repo.rebaseCommits>>;
+    try {
+      info = await repo.rebaseCommits(hash);
+    } catch (e) {
+      void vscode.window.showErrorMessage(errorMessage(e));
+      return;
+    }
+    if (!info.onBranch) {
+      void vscode.window.showWarningMessage(t('Interactive rebase needs a checked-out branch (HEAD is detached).'));
+      return;
+    }
+    if (info.hasMerges) {
+      void vscode.window.showWarningMessage(t('The selected range contains merge commits. Interactive rebase of merges is not supported; choose a commit after the last merge.'));
+      return;
+    }
+    const state = await repo.getState();
+    this.open('rebase', t('Interactive Rebase: {0}', state.head.branch ?? 'HEAD'), { kind: 'rebase', args: { root, base: hash, branch: state.head.branch, commits: info.commits } }, async (m, _reply, _host, close) => {
+      if (m.type !== 'rebaseStart') return;
+      try {
+        const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Rebasing…') }, () => repo.interactiveRebase(m.base, m.entries));
+        close();
+        if (result === 'stopped') {
+          void vscode.window.showInformationMessage(t('Rebase stopped: resolve conflicts or amend the commit, then use Continue in the Git log.'));
+        } else {
+          vscode.window.setStatusBarMessage(`$(check) ${t('Rebase finished')}`, 4000);
+        }
+      } catch (e) {
+        void vscode.window.showErrorMessage(errorMessage(e));
+      }
+      await this.provider.refresh(true);
     });
   }
 

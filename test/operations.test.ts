@@ -358,3 +358,36 @@ test('審查修正：選項注入、@{-N} 名稱、force push 的 lease 綁定�
   const fresh = (await repo.getPushPlan()).trackingHash!;
   await repo.pushTo('origin', 'refs/heads/main', 'main', { force: true, lease: fresh });
 });
+
+test('互動式 rebase：reword、squash、fixup、drop、調整順序；edit 停下後繼續', async () => {
+  const a = makeRepo();
+  a.commit('base', { 'base.txt': '0' });
+  const c1 = a.commit('one', { '1.txt': '1' });
+  const c2 = a.commit('two', { '2.txt': '2' });
+  const c3 = a.commit('three', { '3.txt': '3' });
+  const c4 = a.commit('four', { '4.txt': '4' });
+  const c5 = a.commit('five', { '5.txt': '5' });
+  const repo = (await GitRepository.open('git', a.dir))!;
+  const info = await repo.rebaseCommits(c1);
+  assert.deepEqual(info.commits.map((c) => c.subject), ['one', 'two', 'three', 'four', 'five']);
+  assert.equal(info.hasMerges, false);
+  const result = await repo.interactiveRebase(c1, [
+    { hash: c2, action: 'pick' },
+    { hash: c1, action: 'reword', message: 'one (reworded)\n\nwith body' },
+    { hash: c3, action: 'squash' },
+    { hash: c4, action: 'drop' },
+    { hash: c5, action: 'fixup' },
+  ]);
+  assert.equal(result, 'done');
+  assert.equal(a.git('log', '--format=%s', 'HEAD~2..HEAD'), 'one (reworded)\ntwo');
+  assert.match(a.git('log', '-1', '--format=%B'), /with body[\s\S]*three/);
+  assert.deepEqual(a.git('ls-files').split('\n').sort(), ['1.txt', '2.txt', '3.txt', '5.txt', 'base.txt']);
+
+  // edit：停下，繼續後完成
+  const head = a.git('rev-parse', 'HEAD');
+  const r2 = await repo.interactiveRebase(head, [{ hash: head, action: 'edit' }]);
+  assert.equal(r2, 'stopped');
+  assert.equal((await repo.getState()).operation, 'rebase');
+  await repo.continueOperation('rebase');
+  assert.equal((await repo.getState()).operation, undefined);
+});

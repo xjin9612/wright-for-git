@@ -62,13 +62,14 @@ export class GitRepository {
   }
 
   async getState(): Promise<RepoState> {
-    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail] = await Promise.all([
+    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail, operation] = await Promise.all([
       this.tryRun(['remote']),
       this.run(['for-each-ref', `--format=${REF_FORMAT}`, 'refs/heads', 'refs/remotes', 'refs/tags']),
       this.tryRun(['rev-parse', '--verify', '--quiet', 'HEAD']),
       this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD']),
       this.tryRun(['config', 'user.name']),
       this.tryRun(['config', 'user.email']),
+      this.operationInProgress().catch(() => undefined),
     ]);
     const remotes = (remotesOut ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
     return {
@@ -79,6 +80,7 @@ export class GitRepository {
       remotes,
       userName: userName?.trim() || undefined,
       userEmail: userEmail?.trim() || undefined,
+      operation,
     };
   }
 
@@ -291,6 +293,99 @@ export class GitRepository {
 
   async abortOperation(op: 'cherry-pick' | 'revert' | 'merge' | 'rebase'): Promise<void> {
     await this.run([op, '--abort']);
+    await this.cleanupRebaseTemp();
+  }
+
+  /** 互動式 rebase 結束後，移除留下的訊息檔 */
+  private async cleanupRebaseTemp(): Promise<void> {
+    if (await this.operationInProgress()) return;
+    const { promises: fsp } = await import('node:fs');
+    const names = await fsp.readdir(this.gitDir).catch(() => [] as string[]);
+    for (const n of names) if (n.startsWith('gitworkbench-rebase-')) await fsp.rm(path.join(this.gitDir, n), { recursive: true, force: true });
+  }
+
+  /** 解決衝突後繼續（不開編輯器，沿用預設的提交訊息） */
+  async continueOperation(op: 'cherry-pick' | 'revert' | 'merge' | 'rebase'): Promise<void> {
+    const env = { GIT_EDITOR: 'true' };
+    if (op === 'merge') await runGit(this.gitPath, ['commit', '--no-edit'], { cwd: this.root, env });
+    else await runGit(this.gitPath, [op, '--continue'], { cwd: this.root, env });
+    await this.cleanupRebaseTemp();
+  }
+
+  /** 略過目前的 commit（rebase／cherry-pick） */
+  async skipOperation(op: 'cherry-pick' | 'rebase'): Promise<void> {
+    await runGit(this.gitPath, [op, '--skip'], { cwd: this.root, env: { GIT_EDITOR: 'true' } });
+    await this.cleanupRebaseTemp();
+  }
+
+  /**
+   * 互動式 rebase 的 commit 清單：從 base（含）到 HEAD，由舊到新。含 merge commit 時回傳 hasMerges。
+   */
+  async rebaseCommits(base: string): Promise<{ commits: { hash: string; subject: string; message: string; author: string; authorTime: number }[]; hasMerges: boolean; onBranch: boolean }> {
+    if (!isHash(base)) throw new GitError(`Invalid revision: ${base}`, null, '');
+    const onBranch = !!(await this.tryRun(['symbolic-ref', '--quiet', 'HEAD']));
+    if (!(await this.isAncestor(base, 'HEAD'))) throw new GitError('The commit is not on the current branch', null, '');
+    const parent = (await this.tryRun(['rev-parse', '-q', '--verify', `${base}^`]))?.trim();
+    const range = parent ? [`${parent}..HEAD`] : ['HEAD'];
+    const merges = (await this.run(['rev-list', '--count', '--merges', ...range])).trim();
+    const out = await this.run(['log', '--reverse', '--format=%H%x1f%an%x1f%at%x1f%s%x1f%B%x1e', ...range, '--']);
+    const commits = out
+      .split('\x1e')
+      .map((r) => r.replace(/^\n/, ''))
+      .filter(Boolean)
+      .map((r) => {
+        const [hash, author, at, subject, message] = r.split('\x1f');
+        return { hash, author, authorTime: Number(at), subject, message: (message ?? '').replace(/\s+$/, '') };
+      });
+    return { commits, hasMerges: merges !== '0', onBranch };
+  }
+
+  /**
+   * 執行互動式 rebase。entries 由舊到新；action 為 pick／reword／edit／squash／fixup／drop。
+   * 以 GIT_SEQUENCE_EDITOR 寫入我們的 todo；reword 以 exec 修改訊息（不開編輯器）；squash 沿用合併後的預設訊息。
+   * 遇到衝突或 edit 時 rebase 會停下，回傳 'stopped'。
+   */
+  async interactiveRebase(base: string, entries: { hash: string; action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; message?: string }[]): Promise<'done' | 'stopped'> {
+    const { promises: fsp } = await import('node:fs');
+    if (!isHash(base) || entries.some((e) => !isHash(e.hash))) throw new GitError('Invalid revision', null, '');
+    const parent = (await this.tryRun(['rev-parse', '-q', '--verify', `${base}^`]))?.trim();
+    const stamp = `${process.pid}-${Date.now()}`;
+    const dir = path.join(this.gitDir, `gitworkbench-rebase-${stamp}`);
+    await fsp.mkdir(dir, { recursive: true });
+    // git 透過 sh 執行編輯器指令：路徑一律用 '/'，並以單引號包住
+    const q = (p: string) => `'${p.replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
+    const lines: string[] = [];
+    let n = 0;
+    for (const e of entries) {
+      if (e.action === 'drop') {
+        lines.push(`drop ${e.hash}`);
+        continue;
+      }
+      const verb = e.action === 'reword' ? 'pick' : e.action;
+      lines.push(`${verb} ${e.hash}`);
+      if ((e.action === 'reword' || (e.action === 'squash' && e.message !== undefined)) && e.message !== undefined) {
+        const file = path.join(dir, `msg-${n++}.txt`);
+        await fsp.writeFile(file, e.message, 'utf8');
+        lines.push(`exec git commit --amend --allow-empty --cleanup=strip -q -F ${q(file)}`);
+      }
+    }
+    const todo = path.join(dir, 'todo.txt');
+    await fsp.writeFile(todo, `${lines.join('\n')}\n`, 'utf8');
+    try {
+      await runGit(this.gitPath, ['rebase', '-i', '--autostash', ...(parent ? [parent] : ['--root'])], {
+        cwd: this.root,
+        env: { GIT_SEQUENCE_EDITOR: `cp ${q(todo)}`, GIT_EDITOR: 'true' },
+      });
+      // edit 停下時 git 以 0 結束
+      if (await this.operationInProgress()) return 'stopped';
+      await fsp.rm(dir, { recursive: true, force: true });
+      return 'done';
+    } catch (e) {
+      // 停在 edit 或衝突：保留訊息檔（後續的 exec 還會用到），rebase 結束後再清除
+      if (await this.operationInProgress()) return 'stopped';
+      await fsp.rm(dir, { recursive: true, force: true });
+      throw e;
+    }
   }
 
   /** @param mainline merge commit 時以第幾個 parent 為主線（1 起算） */

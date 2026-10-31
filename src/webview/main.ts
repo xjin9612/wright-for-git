@@ -217,6 +217,8 @@ const syncGroup = el(
 const progress = el('div', { className: 'progress' });
 /** 目前 branch 不在 Branch 篩選中時的提示列（對應 IntelliJ 的「HEAD is not in filter」） */
 const headHint = el('div', { className: 'log-hint hidden' });
+/** 進行中的 rebase／merge／cherry-pick：繼續、略過、中止 */
+const opBar = el('div', { className: 'log-ops hidden' });
 const warningBar = el('div', { className: 'log-warning hidden' });
 
 /** 部分 repo 讀取失敗時，在表格上方顯示提示（其餘 repo 照常顯示） */
@@ -303,7 +305,7 @@ function closeTab(i: number): void {
   renderTabs();
 }
 
-const logPane = el('div', { className: 'log-pane' }, tabStrip, filterBar, progress, headHint, warningBar, table.element);
+const logPane = el('div', { className: 'log-pane' }, tabStrip, filterBar, progress, opBar, headHint, warningBar, table.element);
 
 // ---------- 版面 ----------
 const leftSplitter = makeSplitter(
@@ -420,9 +422,39 @@ function renderChips(): void {
   caseToggle.sync();
   branches.setSelectedRef(f.branches.length === 1 ? f.branches[0] : undefined);
   renderHeadHint();
+  renderOperations();
 }
 
 /** Branch 篩選有值、但沒有包含 HEAD 或任一可見 repo 的目前 branch 時，提示並提供一鍵加入 */
+function renderOperations(): void {
+  clear(opBar);
+  const active = repos.filter((r) => r.operation);
+  opBar.classList.toggle('hidden', active.length === 0);
+  const names: Record<string, string> = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
+  for (const r of active) {
+    const op = r.operation!;
+    const link = (label: string, action: 'continue' | 'skip' | 'abort') => {
+      const a = el('a', { className: 'link', text: label, attrs: { href: '#' } });
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        post({ type: 'operation', root: r.root, action });
+      });
+      return a;
+    };
+    opBar.append(
+      el(
+        'div',
+        { className: 'log-op' },
+        icon('warning'),
+        el('span', { text: t('{0}: {1} in progress', r.name, names[op] ?? op) }),
+        link(t('Continue'), 'continue'),
+        op === 'rebase' || op === 'cherry-pick' ? link(t('Skip'), 'skip') : null,
+        link(t('Abort'), 'abort'),
+      ),
+    );
+  }
+}
+
 function renderHeadHint(): void {
   const f = ui.filter;
   const current = visibleRepos()
@@ -828,6 +860,7 @@ function showContextMenu(index: number, x: number, y: number): void {
     { label: t('Revert Commit'), action: act('revert') },
     { label: t('Reset Current Branch to Here…'), action: act('reset') },
     { label: t('Push All up to Here…'), action: () => openPush({ root, hash: c.hash }) },
+    { label: t('Interactively Rebase from Here…'), action: () => post({ type: 'openRebase', root, hash: c.hash }) },
     '-',
     { label: t('Compare with Local'), action: act('compareLocal') },
   ]);

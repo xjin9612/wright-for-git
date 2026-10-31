@@ -379,6 +379,32 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'pushConfirm':
           await this.handlePushMessage(m, (msg) => this.post(msg));
           break;
+        case 'openRebase':
+          await this.dialogs.openRebase(m.root, m.hash);
+          break;
+        case 'operation': {
+          const e = this.find(m.root);
+          const op = await e?.repo.operationInProgress();
+          if (!e || !op) break;
+          try {
+            if (m.action === 'continue') await e.repo.continueOperation(op);
+            else if (m.action === 'skip' && (op === 'rebase' || op === 'cherry-pick')) await e.repo.skipOperation(op);
+            else if (m.action === 'abort') await e.repo.abortOperation(op);
+          } catch (err) {
+            const next = await e.repo.operationInProgress();
+            // 仍在進行中：多半是還有衝突沒解決
+            if (next) {
+              const open = t('Open Source Control');
+              void vscode.window.showWarningMessage(t('{0}: {1} is still in progress. Resolve the remaining conflicts, then continue.', e.name, next), { detail: errorMessage(err) }, open).then((a) => {
+                if (a === open) void vscode.commands.executeCommand('workbench.view.scm');
+              });
+            } else {
+              void vscode.window.showErrorMessage(errorMessage(err));
+            }
+          }
+          await this.refresh(true);
+          break;
+        }
         case 'openPushPanel':
           this.dialogs.openPush({ roots: m.roots, branch: m.branch, upTo: m.upTo });
           break;

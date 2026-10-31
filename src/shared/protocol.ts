@@ -55,6 +55,8 @@ export interface RepoState {
   remotes: string[];
   userName?: string;
   userEmail?: string;
+  /** 進行中的 rebase／merge／cherry-pick／revert（等待解決衝突或 edit） */
+  operation?: 'cherry-pick' | 'revert' | 'merge' | 'rebase';
 }
 
 export interface LogFilter {
@@ -117,6 +119,23 @@ export interface WorkingChange {
   /** 相對 HEAD 的狀態（A／M／D／R／C／T／U） */
   status: FileStatus;
   kind: ChangeKind;
+}
+
+export type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
+
+export interface RebaseEntry {
+  hash: string;
+  action: RebaseAction;
+  /** reword 的新訊息 */
+  message?: string;
+}
+
+export interface RebaseCommit {
+  hash: string;
+  subject: string;
+  message: string;
+  author: string;
+  authorTime: number;
 }
 
 export interface Changelist {
@@ -217,6 +236,11 @@ export type ToExtension =
   | { type: 'openUnstash'; root?: string }
   /** 逐段提交面板：選取的 hunk（以內容辨識） */
   | { type: 'hunksSelect'; root: string; path: string; selected: number[] }
+  /** 進行中的 rebase／merge 等：繼續、略過、中止 */
+  | { type: 'operation'; root: string; action: 'continue' | 'skip' | 'abort' }
+  /** 互動式 rebase */
+  | { type: 'openRebase'; root: string; hash: string }
+  | { type: 'rebaseStart'; root: string; base: string; entries: RebaseEntry[] }
   /** 編輯器分頁的對話框要求關閉 */
   | { type: 'closeDialog' }
   /** 面板內確認框的結果 */
