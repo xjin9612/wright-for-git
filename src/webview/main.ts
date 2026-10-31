@@ -135,7 +135,7 @@ table.setColumnWidths(ui.widths);
 
 const details = new DetailsPane(
   {
-    onOpenDiff: (root, file, hash, parent) => post({ type: 'openDiff', root, hash, parent, file }),
+    onOpenDiff: (root, file, hash, parent, files) => post({ type: 'openDiff', root, hash, parent, file, files }),
     onPickCommit: (root, hash) => {
       const idx = keyIndex.get(`${repos.findIndex((r) => r.root === root)}:${hash}`);
       if (idx !== undefined) table.select(idx, true, 'center');

@@ -27,5 +27,7 @@
   "command.stash.pop": "套用並刪除（Pop）",
   "command.stash.drop": "刪除（Drop）…",
   "command.stash.branch": "從 Stash 建立 Branch…",
-  "command.stash.openFile": "顯示差異"
+  "command.stash.openFile": "顯示差異",
+  "command.diff.previousFile": "上一個變更檔案",
+  "command.diff.nextFile": "下一個變更檔案"
 }

@@ -173,6 +173,18 @@
         "command": "gitWorkbench.stash.openFile",
         "title": "%command.stash.openFile%",
         "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.diff.previousFile",
+        "title": "%command.diff.previousFile%",
+        "category": "Git Workbench",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "gitWorkbench.diff.nextFile",
+        "title": "%command.diff.nextFile%",
+        "category": "Git Workbench",
+        "icon": "$(arrow-down)"
       }
     ],
     "menus": {
@@ -268,6 +280,14 @@
         {
           "command": "gitWorkbench.stash.refresh",
           "when": "false"
+        },
+        {
+          "command": "gitWorkbench.diff.previousFile",
+          "when": "gitWorkbench.diffNav"
+        },
+        {
+          "command": "gitWorkbench.diff.nextFile",
+          "when": "gitWorkbench.diffNav"
         }
       ],
       "view/item/context": [
@@ -310,6 +330,18 @@
           "command": "gitWorkbench.stash.drop",
           "when": "view == gitWorkbench.stashes && viewItem == stash",
           "group": "3_drop@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "gitWorkbench.diff.previousFile",
+          "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
+          "group": "navigation@-99"
+        },
+        {
+          "command": "gitWorkbench.diff.nextFile",
+          "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
+          "group": "navigation@-98"
         }
       ]
     },
@@ -373,6 +405,18 @@
       {
         "command": "gitWorkbench.show",
         "key": "alt+9"
+      },
+      {
+        "command": "gitWorkbench.diff.nextFile",
+        "key": "ctrl+alt+pagedown",
+        "mac": "cmd+alt+pagedown",
+        "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
+      },
+      {
+        "command": "gitWorkbench.diff.previousFile",
+        "key": "ctrl+alt+pageup",
+        "mac": "cmd+alt+pageup",
+        "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
       }
     ]
   },

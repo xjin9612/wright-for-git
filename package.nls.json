@@ -27,5 +27,7 @@
   "command.stash.pop": "Pop",
   "command.stash.drop": "Drop…",
   "command.stash.branch": "Unstash as Branch…",
-  "command.stash.openFile": "Show Diff"
+  "command.stash.openFile": "Show Diff",
+  "command.diff.previousFile": "Previous Changed File",
+  "command.diff.nextFile": "Next Changed File"
 }

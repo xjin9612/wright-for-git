@@ -130,7 +130,8 @@ export type ToExtension =
   | { type: 'containingBranches'; root: string; hash: string }
   /** 多選 commit：合併各 repo 選取 commit 的變更；requestId 用來忽略過期回應 */
   | { type: 'selectCommits'; requestId: number; items: { root: string; hash: string; parents: string[] }[] }
-  | { type: 'openDiff'; root: string; hash: string; parent?: string; file: ChangedFile }
+  /** files：同一組變更的所有檔案（依顯示順序），供 diff 內切換上一個／下一個檔案 */
+  | { type: 'openDiff'; root: string; hash: string; parent?: string; file: ChangedFile; files?: ChangedFile[] }
   /** 在 roots 中所有擁有此 ref 的 repository checkout */
   | { type: 'checkout'; ref: string; roots: string[] }
   | { type: 'checkoutRevision'; root: string; hash: string }

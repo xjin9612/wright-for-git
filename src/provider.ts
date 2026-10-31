@@ -55,6 +55,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   /** webview 尚未就緒時暫存的篩選（例如從檔案總管觸發「顯示 Git 歷史」） */
   private pendingFilter?: Partial<LogFilter>;
   private pendingOpenPush = false;
+  /** 最近一次從詳情開啟的 diff 所屬的檔案清單（diff 內切換上一個／下一個檔案） */
+  private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number } | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   /** repository 清單、HEAD／refs 或 repo 篩選變動時觸發（供側邊欄 Repositories 更新） */
@@ -313,6 +315,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         }
         case 'openDiff':
+          this.diffNav = m.files && m.files.length > 1 ? { root: m.root, hash: m.hash, parent: m.parent, files: m.files, index: m.files.findIndex((f) => f.path === m.file.path) } : undefined;
+          void vscode.commands.executeCommand('setContext', 'gitWorkbench.diffNav', !!this.diffNav);
           await this.openDiff(m.root, m.hash, m.parent, m.file);
           break;
         case 'checkout':
@@ -591,6 +595,21 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       }
     }
     return [...merged.values()].sort((a, b) => b.count - a.count);
+  }
+
+  /** diff 視窗中切換到上一個／下一個變更檔案 */
+  async navigateDiff(delta: 1 | -1): Promise<void> {
+    const nav = this.diffNav;
+    if (!nav) return;
+    const next = nav.index + delta;
+    if (next < 0 || next >= nav.files.length) {
+      vscode.window.setStatusBarMessage(delta > 0 ? vscode.l10n.t('Last changed file') : vscode.l10n.t('First changed file'), 2000);
+      return;
+    }
+    nav.index = next;
+    const file = nav.files[next];
+    await this.openDiff(nav.root, file.right ?? nav.hash, file.left ?? nav.parent, file);
+    vscode.window.setStatusBarMessage(`${next + 1}/${nav.files.length} ${file.path}`, 2500);
   }
 
   /** 多選 commit：每個 repo 各自合併選取 commit 的淨變更 */

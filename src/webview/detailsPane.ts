@@ -7,7 +7,7 @@ import { renderLabel } from './logTable';
 
 export interface DetailsCallbacks {
   /** 開啟 diff：單一 commit 時 parent 取自真正的 parent（不受路徑篩選改寫影響）；多選時 file 自帶 left／right */
-  onOpenDiff: (root: string, file: ChangedFile, hash: string, parent: string | undefined) => void;
+  onOpenDiff: (root: string, file: ChangedFile, hash: string, parent: string | undefined, files: ChangedFile[]) => void;
   /** 多選時點選 commit 清單中的項目 */
   onPickCommit?: (root: string, hash: string) => void;
   onCopy: (text: string) => void;
@@ -164,8 +164,10 @@ export class DetailsPane {
   }
 
   private openFile(root: string, file: ChangedFile): void {
-    if (this.details) this.cb.onOpenDiff(root, file, this.details.hash, this.details.parents[0]);
-    else if (file.right !== undefined) this.cb.onOpenDiff(root, file, file.right, file.left);
+    // 同一個 repo 的檔案依樹狀顯示順序，供 diff 視窗切換上一個／下一個
+    const files = this.buildAllFileRows().filter((r) => r.root === root).map((r) => r.file!);
+    if (this.details) this.cb.onOpenDiff(root, file, this.details.hash, this.details.parents[0], files);
+    else if (file.right !== undefined) this.cb.onOpenDiff(root, file, file.right, file.left, files);
   }
 
   setDetails(d: CommitDetails): void {
@@ -189,6 +191,17 @@ export class DetailsPane {
   }
 
   // ---------- 檔案樹 ----------
+
+  /** 不受收合狀態影響的所有檔案列（依顯示順序） */
+  private buildAllFileRows(): FileRow[] {
+    const saved = this.collapsed;
+    this.collapsed = new Set();
+    try {
+      return this.buildRows().filter((r) => r.file);
+    } finally {
+      this.collapsed = saved;
+    }
+  }
 
   private buildRows(): FileRow[] {
     const rows: FileRow[] = [];
