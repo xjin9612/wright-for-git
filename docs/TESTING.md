@@ -1,6 +1,24 @@
 # 手動測試清單（發佈前在真實 VS Code 執行）
 
 自動化測試涵蓋 git 解析、graph、多 repo 合併與 webview 渲染，但無法啟動真實 VS Code。
+
+## 測試用 playground
+
+在專案資料夾執行下列指令，會在專案的上一層建立 `playground`（測試用的工作區）與 `playground-remotes`（遠端與「另一台電腦」）：
+
+```
+node scripts/make-playground.mjs            # 第一次建立
+node scripts/make-playground.mjs --force    # 測完想重來：刪除後重建
+node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一筆新 commit（測 Pull／Push 被拒）
+```
+
+用 VS Code 開啟 `playground` 資料夾（不是 `playground-remotes`）。內容：
+- `api-server`：main 領先遠端 2 筆；`feature/rate-limit` 尚未推送（New）；`experiment/cache` 未合併；`old/merged-work` 已合併；tag `v1.0.0`（annotated）、`v1.1.0`；有 rename、刪除、中文檔名
+- `api-server/libs/shared`：巢狀 repo
+- `web-app`：main 落後遠端 1 筆；2 個 stash（其中一個含未追蹤檔案）；`conflict/theme` 與 main 改同一行（merge／rebase／cherry-pick 會衝突）
+- 兩個 repo 都有 `feature/checkout`（同名 branch 合併顯示）
+- `notes`：一般資料夾，不是 repo
+- 作者 Alice／Bob／Carol／Dave，時間分布在最近 4 個月；「我」是 Alice
 以下項目請在 Windows 的 VS Code 中逐一確認；安裝或更新 `.vsix` 後先執行「開發人員: 重新載入視窗」。
 
 ## 開啟與版面
