@@ -25,8 +25,15 @@ interface Persisted {
   onlyFavorites?: boolean;
   /** Author／Date／Hash 欄寬 */
   widths?: Partial<ColumnWidths>;
+  /** 額外的 Log 分頁（各自保留篩選）；第 0 個為主分頁 */
+  tabs?: LogTab[];
+  activeTab?: number;
   /** 選取的 commit：`${root}|${hash}` */
   selectedHash?: string;
+}
+
+interface LogTab {
+  filter: LogFilter;
 }
 
 const saved = loadState<Persisted>();
@@ -44,7 +51,14 @@ const ui: Persisted = {
   favorites: saved?.favorites,
   onlyFavorites: saved?.onlyFavorites,
   widths: saved?.widths,
+  tabs: saved?.tabs,
+  activeTab: saved?.activeTab,
 };
+// 分頁：第 0 個為主分頁，ui.filter 永遠是目前分頁的篩選
+if (!ui.tabs || ui.tabs.length === 0) ui.tabs = [{ filter: ui.filter }];
+ui.activeTab = Math.min(Math.max(0, ui.activeTab ?? 0), ui.tabs.length - 1);
+ui.tabs = ui.tabs.map((tab) => ({ filter: { ...EMPTY_FILTER, ...tab.filter } }));
+ui.filter = ui.tabs[ui.activeTab].filter;
 const persist = debounce(() => saveState(ui), 200);
 
 // ---------- 狀態 ----------
@@ -205,7 +219,69 @@ const filterBar = el(
   viewButton,
 );
 
-const logPane = el('div', { className: 'log-pane' }, filterBar, progress, headHint, warningBar, table.element);
+// ---------- Log 分頁 ----------
+const tabStrip = el('div', { className: 'log-tabs hidden', attrs: { role: 'tablist' } });
+
+function tabTitle(f: LogFilter): string {
+  const parts: string[] = [];
+  if (f.branches.length > 0) parts.push(f.branches.map(shortRefName).join(', '));
+  if (f.users.length > 0) parts.push(f.users.join(', '));
+  if (f.text.trim()) parts.push(`"${f.text.trim()}"`);
+  if (f.paths.length > 0 || f.roots.length > 0) parts.push(pathsLabel());
+  if (f.since || f.until) parts.push(dateLabel());
+  return parts.join(' · ') || 'All';
+}
+
+function renderTabs(): void {
+  const tabs = ui.tabs!;
+  tabStrip.classList.toggle('hidden', tabs.length <= 1);
+  clear(tabStrip);
+  if (tabs.length <= 1) return;
+  tabs.forEach((tab, i) => {
+    const title = i === 0 ? 'Log' : `Log: ${tabTitle(tab.filter)}`;
+    const t = el('div', { className: `log-tab${i === ui.activeTab ? ' active' : ''}`, title, attrs: { role: 'tab', 'aria-selected': String(i === ui.activeTab), tabindex: '0' } }, el('span', { className: 'log-tab-title', text: title }));
+    if (i > 0) t.append(iconButton('close', 'Close tab', () => closeTab(i), 'tab-close'));
+    t.addEventListener('click', () => switchTab(i));
+    t.addEventListener('auxclick', (e) => {
+      if (e.button === 1 && i > 0) closeTab(i);
+    });
+    tabStrip.append(t);
+  });
+}
+
+function switchTab(i: number): void {
+  if (i === ui.activeTab || !ui.tabs![i]) return;
+  ui.activeTab = i;
+  ui.filter = ui.tabs![i].filter;
+  searchInput.value = ui.filter.text;
+  persist();
+  renderTabs();
+  renderChips();
+  loadLog();
+}
+
+/** 新分頁：預設沿用 patch 套在空白篩選上（例如從 Branches 開啟某個 branch） */
+function openTab(filter: Partial<LogFilter>): void {
+  ui.tabs!.push({ filter: { ...EMPTY_FILTER, ...filter } });
+  switchTab(ui.tabs!.length - 1);
+}
+
+function closeTab(i: number): void {
+  if (i === 0) return;
+  const wasActive = ui.activeTab === i;
+  ui.tabs!.splice(i, 1);
+  if (wasActive) {
+    // 關閉目前分頁：切到左邊的分頁（強制重新載入）
+    ui.activeTab = -1;
+    switchTab(i - 1);
+    return;
+  }
+  if (ui.activeTab! > i) ui.activeTab!--;
+  persist();
+  renderTabs();
+}
+
+const logPane = el('div', { className: 'log-pane' }, tabStrip, filterBar, progress, headHint, warningBar, table.element);
 
 // ---------- 版面 ----------
 const leftSplitter = makeSplitter(
@@ -234,6 +310,7 @@ app.className = 'workbench';
 app.append(leftRestore, branches.element, leftSplitter, logPane, rightSplitter, details.element);
 applyLayout();
 renderChips();
+renderTabs();
 window.addEventListener('resize', () => applyLayout());
 
 function applyLayout(): void {
@@ -278,6 +355,8 @@ function setFilter(patch: Partial<LogFilter>): void {
     return;
   }
   ui.filter = next;
+  ui.tabs![ui.activeTab!] = { filter: next };
+  renderTabs();
   persist();
   renderChips();
   loadLog();
@@ -720,6 +799,7 @@ function showRefMenu(ref: MergedRef, x: number, y: number): void {
     { label: `New Branch from ${q}…`, action: act('newBranch') },
     { label: `Compare with Current`, disabled: current, action: act('compare') },
     { label: `Show in Log`, action: () => setFilter({ branches: [ref.name] }) },
+    { label: `Show in New Tab`, action: () => openTab({ branches: [ref.name], roots: ui.filter.roots }) },
     '-',
     { label: `Merge ${q} into Current`, disabled: current, action: act('merge') },
   ];
@@ -766,6 +846,8 @@ function showViewMenu(): void {
     { label: 'Highlight Commit Type', checked: ui.highlights.commitType, action: toggleHl('commitType') },
     { label: 'Highlight My Commits', checked: ui.highlights.mine, action: toggleHl('mine') },
     { label: 'Dim Merge Commits', checked: ui.highlights.merges, action: toggleHl('merges') },
+    '-',
+    { label: 'New Log Tab', action: () => openTab({}) },
     '-',
     { label: 'Show Branches', checked: ui.leftVisible, action: () => setPaneVisible('left', !ui.leftVisible) },
     { label: 'Show Details', checked: ui.rightVisible, action: () => setPaneVisible('right', !ui.rightVisible) },
