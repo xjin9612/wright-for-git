@@ -85,6 +85,8 @@ export interface ChangedFile {
   path: string;
   /** rename／copy 的原路徑 */
   oldPath?: string;
+  /** 所屬模組（相對 repo 根目錄；依目前工作區判斷） */
+  module?: string;
   /** 多選合併變更時，diff 左右兩側的 revision（'' 表示不存在）；單一 commit 時不填 */
   left?: string;
   right?: string;

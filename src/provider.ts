@@ -10,6 +10,7 @@ import { revisionUri } from './diffProvider';
 import { buildPushPlans, runCommitAction, runCommitsAction, runPush, runRefAction, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
 import { combineChanges } from './shared/combine';
+import { ModuleResolver } from './modules';
 import { promises as fsp, statSync } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
@@ -597,7 +598,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     this.detailsAbort = abort;
     try {
       const d = await e.repo.getDetails(hash, abort.signal);
-      if (!abort.signal.aborted) this.post({ type: 'details', details: { ...d, root } });
+      const modules = new ModuleResolver(e.repo.root);
+      if (!abort.signal.aborted) this.post({ type: 'details', details: { ...d, root, files: d.files.map((f) => ({ ...f, module: modules.moduleOf(f.path) })) } });
     } catch (err) {
       if (!abort.signal.aborted) this.post({ type: 'detailsError', root, hash, message: errorMessage(err) });
     }
@@ -667,7 +669,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           parent: c.parents[0],
           files: await e.repo.getChangedFiles(c.hash, c.parents.slice(0, 1), abort.signal),
         }));
-        groups.push({ root, files: combineChanges(changes) });
+        const modules = new ModuleResolver(e.repo.root);
+        groups.push({ root, files: combineChanges(changes).map((f) => ({ ...f, module: modules.moduleOf(f.path) })) });
       }
       if (!abort.signal.aborted) this.post({ type: 'multiDetails', requestId, groups });
     } catch (err) {

@@ -2,13 +2,20 @@
 import type { ChangedFile, CommitDetails, HeadInfo, RefInfo, RepoState } from '../shared/protocol';
 import { buildLabels } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, formatDate, icon, iconButton, makeSplitter } from './dom';
+import { clear, el, formatDate, icon, iconButton, makeSplitter, showMenu } from './dom';
 import { plural, t } from './l10n';
 import { fileIcon } from './fileIcons';
 import { renderLabel } from './logTable';
 
 function fileName(p: string): string {
   return p.slice(p.lastIndexOf('/') + 1);
+}
+
+/** 變更檔案的分組方式（對應 IntelliJ 的 Group By：目錄／儲存庫／模組） */
+export interface FileGrouping {
+  directory: boolean;
+  repository: boolean;
+  module: boolean;
 }
 
 export interface DetailsCallbacks {
@@ -20,8 +27,8 @@ export interface DetailsCallbacks {
   onRequestContaining: (root: string, hash: string) => void;
   onCollapsePane: () => void;
   onSplitChange: (ratio: number) => void;
-  /** 樹狀／平鋪切換 */
-  onFlatChange?: (flat: boolean) => void;
+  /** 分組方式變更 */
+  onGroupChange?: (group: FileGrouping) => void;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -47,6 +54,8 @@ export interface SelectedCommit {
 interface FileRow {
   key: string;
   root: string;
+  icon?: 'repo' | 'module';
+  detail?: string;
   depth: number;
   label: string;
   count?: number;
@@ -70,28 +79,22 @@ export class DetailsPane {
   private containing: { root: string; hash: string; branches: string[] } | undefined;
   private showAllBranches = false;
   private splitRatio: number;
-  private flat: boolean;
-  private readonly flatButton: HTMLButtonElement;
+  private grouping: FileGrouping;
+  private readonly groupButton: HTMLButtonElement;
 
   constructor(
     private readonly cb: DetailsCallbacks,
     splitRatio: number | undefined,
-    flat = false,
+    grouping?: Partial<FileGrouping>,
   ) {
     this.splitRatio = splitRatio ?? 0.55;
-    this.flat = flat;
-    this.flatButton = iconButton('list-flat', t('Show as list'), () => {
-      this.flat = !this.flat;
-      this.syncFlatButton();
-      cb.onFlatChange?.(this.flat);
-      this.renderFiles();
-    });
-    this.syncFlatButton();
+    this.grouping = { directory: true, repository: true, module: false, ...grouping };
+    this.groupButton = iconButton('eye', t('Group By'), () => this.showGroupMenu());
     const toolbar = el(
       'div',
       { className: 'pane-toolbar' },
       iconButton('diff', t('Show diff (Enter)'), () => this.openSelected()),
-      this.flatButton,
+      this.groupButton,
       el('div', { className: 'toolbar-spacer' }),
       iconButton('expand-all', t('Expand all'), () => {
         this.collapsed.clear();
@@ -124,10 +127,23 @@ export class DetailsPane {
     this.renderEmpty(t('Select a commit to view changes'));
   }
 
-  private syncFlatButton(): void {
-    this.flatButton.classList.toggle('on', this.flat);
-    this.flatButton.title = this.flat ? t('Group by directory') : t('Show as list');
-    this.flatButton.setAttribute('aria-pressed', String(this.flat));
+  private showGroupMenu(): void {
+    const r = this.groupButton.getBoundingClientRect();
+    const toggle = (k: keyof FileGrouping) => ({
+      keepOpen: true,
+      action: () => {
+        this.grouping = { ...this.grouping, [k]: !this.grouping[k] };
+        this.cb.onGroupChange?.(this.grouping);
+        this.renderFiles();
+        return this.grouping[k];
+      },
+    });
+    showMenu(r.left, r.bottom + 2, [
+      { label: t('Group By'), disabled: true },
+      { label: t('Directory'), checked: this.grouping.directory, ...toggle('directory') },
+      { label: t('Repository'), checked: this.grouping.repository, ...toggle('repository') },
+      { label: t('Module'), checked: this.grouping.module, ...toggle('module') },
+    ]);
   }
 
   private applySplit(): void {
@@ -231,33 +247,62 @@ export class DetailsPane {
 
   private buildRows(): FileRow[] {
     const rows: FileRow[] = [];
-    for (const g of this.groups) {
-      const rootKey = `\u0000root:${g.root}`;
-      const rootOpen = !this.collapsed.has(rootKey);
-      rows.push({ key: rootKey, root: g.root, depth: 0, label: this.states.get(g.root)?.name ?? '', count: g.files.length, expanded: rootOpen, expandable: true });
-      if (!rootOpen) continue;
-      const walk = (nodes: TreeNode<ChangedFile>[], depth: number) => {
+    const { directory, repository, module } = this.grouping;
+    const addFiles = (root: string, files: ChangedFile[], depth: number, prefix: string, base: string) => {
+      const rel = (f: ChangedFile) => (base && f.path.startsWith(`${base}/`) ? f.path.slice(base.length + 1) : f.path);
+      if (!directory) {
+        // 平鋪：檔名在前、所在目錄淡色顯示在後
+        const sorted = [...files].sort((a, b) => fileName(a.path).localeCompare(fileName(b.path)) || a.path.localeCompare(b.path));
+        for (const f of sorted) rows.push({ key: `${root}\u0000${f.path}`, root, depth, label: fileName(f.path), file: f, expanded: false, expandable: false });
+        return;
+      }
+      const walk = (nodes: TreeNode<ChangedFile>[], d: number) => {
         for (const n of nodes) {
           if (n.item) {
-            rows.push({ key: `${g.root}\u0000${n.item.path}`, root: g.root, depth, label: n.name, file: n.item, expanded: false, expandable: false });
+            rows.push({ key: `${root}\u0000${n.item.path}`, root, depth: d, label: n.name, file: n.item, expanded: false, expandable: false });
           } else {
-            const key = `${g.root}\u0000${n.path}/`;
+            const key = `${root}\u0000${prefix}${n.path}/`;
             const open = !this.collapsed.has(key);
-            rows.push({ key, root: g.root, depth, label: n.name, count: n.count, expanded: open, expandable: true });
-            if (open) walk(n.children, depth + 1);
+            rows.push({ key, root, depth: d, label: n.name, count: n.count, expanded: open, expandable: true });
+            if (open) walk(n.children, d + 1);
           }
         }
       };
-      if (this.flat) {
-        // 平鋪：檔名在前、所在目錄淡色顯示在後
-        const sorted = [...g.files].sort((a, b) => fileName(a.path).localeCompare(fileName(b.path)) || a.path.localeCompare(b.path));
-        for (const f of sorted) rows.push({ key: `${g.root}\u0000${f.path}`, root: g.root, depth: 1, label: fileName(f.path), file: f, expanded: false, expandable: false });
+      walk(buildTree(files, rel), depth);
+    };
+    for (const g of this.groups) {
+      let depth = 0;
+      if (repository || this.groups.length > 1) {
+        const rootKey = `\u0000root:${g.root}`;
+        const rootOpen = !this.collapsed.has(rootKey);
+        rows.push({ key: rootKey, root: g.root, depth: 0, label: this.states.get(g.root)?.name ?? '', count: g.files.length, expanded: rootOpen, expandable: true, icon: 'repo' });
+        if (!rootOpen) continue;
+        depth = 1;
+      }
+      if (module) {
+        const byModule = new Map<string, ChangedFile[]>();
+        for (const f of g.files) {
+          const m = f.module ?? '\u0000none';
+          byModule.set(m, [...(byModule.get(m) ?? []), f]);
+        }
+        for (const [m, files] of [...byModule].sort((a, b) => a[0].localeCompare(b[0]))) {
+          if (m === '\u0000none') {
+            addFiles(g.root, files, depth, 'nomodule:', '');
+            continue;
+          }
+          const key = `${g.root}\u0000module:${m}`;
+          const open = !this.collapsed.has(key);
+          const label = m ? m.slice(m.lastIndexOf('/') + 1) : (this.states.get(g.root)?.name ?? '');
+          rows.push({ key, root: g.root, depth, label, count: files.length, expanded: open, expandable: true, icon: 'module', detail: m || undefined });
+          if (open) addFiles(g.root, files, depth + 1, `module:${m}/`, m);
+        }
       } else {
-        walk(buildTree(g.files, (f) => f.path), 1);
+        addFiles(g.root, g.files, depth, '', '');
       }
     }
     return rows;
   }
+
 
   private renderFiles(): void {
     this.rows = this.buildRows();
@@ -276,10 +321,11 @@ export class DetailsPane {
         'div',
         { className: `tree-row${r.key === this.selectedFile ? ' selected' : ''}`, title, attrs: { role: 'treeitem' } },
         twisty,
-        f ? fileIcon(f.path) : icon(r.depth === 0 ? 'repo' : 'folder'),
+        f ? fileIcon(f.path) : icon(r.icon ?? 'folder'),
         el('span', { className: `tree-label${f ? ` status-${f.status}` : ''}`, text: r.label }),
         r.count !== undefined ? el('span', { className: 'tree-count', text: plural(r.count, '{0} file', '{0} files') }) : null,
-        f && this.flat && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
+        f && !this.grouping.directory && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
+        r.detail ? el('span', { className: 'tree-count', text: r.detail }) : null,
         f?.oldPath ? el('span', { className: 'tree-count', text: `← ${f.oldPath}` }) : null,
       );
       row.style.paddingLeft = `${4 + r.depth * 14}px`;

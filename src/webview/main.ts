@@ -3,7 +3,7 @@ import { MultiGraph } from '../shared/multiGraph';
 import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RefAction, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
 import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
-import { DetailsPane } from './detailsPane';
+import { DetailsPane, type FileGrouping } from './detailsPane';
 import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { showConfirm } from './confirmDialog';
@@ -27,8 +27,10 @@ interface Persisted {
   onlyFavorites?: boolean;
   /** Author／Date／Hash 欄寬 */
   widths?: Partial<ColumnWidths>;
-  /** 變更檔案以平鋪清單顯示 */
+  /** 舊版設定：變更檔案以平鋪清單顯示（改由 fileGrouping 取代） */
   flatFiles?: boolean;
+  /** 變更檔案的分組方式 */
+  fileGrouping?: Partial<FileGrouping>;
   /** 額外的 Log 分頁（各自保留篩選）；第 0 個為主分頁 */
   tabs?: LogTab[];
   activeTab?: number;
@@ -63,6 +65,7 @@ const ui: Persisted = {
   repoNames: saved?.repoNames,
   tabs: saved?.tabs,
   flatFiles: saved?.flatFiles,
+  fileGrouping: saved?.fileGrouping,
   activeTab: saved?.activeTab,
 };
 // 分頁：第 0 個為主分頁，ui.filter 永遠是目前分頁的篩選
@@ -166,13 +169,13 @@ const details = new DetailsPane(
       ui.split = ratio;
       persist();
     },
-    onFlatChange: (flat) => {
-      ui.flatFiles = flat;
+    onGroupChange: (group) => {
+      ui.fileGrouping = group;
       persist();
     },
   },
   ui.split,
-  ui.flatFiles,
+  ui.fileGrouping ?? (ui.flatFiles ? { directory: false } : undefined),
 );
 
 // ---------- 篩選列 ----------
