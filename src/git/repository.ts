@@ -179,6 +179,102 @@ export class GitRepository {
     }
   }
 
+  // ---------- 寫入操作（同步、commit 操作）----------
+
+  /** 執行 git 指令（供操作層使用）；失敗時丟出 GitError，訊息為 git 的 stderr */
+  exec(args: string[]): Promise<string> {
+    return this.run(args);
+  }
+
+  /** 抓取所有 remote（是否 prune 依使用者的 fetch.prune 設定） */
+  async fetch(): Promise<void> {
+    await this.run(['fetch', '--all']);
+  }
+
+  /** 依使用者的 pull.rebase 等設定執行 pull */
+  async pull(): Promise<void> {
+    await this.run(['pull']);
+  }
+
+  /**
+   * push 目前 branch。setUpstream 時以 `-u <remote> <branch>` 建立 upstream；
+   * forceWithLease 只在遠端仍是本機最後看到的狀態時才覆蓋，不提供無保護的 --force。
+   */
+  async push(opts: { setUpstream?: { remote: string; branch: string }; forceWithLease?: boolean } = {}): Promise<void> {
+    const args = ['push'];
+    if (opts.forceWithLease) args.push('--force-with-lease');
+    if (opts.setUpstream) {
+      const { remote, branch } = opts.setUpstream;
+      if (remote.startsWith('-') || branch.startsWith('-')) throw new GitError('Invalid remote or branch', null, '');
+      args.push('-u', remote, branch);
+    }
+    await this.run(args);
+  }
+
+  /** 進行中的 cherry-pick／revert／merge／rebase（衝突待解決時） */
+  async operationInProgress(): Promise<'cherry-pick' | 'revert' | 'merge' | 'rebase' | undefined> {
+    const has = async (ref: string) => (await this.tryRun(['rev-parse', '-q', '--verify', ref])) !== undefined;
+    if (await has('CHERRY_PICK_HEAD')) return 'cherry-pick';
+    if (await has('REVERT_HEAD')) return 'revert';
+    if (await has('MERGE_HEAD')) return 'merge';
+    const { existsSync } = await import('node:fs');
+    if (existsSync(path.join(this.gitDir, 'rebase-merge')) || existsSync(path.join(this.gitDir, 'rebase-apply'))) return 'rebase';
+    return undefined;
+  }
+
+  async abortOperation(op: 'cherry-pick' | 'revert' | 'merge' | 'rebase'): Promise<void> {
+    await this.run([op, '--abort']);
+  }
+
+  /** @param mainline merge commit 時以第幾個 parent 為主線（1 起算） */
+  async cherryPick(hash: string, mainline?: number): Promise<void> {
+    if (!isHash(hash)) throw new GitError(`Invalid revision: ${hash}`, null, '');
+    await this.run(['cherry-pick', ...(mainline ? ['-m', String(mainline)] : []), hash]);
+  }
+
+  async revert(hash: string, mainline?: number): Promise<void> {
+    if (!isHash(hash)) throw new GitError(`Invalid revision: ${hash}`, null, '');
+    await this.run(['revert', '--no-edit', ...(mainline ? ['-m', String(mainline)] : []), hash]);
+  }
+
+  async reset(hash: string, mode: 'soft' | 'mixed' | 'hard'): Promise<void> {
+    if (!isHash(hash)) throw new GitError(`Invalid revision: ${hash}`, null, '');
+    await this.run(['reset', `--${mode}`, hash]);
+  }
+
+  /** 工作區是否有未提交的變更（含 staged，不含未追蹤檔案） */
+  async isDirty(): Promise<boolean> {
+    const out = await this.run(['status', '--porcelain', '--untracked-files=no']);
+    return out.trim() !== '';
+  }
+
+  /** 名稱是否為合法的 branch／tag 名稱（交給 git check-ref-format 判斷） */
+  async isValidRefName(name: string, kind: 'branch' | 'tag'): Promise<boolean> {
+    if (!name || name.startsWith('-')) return false;
+    const args = kind === 'branch' ? ['check-ref-format', '--branch', name] : ['check-ref-format', `refs/tags/${name}`];
+    return (await this.tryRun(args)) !== undefined;
+  }
+
+  /** 從指定 commit 建立 branch；checkout 時一併切換過去 */
+  async createBranch(name: string, start: string, checkout: boolean): Promise<void> {
+    if (!(await this.isValidRefName(name, 'branch'))) throw new GitError(`Invalid branch name: ${name}`, null, '');
+    if (!isHash(start)) throw new GitError(`Invalid revision: ${start}`, null, '');
+    await this.run(checkout ? ['checkout', '-b', name, start] : ['branch', name, start]);
+  }
+
+  /** 建立 tag；有 message 時為 annotated tag */
+  async createTag(name: string, target: string, message?: string): Promise<void> {
+    if (!(await this.isValidRefName(name, 'tag'))) throw new GitError(`Invalid tag name: ${name}`, null, '');
+    if (!isHash(target)) throw new GitError(`Invalid revision: ${target}`, null, '');
+    await this.run(message ? ['tag', '-a', '-m', message, name, target] : ['tag', name, target]);
+  }
+
+  /** 指定 commit 與目前工作區（含未 stage 的修改）之間的差異檔案 */
+  async diffWithWorkingTree(hash: string): Promise<ChangedFile[]> {
+    if (!isHash(hash)) return [];
+    return parseNameStatusZ(await this.run(['diff', '-M', '--name-status', '-z', hash, '--']));
+  }
+
   async checkout(target: string, opts: { track?: boolean } = {}): Promise<void> {
     // 防止以 '-' 開頭的值被當成選項
     if (!target || target.startsWith('-')) throw new GitError(`Invalid checkout target: ${target}`, null, '');

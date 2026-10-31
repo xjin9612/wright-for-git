@@ -18,7 +18,8 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
   - Highlights: Conventional Commits type coloring (`feat`, `fix`, `docs`…), bold for your own commits, dimmed merge commits
   - Columns: Author (`*` when author ≠ committer), Date, Hash — toggle them from the 👁 menu
   - Virtual scrolling with streamed loading; tested with 100,000 commits
-  - Context menu: copy hash / subject, checkout revision
+  - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), compare with the working tree
+- **Sync** — Fetch, Pull and Push in the toolbar (Force Push uses `--force-with-lease` and asks first). Pull follows your `pull.rebase` setting; pushing a branch without an upstream offers to set it. Local branches show ↑ahead ↓behind in the Branches tree
 - **Changed files** — tree with compacted folders and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff.
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
@@ -32,6 +33,7 @@ An IntelliJ-style Git log for VS Code. **Branches tree | Commit log with graph |
 - **Paths** filter: the first level selects repositories; with a single repository selected you can drill into its folders (like IntelliJ's multi-root Paths filter)
 - The **Repositories** view in the side bar stays in sync with the Paths filter
 - Branches with the same name across repositories are merged into a single entry — double-click to check it out in all of them at once
+- Fetch / Pull / Push run on every repository visible under the Paths filter, with one combined summary
 
 ## Keyboard (in the log)
 
@@ -72,7 +74,7 @@ Open this folder in VS Code and press `F5` to launch an Extension Development Ho
 
 ### Releasing
 
-1. Bump `version` in `package.json` and add a matching section at the top of `CHANGELOG.md` (`## 1.1.0`)
+1. Bump `version` in `package.json` and add a matching section at the top of `CHANGELOG.md` (`## 1.1.0`) — it becomes the release notes
 2. Commit, then tag and push: `git tag v1.1.0 && git push origin v1.1.0`
 3. GitHub Actions (`.github/workflows/release.yml`) checks the version, runs the tests, packages the `.vsix`, and publishes a GitHub Release using that CHANGELOG section as the notes
 

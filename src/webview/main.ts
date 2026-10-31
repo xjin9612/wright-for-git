@@ -1,6 +1,6 @@
 // Webview 進入點：組合三欄、管理篩選與資料流
 import { MultiGraph } from '../shared/multiGraph';
-import { EMPTY_FILTER, type CommitInfo, type LogFilter, type RepoState, type ToWebview, type UserInfo } from '../shared/protocol';
+import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
 import { mergeRefs } from '../shared/refs';
 import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
@@ -130,6 +130,24 @@ const branchChip = filterChip('Branch', () => openBranchPicker(), () => setFilte
 const userChip = filterChip('User', () => openUserPicker(), () => setFilter({ users: [] }));
 const pathsChip = filterChip('Paths', () => openPathsPicker(), () => setFilter({ paths: [], roots: [] }));
 const viewButton = iconButton('eye', 'View options', () => showViewMenu());
+
+/** 同步：作用於目前 Paths 篩選下可見的 repository */
+const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
+const pushMenuButton = iconButton('chevron-down', 'More push options', () => {
+  const r = pushMenuButton.getBoundingClientRect();
+  showMenu(r.left - 120, r.bottom + 2, [
+    { label: 'Push', action: () => sync('push') },
+    { label: 'Force Push (with lease)…', action: () => sync('forcePush') },
+  ]);
+}, 'split-caret');
+const syncGroup = el(
+  'div',
+  { className: 'toolbar-group' },
+  iconButton('fetch', 'Fetch all remotes', () => sync('fetch')),
+  iconButton('pull', 'Pull (uses your pull.rebase setting)', () => sync('pull')),
+  iconButton('push', 'Push', () => sync('push')),
+  pushMenuButton,
+);
 const progress = el('div', { className: 'progress' });
 const warningBar = el('div', { className: 'log-warning hidden' });
 
@@ -148,6 +166,8 @@ const filterBar = el(
   userChip.element,
   pathsChip.element,
   el('div', { className: 'toolbar-spacer' }),
+  syncGroup,
+  el('div', { className: 'toolbar-divider' }),
   iconButton('refresh', 'Refresh', () => post({ type: 'refresh' })),
   viewButton,
 );
@@ -539,11 +559,20 @@ function showContextMenu(index: number, x: number, y: number): void {
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
   if (!c || !root) return;
+  const act = (action: CommitAction) => () => post({ type: 'commitAction', action, root, hash: c.hash, parents: c.parents, subject: c.subject });
   showMenu(x, y, [
     { label: 'Copy Revision Number', action: () => post({ type: 'copy', text: c.hash }) },
     { label: 'Copy Subject', action: () => post({ type: 'copy', text: c.subject }) },
     '-',
     { label: 'Checkout Revision…', action: () => post({ type: 'checkoutRevision', root, hash: c.hash }) },
+    { label: 'New Branch…', action: act('newBranch') },
+    { label: 'New Tag…', action: act('newTag') },
+    '-',
+    { label: 'Cherry-Pick', action: act('cherryPick') },
+    { label: 'Revert Commit', action: act('revert') },
+    { label: 'Reset Current Branch to Here…', action: act('reset') },
+    '-',
+    { label: 'Compare with Local', action: act('compareLocal') },
   ]);
 }
 

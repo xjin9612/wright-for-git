@@ -15,5 +15,9 @@
   "command.openRepository": "Show Only This Repository",
   "config.scanDepth": "How many folder levels below each workspace folder are scanned for Git repositories (0 = only the workspace folder itself).",
   "config.scanExclude": "Folder names skipped when scanning for repositories.",
-  "command.showAllRepositories": "Show All Repositories"
+  "command.showAllRepositories": "Show All Repositories",
+  "command.fetch": "Fetch",
+  "command.pull": "Pull",
+  "command.push": "Push",
+  "command.forcePush": "Force Push (with lease)"
 }

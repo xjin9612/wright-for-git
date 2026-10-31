@@ -1,6 +1,6 @@
 # 待辦清單（Roadmap）
 
-已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈，詳見 CHANGELOG）
+已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈）、1.1.0（同步、Commit 右鍵），詳見 CHANGELOG
 
 ---
 
@@ -12,9 +12,9 @@
 | 多 repo 合併檢視 | 各 repo 分開 | ✅ | — |
 | 檔案歷史 | Timeline | ✅ 顯示 Git 歷史 | — |
 | Checkout branch | ✅ | ✅ | — |
-| Fetch／Pull／Push／Sync、ahead/behind | ✅ | ❌ | 階段二 |
+| Fetch／Pull／Push／Sync、ahead/behind | ✅ | ✅ 1.1.0 | — |
 | Branch 建立／改名／刪除／merge／rebase | ✅ | ❌ | 階段二 |
-| Commit 操作：cherry-pick／revert／reset／建 tag | 部分（指令面板） | ❌ | 階段二 |
+| Commit 操作：cherry-pick／revert／reset／建 tag | 部分（指令面板） | ✅ 1.1.0 | — |
 | Stash 建立／套用／刪除 | ✅ | ❌ | 階段二 |
 | 變更清單、stage／unstage、discard、commit／amend | ✅ | ❌ | 階段五（評估） |
 | 編輯器行號旁的變更標示、merge 衝突編輯器 | ✅ | ❌ | 沿用內建 |
@@ -28,9 +28,9 @@
 
 | # | 項目 | 說明 |
 |---|---|---|
-| 2.1 | 同步 | 工具列 Fetch／Pull／Push；Branches 樹顯示 ahead／behind（↑↓）；多 repo 時一次對所選 repo 執行 |
+| 2.1 | ✅ 同步（1.1.0） | 工具列 Fetch／Pull／Push；Branches 樹顯示 ahead／behind（↑↓）；多 repo 時一次對所選 repo 執行 |
 | 2.2 | Branch 右鍵選單 | Checkout、New Branch from…、Rename、Delete、Merge into Current、Rebase Current onto、Compare with Current、Push、Pull |
-| 2.3 | Commit 右鍵選單 | Cherry-pick、Revert、Reset Current Branch to Here（soft／mixed／hard）、New Branch、New Tag、Compare with Local |
+| 2.3 | ✅ Commit 右鍵選單（1.1.0） | Cherry-pick、Revert、Reset Current Branch to Here（soft／mixed／hard）、New Branch、New Tag、Compare with Local |
 | 2.4 | Stash | 底部面板新增 Stash 分頁：清單、檢視內容、Apply／Pop／Drop、Stash 目前變更 |
 | 2.5 | 多選 commit | `Ctrl`／`Shift` 多選，右欄顯示合併後的變更 |
 | 2.6 | 篩選提示 | 目前 branch 被 Branch 篩選排除時提示「HEAD 不在篩選中」，一鍵切回 |
@@ -65,7 +65,7 @@
 
 | # | 項目 | 說明 |
 |---|---|---|
-| 5.1 | 上 GitHub | 建立 `xjin9612/vscode-git-workbench` 並推送 1.0.0 |
+| 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
 | 5.3 | 整合測試 | `@vscode/test-electron` 在真實 VS Code 中跑主要流程 |
 | 5.4 | 大型 repo 效能 | 實測 VS Code 內的載入時間；提示或自動執行 `git commit-graph write` |

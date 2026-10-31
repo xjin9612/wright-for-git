@@ -18,7 +18,8 @@
   - Highlight：Conventional Commits 類型上色、我的 commit 粗體、merge commit 淡化
   - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換
   - 虛擬捲動，串流分批載入
-  - 右鍵：複製 hash／subject、checkout revision
+  - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、與工作區比較
+- **同步**：工具列 Fetch／Pull／Push（Force Push 使用 `--force-with-lease` 並先確認）；Pull 依照 `pull.rebase` 設定；沒有 upstream 時會詢問是否設定；Branches 樹顯示 ↑領先 ↓落後
 - **變更檔案**：樹狀（壓縮單一子目錄、檔案數；新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
@@ -32,6 +33,7 @@
 - **Paths** 篩選：第一層勾選要顯示的 repo；只選一個 repo 時可再展開子資料夾（等同 IntelliJ 多 root 的 Paths）
 - 側邊欄 **Repositories** 的勾選與 Paths 篩選同步
 - 多個 repo 都有的同名 branch 在 Branches 樹中合併為一筆，雙擊一次 checkout 全部
+- Fetch／Pull／Push 會對 Paths 篩選下可見的所有 repo 執行，結果彙整成一則通知
 
 ## 快捷鍵（Log 面板內）
 
@@ -69,7 +71,7 @@ npm run package     # 打包 .vsix
 
 ### 發佈新版本
 
-1. 修改 `package.json` 的 `version`，並在 `CHANGELOG.md` 最上方新增同版本的段落（`## 1.1.0`）
+1. 修改 `package.json` 的 `version`，並在 `CHANGELOG.md`（英文，作為 Release 說明）最上方新增同版本的段落（`## 1.1.0`）
 2. commit 後打 tag 並推送：`git tag v1.1.0 && git push origin v1.1.0`
 3. GitHub Actions（`.github/workflows/release.yml`）會檢查版本、跑測試、打包 `.vsix`，並以 CHANGELOG 該段落建立 Release
 

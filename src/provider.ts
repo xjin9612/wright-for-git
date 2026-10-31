@@ -7,9 +7,10 @@ import { isGraphFilter } from './git/parsers';
 import { GitRepository } from './git/repository';
 import { builtinRepositoryRoots, onRepositoryChange } from './gitExtension';
 import { revisionUri } from './diffProvider';
+import { runCommitAction, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
 import { promises as fsp } from 'node:fs';
-import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
+import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -316,6 +317,16 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'selectRepository':
           await this.selectRepository();
           break;
+        case 'sync':
+          await this.sync(m.action, m.roots);
+          break;
+        case 'commitAction': {
+          const [target] = await this.freshTargets([m.root]);
+          if (!target) break;
+          await runCommitAction(m.action, target, m.hash, m.parents, m.subject);
+          await this.refresh(true);
+          break;
+        }
       }
     } catch (e) {
       void vscode.window.showErrorMessage(vscode.l10n.t('Git command failed: {0}', errorMessage(e)));
@@ -512,6 +523,23 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const short = (h: string) => (h ? h.slice(0, 8) : '∅');
     const title = `${path.basename(file.path)} (${short(leftRef)} ↔ ${short(rightRef)})`;
     await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true });
+  }
+
+  // ---------- 同步 ----------
+
+  /** 取得最新狀態的操作目標（避免用到過期的 upstream／branch 資訊） */
+  private async freshTargets(roots: string[]): Promise<RepoTarget[]> {
+    const keys = new Set(roots.map((r) => pathKey(r)));
+    const list = this.entries.filter((e) => keys.has(e.key));
+    return mapLimit(list, 6, async (e) => ({ repo: e.repo, name: e.name, state: await e.repo.getState().catch(() => e.state) }));
+  }
+
+  /** 對指定 repository 同步；未指定時為目前 Paths 篩選下可見的 repository */
+  async sync(action: SyncAction, roots?: string[]): Promise<void> {
+    await this.ensureDiscovered();
+    const list = roots ?? this.visibleEntries().map((e) => e.repo.root);
+    await runSync(action, await this.freshTargets(list));
+    await this.refresh(true);
   }
 
   // ---------- checkout ----------

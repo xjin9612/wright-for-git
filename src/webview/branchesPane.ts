@@ -12,6 +12,8 @@ interface Row {
   ref?: MergedRef;
   /** 名稱後方的淡色說明（多 repo 時顯示所屬 repo） */
   extra?: string;
+  /** 相對 upstream 的領先／落後（↑2 ↓3） */
+  track?: string;
   extraTitle?: string;
   expandable: boolean;
   expanded: boolean;
@@ -117,6 +119,7 @@ export class BranchesPane {
             depth,
             kind: 'ref',
             ref: r,
+            track: trackText(r),
             extra: !multi ? undefined : r.roots.length === 1 ? nameOf.get(r.roots[0]) : `${r.roots.length} repos`,
             extraTitle: multi ? r.roots.map((x) => nameOf.get(x) ?? x).join('\n') : undefined,
             expandable: false,
@@ -205,6 +208,7 @@ export class BranchesPane {
       twisty,
       iconName ? icon(iconName, iconClass) : null,
       label,
+      row.track ? el('span', { className: 'tree-track', text: row.track, title: row.ref?.gone ? 'Upstream is gone' : `${row.ref?.ahead ?? 0} ahead, ${row.ref?.behind ?? 0} behind` }) : null,
       row.extra ? el('span', { className: 'tree-count', text: row.extra, title: row.extraTitle }) : null,
     );
     if (row.ref?.upstream && row.ref.type === 'local') div.title = `${row.ref.short} → ${row.ref.upstream}`;
@@ -317,4 +321,14 @@ export class BranchesPane {
     addFolders('tags', this.refs.filter((r) => r.type === 'tag').map((r) => r.short));
     return keys;
   }
+}
+
+/** 領先／落後顯示文字：「↑2 ↓3」；upstream 已刪除時顯示「gone」 */
+function trackText(r: MergedRef): string | undefined {
+  if (r.type !== 'local') return undefined;
+  if (r.gone) return 'gone';
+  const parts: string[] = [];
+  if (r.ahead) parts.push(`↑${r.ahead}`);
+  if (r.behind) parts.push(`↓${r.behind}`);
+  return parts.length > 0 ? parts.join(' ') : undefined;
 }

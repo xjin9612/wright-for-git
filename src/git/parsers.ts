@@ -6,7 +6,7 @@ const RS = '\x1e'; // 記錄分隔
 
 export const LOG_FORMAT = ['%H', '%P', '%an', '%ae', '%at', '%cn', '%ce', '%ct', '%s'].join('%x1f') + '%x1e';
 export const DETAILS_FORMAT = ['%H', '%P', '%an', '%ae', '%at', '%cn', '%ce', '%ct', '%B'].join('%x1f');
-export const REF_FORMAT = ['%(refname)', '%(objectname)', '%(*objectname)', '%(upstream:short)', '%(symref)'].join('%00');
+export const REF_FORMAT = ['%(refname)', '%(objectname)', '%(*objectname)', '%(upstream:short)', '%(symref)', '%(upstream:track)'].join('%00');
 
 /** 是否為「只依 ref 篩選」：此時才有完整的 parent 關係可畫 graph */
 export function isGraphFilter(filter: LogFilter): boolean {
@@ -120,11 +120,11 @@ export function parseRefs(text: string, remotes: readonly string[]): RefInfo[] {
   const refs: RefInfo[] = [];
   for (const line of text.split('\n')) {
     if (!line) continue;
-    const [name, objectName, peeled, upstream, symref] = line.split('\0');
+    const [name, objectName, peeled, upstream, symref, track] = line.split('\0');
     if (symref) continue; // 略過 origin/HEAD 這類 symbolic ref
     const hash = peeled || objectName;
     if (name.startsWith('refs/heads/')) {
-      refs.push({ name, short: name.slice(11), type: 'local', hash, upstream: upstream || undefined });
+      refs.push({ name, short: name.slice(11), type: 'local', hash, upstream: upstream || undefined, ...parseTrack(track) });
     } else if (name.startsWith('refs/remotes/')) {
       const short = name.slice(13);
       const remote = sortedRemotes.find((r) => short.startsWith(`${r}/`)) ?? short.split('/')[0];
@@ -134,6 +134,15 @@ export function parseRefs(text: string, remotes: readonly string[]): RefInfo[] {
     }
   }
   return refs;
+}
+
+/** 解析 `%(upstream:track)`：「[ahead 2, behind 3]」「[gone]」或空字串 */
+export function parseTrack(track: string | undefined): Pick<RefInfo, 'ahead' | 'behind' | 'gone'> {
+  if (!track) return {};
+  if (track.includes('gone')) return { gone: true };
+  const ahead = /ahead (\d+)/.exec(track);
+  const behind = /behind (\d+)/.exec(track);
+  return { ...(ahead ? { ahead: Number(ahead[1]) } : {}), ...(behind ? { behind: Number(behind[1]) } : {}) };
 }
 
 /** 解析 `git diff-tree -r -M --name-status -z` 輸出 */

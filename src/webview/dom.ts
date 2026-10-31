@@ -46,6 +46,9 @@ const ICONS = {
   head: '<circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2" fill="currentColor"/>',
   check: '<path d="M3 8.5l3 3 7-7"/>',
   repo: '<path d="M3 2.5h9.5v11H3z"/><path d="M5.5 2.5v11"/>',
+  fetch: '<path d="M4.6 10.5H4a2.7 2.7 0 0 1-.3-5.4A4 4 0 0 1 11.4 4a3.3 3.3 0 0 1 .9 6.5h-.9"/><path d="M8 7.5v7M5.8 12.3 8 14.5l2.2-2.2"/>',
+  pull: '<path d="M8 1.5v9M4.5 7 8 10.5 11.5 7M2.5 14h11"/>',
+  push: '<path d="M8 11V2M4.5 5.5 8 2l3.5 3.5M2.5 14h11"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -22,6 +22,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('gitWorkbench.refresh', () => provider.rediscover(true)),
     vscode.commands.registerCommand('gitWorkbench.selectRepository', () => provider.selectRepository()),
     vscode.commands.registerCommand('gitWorkbench.showHistory', (uri?: vscode.Uri) => provider.showHistory(uri)),
+    vscode.commands.registerCommand('gitWorkbench.fetch', () => provider.sync('fetch')),
+    vscode.commands.registerCommand('gitWorkbench.pull', () => provider.sync('pull')),
+    vscode.commands.registerCommand('gitWorkbench.push', () => provider.sync('push')),
+    vscode.commands.registerCommand('gitWorkbench.forcePush', () => provider.sync('forcePush')),
     vscode.commands.registerCommand('gitWorkbench.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),
     // 設定變更集中處理，避免同一次變更觸發多次重新載入
     vscode.workspace.onDidChangeConfiguration((e) => {

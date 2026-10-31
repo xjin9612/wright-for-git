@@ -83,6 +83,9 @@ export function mergeRefs(states: readonly RepoState[]): MergedRef[] {
       if (m) {
         m.roots.push(s.root);
         m.current ||= isCurrent;
+        // 多個 repo 的領先／落後數加總
+        if (r.ahead) m.ahead = (m.ahead ?? 0) + r.ahead;
+        if (r.behind) m.behind = (m.behind ?? 0) + r.behind;
       } else {
         map.set(r.name, { ...r, roots: [s.root], current: isCurrent });
       }

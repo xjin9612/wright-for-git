@@ -15,5 +15,9 @@
   "command.openRepository": "只顯示此 Repository",
   "config.scanDepth": "在每個工作區資料夾底下往下掃描幾層來尋找 Git repository（0 = 只看工作區資料夾本身）。",
   "config.scanExclude": "掃描 repository 時略過的資料夾名稱。",
-  "command.showAllRepositories": "顯示全部 Repository"
+  "command.showAllRepositories": "顯示全部 Repository",
+  "command.fetch": "Fetch",
+  "command.pull": "Pull",
+  "command.push": "Push",
+  "command.forcePush": "Force Push（with lease）"
 }

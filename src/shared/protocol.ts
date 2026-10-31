@@ -32,6 +32,12 @@ export interface RefInfo {
   remoteBranch?: string;
   /** local branch 的 upstream 短名稱 */
   upstream?: string;
+  /** 相對 upstream 領先的 commit 數 */
+  ahead?: number;
+  /** 相對 upstream 落後的 commit 數 */
+  behind?: number;
+  /** upstream 已被刪除 */
+  gone?: boolean;
 }
 
 export interface HeadInfo {
@@ -111,7 +117,14 @@ export type ToExtension =
   | { type: 'requestPaths'; root: string }
   | { type: 'refresh' }
   | { type: 'copy'; text: string }
-  | { type: 'selectRepository' };
+  | { type: 'selectRepository' }
+  /** 同步：對 roots 中的 repository 執行 */
+  | { type: 'sync'; action: SyncAction; roots: string[] }
+  /** Commit 右鍵選單的操作 */
+  | { type: 'commitAction'; action: CommitAction; root: string; hash: string; parents: string[]; subject: string };
+
+export type SyncAction = 'fetch' | 'pull' | 'push' | 'forcePush';
+export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'newTag' | 'compareLocal';
 
 /** Extension → Webview */
 export type ToWebview =
