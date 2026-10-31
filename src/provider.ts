@@ -513,7 +513,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       }
       // 沒有任何 commit 的 repo（剛 init）略過
       if (!hasHead && state.refs.length === 0) return;
-      targets.push({ index, filter: { ...this.currentFilter, branches }, hasHead });
+      // 路徑篩選：Select… 跨 repo 勾選時各 repo 各自的路徑；沒有勾到資料夾的 repo 不限路徑
+      const byRoot = this.currentFilter.pathsByRoot;
+      const paths = byRoot ? (byRoot[e.repo.root] ?? []) : this.currentFilter.paths;
+      targets.push({ index, filter: { ...this.currentFilter, branches, paths }, hasHead });
     });
 
     const merger = new LogMerger(targets.length);

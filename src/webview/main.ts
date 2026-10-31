@@ -4,9 +4,10 @@ import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type 
 import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
 import { DetailsPane } from './detailsPane';
-import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
+import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { showConfirm } from './confirmDialog';
+import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { t } from './l10n';
@@ -34,6 +35,8 @@ interface Persisted {
   activeTab?: number;
   /** Branches 的分組與顯示選項 */
   branchOptions?: Partial<BranchOptions>;
+  /** 多 repo 時左側顯示 repo 名稱欄 */
+  repoNames?: boolean;
   /** 選取的 commit：`${root}|${hash}` */
   selectedHash?: string;
 }
@@ -58,6 +61,7 @@ const ui: Persisted = {
   onlyFavorites: saved?.onlyFavorites,
   widths: saved?.widths,
   branchOptions: saved?.branchOptions,
+  repoNames: saved?.repoNames,
   tabs: saved?.tabs,
   flatFiles: saved?.flatFiles,
   activeTab: saved?.activeTab,
@@ -86,7 +90,6 @@ let users: UserInfo[] | undefined;
 let usersPicker: { refresh: () => void } | undefined;
 const dirsByRoot = new Map<string, string[]>();
 const dirsRequested = new Set<string>();
-let pathsPicker: { refresh: () => void } | undefined;
 let openPushWhenReady = false;
 
 /** 目前 Paths（repo）篩選下要顯示的 repository */
@@ -134,6 +137,10 @@ const table = new LogTable(
   {
     onSelect: (i) => onCommitSelected(i),
     onMultiSelect: (indices) => onCommitsSelected(indices),
+    onRepoNamesChange: (show) => {
+      ui.repoNames = show;
+      persist();
+    },
     onColumnWidths: (w) => {
       ui.widths = w;
       persist();
@@ -145,6 +152,7 @@ const table = new LogTable(
 );
 
 table.setColumnWidths(ui.widths);
+table.setRepoNames(!!ui.repoNames);
 
 const details = new DetailsPane(
   {
@@ -190,7 +198,7 @@ searchInput.addEventListener('keydown', (e) => {
 
 const branchChip = filterChip('Branch', () => showBranchMenu(), () => setFilter({ branches: [] }));
 const userChip = filterChip('User', () => openUserPicker(), () => setFilter({ users: [] }));
-const pathsChip = filterChip('Paths', () => openPathsPicker(), () => setFilter({ paths: [], roots: [] }));
+const pathsChip = filterChip('Paths', () => showPathsMenu(), () => setFilter({ paths: [], roots: [], pathsByRoot: undefined }));
 const dateChip = filterChip('Date', () => openDatePicker(), () => setFilter({ since: undefined, until: undefined }));
 const viewButton = iconButton('eye', t('View options'), () => showViewMenu());
 
@@ -245,7 +253,7 @@ function tabTitle(f: LogFilter): string {
   if (f.branches.length > 0) parts.push(f.branches.map(shortRefName).join(', '));
   if (f.users.length > 0) parts.push(f.users.join(', '));
   if (f.text.trim()) parts.push(`"${f.text.trim()}"`);
-  if (f.paths.length > 0 || f.roots.length > 0) parts.push(pathsLabel());
+  if (f.paths.length > 0 || f.pathsByRoot || f.roots.length > 0) parts.push(pathsLabel());
   if (f.since || f.until) parts.push(dateLabel());
   return parts.join(' · ') || t('All');
 }
@@ -395,10 +403,15 @@ function repoName(root: string): string {
 /** Paths 篩選框的顯示文字：`repo` 或 `repo / 子路徑` */
 function pathsLabel(): string {
   const f = ui.filter;
-  const roots = f.roots.length > 0 ? f.roots : f.paths.length > 0 && repos.length === 1 ? [repos[0].root] : [];
-  const names = roots.map(repoName);
-  if (f.paths.length === 0) return names.join('|');
-  return `${names.join('|')} / ${f.paths.join('|')}`;
+  const map = pathMap(f);
+  const roots = f.roots.length > 0 ? f.roots : Object.keys(map);
+  return roots
+    .map((root) => {
+      const name = repoName(root);
+      const paths = map[root];
+      return paths && paths.length > 0 ? `${name}/${paths.join(',')}` : name;
+    })
+    .join('|');
 }
 
 function renderChips(): void {
@@ -590,80 +603,81 @@ function openUserPicker(): void {
   });
 }
 
+/** 目前每個 repo 的路徑篩選（相容舊的 paths：單一 repo 時套用在該 repo） */
+function pathMap(f: LogFilter = ui.filter): Record<string, string[]> {
+  if (f.pathsByRoot) return f.pathsByRoot;
+  if (f.paths.length === 0) return {};
+  const root = f.roots.length === 1 ? f.roots[0] : repos.length === 1 ? repos[0].root : undefined;
+  return root ? { [root]: f.paths } : {};
+}
+
+function requestDirs(root: string): string[] | undefined {
+  const list = dirsByRoot.get(root);
+  if (!list && !dirsRequested.has(root)) {
+    dirsRequested.add(root);
+    post({ type: 'requestPaths', root });
+  }
+  return list;
+}
+
 /**
- * Paths 篩選（對應 IntelliJ）：第一層一律是 repository；只選一個 repo（或只有一個 repo）時，
- * 下面再列出該 repo 的子資料夾。資料夾的值為 `<repo 名稱>/<路徑>`。
+ * Paths 篩選（對應 IntelliJ）：Select… 開資料夾樹；下方 Roots 為各儲存庫的勾選，
+ * 點一下切換、Ctrl+點選只看這一個。
  */
-function openPathsPicker(): void {
-  const byName = new Map(repos.map((r) => [r.name, r]));
-  const folderOptions = (repo: RepoState): PickerOption[] => {
-    const list = dirsByRoot.get(repo.root);
-    if (!list) {
-      if (!dirsRequested.has(repo.root)) {
-        dirsRequested.add(repo.root);
-        post({ type: 'requestPaths', root: repo.root });
-      }
-      return [];
-    }
-    return list.map((d) => ({ value: `${repo.name}/${d}`, label: d.slice(d.lastIndexOf('/') + 1), detail: d, icon: 'folder' as const, indent: d.split('/').length }));
+function showPathsMenu(): void {
+  const r = pathsChip.element.getBoundingClientRect();
+  const all = repos.map((x) => x.root);
+  const shown = () => new Set(ui.filter.roots.length > 0 ? ui.filter.roots : all);
+  const applyRoots = (roots: string[]) => {
+    const keep = pathMap();
+    const next: Record<string, string[]> = {};
+    for (const root of roots) if (keep[root]) next[root] = keep[root];
+    const allShown = roots.length === all.length;
+    setFilter({ roots: allShown ? [] : roots, paths: [], pathsByRoot: Object.keys(next).length > 0 ? next : undefined });
   };
-  pathsPicker = openPicker({
-    anchor: pathsChip.element,
-    values: currentPathValues(),
-    options: (current) => {
-      const opts: PickerOption[] = [];
-      const pickedRepos = current.filter((v) => byName.has(v));
-      // 只有一個 repo，或只勾了一個 repo（或勾的資料夾都屬於同一個 repo）時展開資料夾
-      const folderRepo =
-        repos.length === 1
-          ? repos[0]
-          : pickedRepos.length === 1
-            ? byName.get(pickedRepos[0])
-            : pickedRepos.length === 0
-              ? repoOfFolderValue(current.find((v) => !byName.has(v)))
-              : undefined;
-      for (const r of repos) {
-        opts.push({ value: r.name, icon: 'repo', detail: r.head.branch ?? t('detached') });
-        if (folderRepo === r) opts.push(...folderOptions(r));
-      }
-      return opts;
-    },
-    onApply: (values) => {
-      pathsPicker = undefined;
-      const roots = new Set<string>();
-      const paths: string[] = [];
-      for (const v of values) {
-        const repo = byName.get(v);
-        if (repo) {
-          roots.add(repo.root);
-          continue;
-        }
-        const owner = repoOfFolderValue(v);
-        if (!owner) continue;
-        roots.add(owner.root);
-        paths.push(v.slice(owner.name.length + 1).replace(/\\/g, '/').replace(/^\/+|\/+$/g, ''));
-      }
-      // 子資料夾只在單一 repo 時有意義
-      const rootList = [...roots];
-      const usePaths = rootList.length === 1 ? paths.filter(Boolean) : [];
-      setFilter({ roots: rootList.length === repos.length && usePaths.length === 0 ? [] : rootList, paths: usePaths });
+  const items: MenuItem[] = [
+    { label: t('Select…'), action: () => openFoldersDialog() },
+    '-',
+    { label: t('Roots'), disabled: true },
+    ...repos.map(
+      (repo): MenuItem => ({
+        label: repo.name,
+        detail: repo.head.branch ?? t('detached'),
+        checked: shown().has(repo.root),
+        keepOpen: true,
+        action: (e) => {
+          if (e.ctrlKey || e.metaKey) {
+            applyRoots([repo.root]);
+            closeMenus();
+            return true;
+          }
+          const set = shown();
+          if (set.has(repo.root)) {
+            if (set.size === 1) return true; // 至少保留一個
+            set.delete(repo.root);
+          } else set.add(repo.root);
+          applyRoots(all.filter((x) => set.has(x)));
+          return set.has(repo.root);
+        },
+      }),
+    ),
+  ];
+  showMenu(r.left, r.bottom + 2, items);
+  const hint = el('div', { className: 'menu-hint', text: t('Ctrl+Click to show only that repository') });
+  document.querySelector('.context-menu[data-level="0"]')?.append(hint);
+}
+
+function openFoldersDialog(): void {
+  const map = pathMap();
+  openPathsDialog({
+    repos,
+    initial: { roots: ui.filter.roots.length > 0 ? ui.filter.roots : Object.keys(map), pathsByRoot: map },
+    dirsOf: (root) => requestDirs(root),
+    onApply: (sel) => {
+      const allRoots = sel.roots.length === 0 || (sel.roots.length === repos.length && Object.keys(sel.pathsByRoot).length === 0);
+      setFilter({ roots: allRoots ? [] : sel.roots, paths: [], pathsByRoot: Object.keys(sel.pathsByRoot).length > 0 ? sel.pathsByRoot : undefined });
     },
   });
-}
-
-/** `<repo 名稱>/<路徑>` 對應的 repo（取名稱最長者，處理巢狀 repo 名稱） */
-function repoOfFolderValue(v: string | undefined): RepoState | undefined {
-  if (!v) return undefined;
-  return repos.filter((r) => v.startsWith(`${r.name}/`)).sort((a, b) => b.name.length - a.name.length)[0];
-}
-
-/** 目前篩選轉成 Paths 彈出框的值 */
-function currentPathValues(): string[] {
-  const f = ui.filter;
-  const roots = f.roots.length > 0 ? f.roots : f.paths.length > 0 && repos.length === 1 ? [repos[0].root] : [];
-  const names = roots.map(repoName);
-  if (f.paths.length > 0 && names.length === 1) return f.paths.map((p) => `${names[0]}/${p}`);
-  return names;
 }
 
 function toggleButton(label: string, title: string, get: () => boolean, set: (v: boolean) => void) {
@@ -769,7 +783,7 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
 
 function hasActiveFilter(): boolean {
   const f = ui.filter;
-  return f.text.trim() !== '' || f.users.length > 0 || f.branches.length > 0 || f.paths.length > 0 || f.roots.length > 0 || !!f.since || !!f.until;
+  return f.text.trim() !== '' || f.users.length > 0 || f.branches.length > 0 || f.paths.length > 0 || !!f.pathsByRoot || f.roots.length > 0 || !!f.since || !!f.until;
 }
 
 const requestDetails = debounce((root: string, hash: string) => post({ type: 'selectCommit', root, hash }), 60);
@@ -981,6 +995,10 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       // 移除已不存在的 repo 篩選
       const roots = new Set(repos.map((r) => r.root));
       if (ui.filter.roots.some((r) => !roots.has(r))) ui.filter = { ...ui.filter, roots: ui.filter.roots.filter((r) => roots.has(r)) };
+      if (ui.filter.pathsByRoot && Object.keys(ui.filter.pathsByRoot).some((r) => !roots.has(r))) {
+        const next = Object.fromEntries(Object.entries(ui.filter.pathsByRoot).filter(([r]) => roots.has(r)));
+        ui.filter = { ...ui.filter, pathsByRoot: Object.keys(next).length > 0 ? next : undefined };
+      }
       table.setRepos(repos);
       details.setRepos(repos);
       renderChips();
@@ -1034,7 +1052,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'paths':
       dirsByRoot.set(m.root, m.paths);
-      pathsPicker?.refresh();
+      refreshPathsDialog();
       break;
     case 'pushPreview':
     case 'pushCommitFiles':
@@ -1051,7 +1069,8 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'applyFilter':
       if (m.filter.text !== undefined) searchInput.value = m.filter.text;
-      setFilter(m.filter);
+      // 由 extension 指定 roots／paths（側邊欄、顯示 Git 歷史）時，取代 Select… 的跨 repo 路徑
+      setFilter('paths' in m.filter || 'roots' in m.filter ? { pathsByRoot: undefined, ...m.filter } : m.filter);
       break;
   }
 });

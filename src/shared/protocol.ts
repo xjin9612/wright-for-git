@@ -69,6 +69,8 @@ export interface LogFilter {
   paths: string[];
   /** 只顯示這些 repository（root 路徑）；空陣列表示全部 */
   roots: string[];
+  /** 各 repository 的路徑篩選（Paths → Select… 跨 repo 勾選資料夾）；有值時優先於 paths */
+  pathsByRoot?: Record<string, string[]>;
   /** 日期範圍（git 日期字串，如 7.days.ago、2026-01-31）；比對 committer 日期 */
   since?: string;
   until?: string;

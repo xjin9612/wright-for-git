@@ -11,6 +11,8 @@ const GRAPH_PAD = 6;
 const OVERSCAN = 8;
 /** 多 repo 時每列最左側的 repo 色條寬度 */
 const STRIP_WIDTH = 4;
+/** 展開顯示 repo 名稱時的欄寬 */
+const NAMES_WIDTH = 92;
 const STRIP_GAP = 4;
 
 /** repo 色條顏色（與 lane 顏色錯開） */
@@ -46,6 +48,8 @@ export interface LogTableCallbacks {
   /** 多選（Ctrl／Shift）：indices 依列順序排列，至少兩筆 */
   onMultiSelect: (indices: number[]) => void;
   onContextMenu: (index: number, x: number, y: number) => void;
+  /** 點左側 repo 色條：切換顯示 repo 名稱欄 */
+  onRepoNamesChange?: (show: boolean) => void;
   /** 拖曳調整欄寬結束 */
   onColumnWidths?: (widths: ColumnWidths) => void;
 }
@@ -93,6 +97,9 @@ export class LogTable {
   private frame = 0;
   private heldScroll: number | undefined;
   private widths: ColumnWidths = { ...DEFAULT_WIDTHS };
+  /** 多 repo 時左側顯示 repo 名稱欄（否則只是一條色條） */
+  private repoNames = false;
+  private stripWidth = STRIP_WIDTH;
   private readonly handles = new Map<(typeof COLS)[number], HTMLDivElement>();
 
   constructor(
@@ -121,6 +128,13 @@ export class LogTable {
     this.rowsLayer.addEventListener('mousedown', (e) => {
       const idx = this.indexFromEvent(e);
       if (idx === undefined) return;
+      // 點左側 repo 色條／名稱欄：切換名稱欄（對應 IntelliJ 點 root 欄展開）
+      if (e.button === 0 && this.element.classList.contains('multi-repo') && e.clientX - this.rowsLayer.getBoundingClientRect().left < this.stripWidth + 2) {
+        e.preventDefault();
+        this.setRepoNames(!this.repoNames);
+        this.cb.onRepoNamesChange?.(this.repoNames);
+        return;
+      }
       // 右鍵點在已選取的列上：保留多選（右鍵選單作用於整個選取）
       if (e.button !== 0 && this.isSelected(idx)) return;
       if (e.button === 0 && e.shiftKey) {
@@ -140,6 +154,11 @@ export class LogTable {
       this.cb.onContextMenu(idx, e.clientX, e.clientY);
     });
     this.applyColumns();
+  }
+
+  setRepoNames(show: boolean): void {
+    this.repoNames = show;
+    this.invalidateRows();
   }
 
   setColumnWidths(w: Partial<ColumnWidths> | undefined): void {
@@ -408,7 +427,8 @@ export class LogTable {
 
     const frame = this.graph.frame(first, last);
     const multi = this.graph.repoCount > 1;
-    const graphLeft = multi ? STRIP_WIDTH + STRIP_GAP : 0;
+    this.stripWidth = this.repoNames ? NAMES_WIDTH : STRIP_WIDTH;
+    const graphLeft = multi ? this.stripWidth + STRIP_GAP : 0;
     const graphWidth = graphLeft + GRAPH_PAD * 2 + frame.lanes * LANE_WIDTH;
     this.element.classList.toggle('multi-repo', multi);
 
@@ -473,6 +493,15 @@ export class LogTable {
     view.hash.textContent = c.hash.slice(0, 8);
   }
 
+  private get nameColor(): string {
+    return getComputedStyle(this.element).getPropertyValue('--vscode-foreground').trim() || '#ccc';
+  }
+
+  private get nameFont(): string {
+    const cs = getComputedStyle(this.element);
+    return `11px ${cs.fontFamily}`;
+  }
+
   private drawGraph(first: number, st: number, vh: number, vw: number, graphWidth: number, graphLeft: number, frame: FrameLayout, multi: boolean): void {
     const dpr = window.devicePixelRatio || 1;
     const w = Math.min(graphWidth, vw);
@@ -500,6 +529,8 @@ export class LogTable {
       ctx.stroke();
     };
 
+    /** 名稱欄：同 repo 連續列的範圍，名稱寫在可見部分的第一列 */
+    const runs: { repo: number; top: number; bottom: number }[] = [];
     frame.rows.forEach((fr, k) => {
       const i = first + k;
       const { repo, row } = fr;
@@ -508,7 +539,18 @@ export class LogTable {
       const y1 = y0 + ROW_HEIGHT;
       if (multi) {
         ctx.fillStyle = REPO_COLORS[repo % REPO_COLORS.length];
-        ctx.fillRect(0, y0, STRIP_WIDTH, ROW_HEIGHT);
+        if (this.repoNames) {
+          // 名稱欄：同 repo 連續的列合成一塊，名稱寫在這一塊的第一列
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(0, y0, this.stripWidth, ROW_HEIGHT);
+          ctx.globalAlpha = 1;
+          ctx.fillRect(0, y0, 3, ROW_HEIGHT);
+          const prev = k > 0 ? frame.rows[k - 1].repo : -1;
+          if (prev !== repo) runs.push({ repo, top: y0, bottom: y1 });
+          else runs[runs.length - 1].bottom = y1;
+        } else {
+          ctx.fillRect(0, y0, STRIP_WIDTH, ROW_HEIGHT);
+        }
       }
       // 直通線：此 repo 未與節點相連的 lane，以及其他 repo 穿過此列的 lane
       for (const t of fr.through) line(t.color, x(repo, t.lane), y0, x(repo, t.lane), y1);
@@ -516,6 +558,17 @@ export class LogTable {
       for (const s of row.top) line(s.color, x(repo, s.from), y0, x(repo, s.to), mid);
       for (const s of row.bottom) line(s.color, x(repo, s.from), mid, x(repo, s.to), y1);
     });
+
+    if (runs.length > 0) {
+      ctx.fillStyle = this.nameColor;
+      ctx.font = this.nameFont;
+      ctx.textBaseline = 'middle';
+      for (const run of runs) {
+        if (run.bottom <= 0 || run.top >= vh) continue;
+        const name = this.states[run.repo]?.name ?? '';
+        ctx.fillText(fitText(ctx, name, this.stripWidth - 10), 7, Math.max(run.top, 0) + ROW_HEIGHT / 2);
+      }
+    }
 
     // 節點畫在線上方
     frame.rows.forEach((fr, k) => {
@@ -570,4 +623,12 @@ function renderSubject(target: HTMLElement, subject: string, colorType: boolean)
 export function renderLabel(l: RefLabel): HTMLElement {
   const iconName = l.kind === 'head' ? 'head' : 'tag';
   return el('span', { className: `ref-label kind-${l.kind}${l.current ? ' current' : ''}`, title: l.title }, icon(iconName), el('span', { className: 'ref-text', text: l.text }));
+}
+
+/** 依寬度截斷文字（加上 …） */
+function fitText(ctx: CanvasRenderingContext2D, text: string, max: number): string {
+  if (ctx.measureText(text).width <= max) return text;
+  let s = text;
+  while (s.length > 1 && ctx.measureText(`${s}…`).width > max) s = s.slice(0, -1);
+  return `${s}…`;
 }

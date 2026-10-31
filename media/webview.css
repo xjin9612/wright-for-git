@@ -451,3 +451,9 @@ select.push-remote {
 .menu-item.open { background: var(--vscode-menu-selectionBackground, var(--sel-focus-bg)); color: var(--vscode-menu-selectionForeground, inherit); }
 .menu-star { cursor: pointer; color: var(--muted); }
 .menu-star .favorite { color: var(--vscode-charts-yellow, #e2c08d); }
+
+.menu-hint { padding: 4px 10px 2px; color: var(--muted); font-size: 0.85em; border-top: 1px solid var(--vscode-menu-separatorBackground, var(--border)); margin-top: 4px; }
+.paths-dialog { width: min(560px, calc(100vw - 24px)); }
+.paths-search { margin: 8px 12px 4px; }
+.paths-tree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; }
+.paths-tree input[type="checkbox"] { margin: 0 4px 0 0; }
