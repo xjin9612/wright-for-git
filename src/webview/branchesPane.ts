@@ -27,6 +27,8 @@ export interface BranchesCallbacks {
   /** roots：擁有此 ref 的 repository */
   onCheckout: (refName: string, roots: string[]) => void;
   onRefresh: () => void;
+  /** ref 右鍵選單 */
+  onContextMenu: (ref: MergedRef, x: number, y: number) => void;
   /** Fetch 所有 remote */
   onFetch: () => void;
   onCollapsePane: () => void;
@@ -217,6 +219,14 @@ export class BranchesPane {
     if (row.ref?.upstream && row.ref.type === 'local') div.title = `${row.ref.short} → ${row.ref.upstream}`;
     div.style.paddingLeft = `${4 + row.depth * 14}px`;
     div.addEventListener('click', () => this.activate(row, false));
+    div.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!row.ref) return;
+      this.selectedKey = row.key;
+      this.list.querySelector('.tree-row.selected')?.classList.remove('selected');
+      div.classList.add('selected');
+      this.cb.onContextMenu(row.ref, e.clientX, e.clientY);
+    });
     div.addEventListener('dblclick', () => {
       if (row.ref) this.cb.onCheckout(row.ref.name, row.ref.roots);
     });

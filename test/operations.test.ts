@@ -229,3 +229,57 @@ test('建立 branch／tag 與名稱驗證；與工作區比較', async () => {
   const diff = await repo.diffWithWorkingTree(c1);
   assert.deepEqual(diff.map((f) => `${f.status} ${f.path}`).sort(), ['A b.txt', 'M a.txt']);
 });
+
+test('branch 操作：rename、delete（未合併需 force）、merge、rebase、update、遠端刪除、tag', async () => {
+  const { a, bare, b } = remoteSetup();
+  const repo = (await GitRepository.open('git', a.dir))!;
+  const base = a.git('rev-parse', 'HEAD');
+
+  // rename
+  a.git('branch', '-q', 'topic');
+  await repo.renameBranch('topic', 'topic2');
+  assert.match(a.git('branch', '--list', 'topic2'), /topic2/);
+  await assert.rejects(repo.renameBranch('topic2', 'bad..name'));
+
+  // 未合併的 branch：-d 失敗，force 成功
+  a.git('checkout', '-q', 'topic2');
+  a.commit('topic work', { 't.txt': '1' });
+  a.git('checkout', '-q', 'main');
+  await assert.rejects(repo.deleteBranch('topic2', false), /not fully merged/);
+  // merge 進 main 後即可一般刪除
+  await repo.merge('refs/heads/topic2');
+  assert.equal(a.git('log', '-1', '--format=%s'), 'topic work');
+  await repo.deleteBranch('topic2', false);
+  await assert.rejects(repo.merge('--abort'), /Invalid ref/);
+
+  // rebase：side 在 base 上，main 往前一筆後 rebase
+  a.git('checkout', '-q', '-b', 'side', base);
+  a.commit('side work', { 's.txt': '1' });
+  await repo.rebase('refs/heads/main');
+  assert.equal(a.git('rev-parse', 'HEAD~1'), a.git('rev-parse', 'main'));
+
+  // update：非目前 branch 從 upstream fast-forward
+  a.git('push', '-q', 'origin', 'main');
+  b('pull', '-q');
+  b('commit', '-q', '--allow-empty', '-m', 'remote ahead');
+  b('push', '-q');
+  a.git('fetch', '-q');
+  await repo.updateBranch('main');
+  assert.equal(a.git('log', '-1', '--format=%s', 'main'), 'remote ahead');
+  await assert.rejects(repo.updateBranch('side'), /no upstream/);
+
+  // 遠端 branch 刪除與 tag
+  a.git('push', '-q', 'origin', 'side');
+  await repo.deleteRemoteBranch('origin', 'side');
+  assert.doesNotMatch(execFileSync('git', ['branch'], { cwd: bare, encoding: 'utf8' }), /side/);
+  a.git('tag', 'v1');
+  await repo.pushTag('origin', 'v1');
+  assert.match(execFileSync('git', ['tag'], { cwd: bare, encoding: 'utf8' }), /v1/);
+  await repo.deleteTag('v1');
+  assert.equal(a.git('tag'), '');
+
+  // compare：diffBetween
+  const files = await repo.diffBetween(base, a.git('rev-parse', 'HEAD'));
+  assert.deepEqual(files.map((f) => f.path).sort(), ['s.txt', 't.txt']);
+  assert.equal(await repo.resolve('refs/heads/nope'), undefined);
+});

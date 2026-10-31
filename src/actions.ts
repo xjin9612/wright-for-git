@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
-import type { CommitAction, PushPlan, PushTarget, RepoState, SyncAction } from './shared/protocol';
+import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
 
 export interface RepoTarget {
   repo: GitRepository;
@@ -117,13 +117,13 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
 // ---------- Push ----------
 
 /** 各 repo 的 push 預覽（Push 對話框用）；overrides 為使用者在對話框改過的目標 */
-export async function buildPushPlans(targets: RepoTarget[], upTo?: { root: string; hash: string }, overrides: PushTarget[] = []): Promise<PushPlan[]> {
+export async function buildPushPlans(targets: RepoTarget[], upTo?: { root: string; hash: string }, overrides: PushTarget[] = [], branch?: string): Promise<PushPlan[]> {
   return Promise.all(
     targets.map(async (target): Promise<PushPlan> => {
       const o = overrides.find((x) => x.root === target.repo.root);
       const hash = upTo && upTo.root === target.repo.root ? upTo.hash : undefined;
       try {
-        return { ...(await target.repo.getPushPlan({ upTo: hash, remote: o?.remote, remoteBranch: o?.remoteBranch })), name: target.name };
+        return { ...(await target.repo.getPushPlan({ branch: o?.branch ?? branch, upTo: hash, remote: o?.remote, remoteBranch: o?.remoteBranch })), name: target.name };
       } catch (e) {
         return { root: target.repo.root, name: target.name, remotes: [], hasUpstream: false, isNew: false, commits: [], total: 0, behind: 0, problem: 'error', message: errorMessage(e) };
       }
@@ -155,7 +155,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
   if (force) {
     const ok = t('Force Push');
     const detail = [
-      ...work.map(({ target, push }) => `${target.name}: ${push.upTo ? short(push.upTo) : target.state?.head.branch ?? ''} → ${push.remote}/${push.remoteBranch}`),
+      ...work.map(({ target, push }) => `${target.name}: ${push.upTo ? short(push.upTo) : push.branch ?? target.state?.head.branch ?? ''} → ${push.remote}/${push.remoteBranch}`),
       '',
       t('Uses --force-with-lease: the push is rejected instead of overwriting if the remote has commits you have not fetched.'),
     ].join('\n');
@@ -313,5 +313,215 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
     }
   } catch (e) {
     void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
+  }
+}
+
+// ---------- Branch／Tag 操作 ----------
+
+function refIn(target: RepoTarget, refName: string): RefInfo | undefined {
+  return target.state?.refs.find((r) => r.name === refName);
+}
+
+/** 多個 repo 時先以 modal 確認，列出受影響的 repo */
+async function confirmMulti(targets: RepoTarget[], message: string, ok: string, always = false): Promise<boolean> {
+  if (targets.length <= 1 && !always) return true;
+  const answer = await vscode.window.showWarningMessage(message, { modal: true, detail: targets.map((x) => x.name).join('\n') }, ok);
+  return answer === ok;
+}
+
+async function pickTarget(targets: RepoTarget[]): Promise<RepoTarget | undefined> {
+  if (targets.length <= 1) return targets[0];
+  const pick = await vscode.window.showQuickPick(
+    targets.map((x) => ({ label: x.name, description: x.state?.head.branch, x })),
+    { placeHolder: t('Choose a repository') },
+  );
+  return pick?.x;
+}
+
+/**
+ * Branches 右鍵選單的操作。targets 為擁有此 ref 的 repository（同名 branch 跨 repo 一次處理）。
+ */
+export async function runRefAction(action: RefAction, refName: string, targets: RepoTarget[]): Promise<void> {
+  const first = targets[0] && refIn(targets[0], refName);
+  if (!first) return;
+  const name = first.short;
+  const failures: string[] = [];
+  /** 依序對每個 repo 執行；失敗時收集訊息，最後一次顯示 */
+  const each = async (fn: (target: RepoTarget, ref: RefInfo) => Promise<void>, list = targets) => {
+    for (const target of list) {
+      const ref = refIn(target, refName);
+      if (!ref) continue;
+      try {
+        await fn(target, ref);
+      } catch (e) {
+        if (!(await handleConflict(target))) failures.push(targets.length > 1 ? `${target.name}: ${errorMessage(e)}` : errorMessage(e));
+      }
+    }
+  };
+  const done = (msg: string) => {
+    if (failures.length > 0) void vscode.window.showErrorMessage(failures.join('\n'));
+    else vscode.window.setStatusBarMessage(`$(check) ${msg}`, 4000);
+  };
+
+  switch (action) {
+    case 'newBranch': {
+      const existing = new Set(targets.flatMap((x) => x.state?.refs.filter((r) => r.type === 'local').map((r) => r.short) ?? []));
+      const suggestion = first.type === 'remote' ? (first.remoteBranch ?? '') : '';
+      const input = await vscode.window.showInputBox({
+        title: t('New Branch from {0}', name),
+        value: existing.has(suggestion) ? '' : suggestion,
+        prompt: t('The new branch will be checked out.'),
+        validateInput: async (v) => {
+          const s = v.trim();
+          if (!s) return undefined;
+          if (existing.has(s)) return t('Branch {0} already exists.', s);
+          return (await targets[0].repo.isValidRefName(s, 'branch')) ? undefined : t('Not a valid branch name.');
+        },
+      });
+      const branch = input?.trim();
+      if (!branch) return;
+      await each(async (target, ref) => {
+        await target.repo.createBranch(branch, ref.hash, true);
+        // 從 remote branch 建立時設定為 upstream（與 IntelliJ 相同）
+        if (ref.type === 'remote') await target.repo.exec(['branch', `--set-upstream-to=${ref.short}`, branch]);
+      });
+      done(t('Created and checked out {0}', branch));
+      return;
+    }
+    case 'rename': {
+      if (first.type !== 'local') return;
+      const input = await vscode.window.showInputBox({
+        title: t('Rename {0}', name),
+        value: name,
+        validateInput: async (v) => {
+          const s = v.trim();
+          if (!s || s === name) return undefined;
+          if (targets.some((x) => x.state?.refs.some((r) => r.type === 'local' && r.short === s))) return t('Branch {0} already exists.', s);
+          return (await targets[0].repo.isValidRefName(s, 'branch')) ? undefined : t('Not a valid branch name.');
+        },
+      });
+      const next = input?.trim();
+      if (!next || next === name) return;
+      await each((target) => target.repo.renameBranch(name, next));
+      done(t('Renamed {0} to {1}', name, next));
+      return;
+    }
+    case 'delete': {
+      if (first.type === 'local') {
+        const current = targets.filter((x) => x.state?.head.branch === name);
+        if (current.length > 0) {
+          void vscode.window.showErrorMessage(t('Cannot delete the current branch {0}. Check out another branch first.', name));
+          return;
+        }
+        if (!(await confirmMulti(targets, t('Delete branch {0} in {1} repositories?', name, targets.length), t('Delete')))) return;
+        const unmerged: RepoTarget[] = [];
+        await each(async (target) => {
+          try {
+            await target.repo.deleteBranch(name, false);
+          } catch (e) {
+            // -d 拒絕刪除尚未合併的 branch：之後一次詢問是否強制刪除
+            if (/not fully merged/i.test(errorMessage(e))) unmerged.push(target);
+            else throw e;
+          }
+        });
+        if (unmerged.length > 0) {
+          const force = t('Delete Anyway');
+          const answer = await vscode.window.showWarningMessage(
+            t('Branch {0} has commits that are not merged into the current branch or its upstream. Delete it anyway?', name),
+            { modal: true, detail: [t('Those commits will only be reachable through the reflog.'), '', ...unmerged.map((x) => x.name)].join('\n') },
+            force,
+          );
+          if (answer !== force) return;
+          for (const target of unmerged) {
+            try {
+              await target.repo.deleteBranch(name, true);
+            } catch (e) {
+              failures.push(`${target.name}: ${errorMessage(e)}`);
+            }
+          }
+        }
+        done(t('Deleted branch {0}', name));
+      } else if (first.type === 'remote') {
+        const remote = first.remote!;
+        const branch = first.remoteBranch!;
+        if (!(await confirmMulti(targets, t('Delete remote branch {0}? This removes it from {1} for everyone.', name, remote), t('Delete'), true))) return;
+        await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Deleting {0}…', name) }, () =>
+          each((target) => target.repo.deleteRemoteBranch(remote, branch)),
+        );
+        done(t('Deleted remote branch {0}', name));
+      } else {
+        if (!(await confirmMulti(targets, t('Delete tag {0}? Tags already pushed stay on the remote.', name), t('Delete'), true))) return;
+        await each((target) => target.repo.deleteTag(name));
+        done(t('Deleted tag {0}', name));
+      }
+      return;
+    }
+    case 'merge':
+    case 'rebase': {
+      const eligible = targets.filter((x) => x.state?.head.branch && x.state.head.branch !== (first.type === 'local' ? name : ''));
+      if (eligible.length === 0) {
+        void vscode.window.showWarningMessage(t('No repository has a current branch to {0} into.', action));
+        return;
+      }
+      const ok = action === 'merge' ? t('Merge') : t('Rebase');
+      const message =
+        action === 'merge'
+          ? t('Merge {0} into the current branch in {1} repositories?', name, eligible.length)
+          : t('Rebase the current branch onto {0} in {1} repositories?', name, eligible.length);
+      if (!(await confirmMulti(eligible, message, ok))) return;
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: action === 'merge' ? t('Merging {0}…', name) : t('Rebasing onto {0}…', name) }, () =>
+        each((target) => (action === 'merge' ? target.repo.merge(refName) : target.repo.rebase(refName)), eligible),
+      );
+      done(action === 'merge' ? t('Merged {0}', name) : t('Rebased onto {0}', name));
+      return;
+    }
+    case 'update': {
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Updating {0}…', name) }, () => each((target) => target.repo.updateBranch(name)));
+      done(t('Updated {0}', name));
+      return;
+    }
+    case 'pushTag': {
+      const remotes = [...new Set(targets.flatMap((x) => x.state?.remotes ?? []))];
+      if (remotes.length === 0) {
+        void vscode.window.showWarningMessage(t('No remote configured.'));
+        return;
+      }
+      const remote =
+        remotes.length === 1
+          ? remotes[0]
+          : (await vscode.window.showQuickPick(remotes.includes('origin') ? ['origin', ...remotes.filter((r) => r !== 'origin')] : remotes, { placeHolder: t('Push tag {0} to', name) }));
+      if (!remote) return;
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Pushing tag {0}…', name) }, () =>
+        each((target) => (target.state?.remotes.includes(remote) ? target.repo.pushTag(remote, name) : Promise.resolve())),
+      );
+      done(t('Pushed tag {0} to {1}', name, remote));
+      return;
+    }
+    case 'compare': {
+      const target = await pickTarget(targets);
+      if (!target) return;
+      const { repo } = target;
+      const head = await repo.resolve('HEAD');
+      const other = await repo.resolve(refName);
+      if (!head || !other) return;
+      const counts = (await repo.exec(['rev-list', '--left-right', '--count', `${head}...${other}`])).trim().split(/\s+/).map(Number);
+      const files = await repo.diffBetween(head, other);
+      const current = target.state?.head.branch ?? 'HEAD';
+      const summary = t('{0}: {1} commit(s) not in {2}; {2}: {3} commit(s) not in {0}', name, counts[1] ?? 0, current, counts[0] ?? 0);
+      if (files.length === 0) {
+        void vscode.window.showInformationMessage(`${t('No file differences between {0} and {1}.', current, name)} ${summary}`);
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        files.map((f) => ({ label: path.basename(f.path), description: f.oldPath ? `${f.oldPath} → ${f.path}` : f.path, file: f })),
+        { title: t('Compare {0} with {1}', current, name), placeHolder: `${t('{0} file(s) differ', files.length)} · ${summary}`, matchOnDescription: true },
+      );
+      if (!pick) return;
+      const f = pick.file;
+      const left = revisionUri(repo.root, f.status === 'A' ? '' : head, f.oldPath ?? f.path);
+      const right = revisionUri(repo.root, f.status === 'D' ? '' : other, f.path);
+      await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(f.path)} (${current} ↔ ${name})`);
+      return;
+    }
   }
 }

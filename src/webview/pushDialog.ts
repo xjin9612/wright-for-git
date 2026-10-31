@@ -7,6 +7,8 @@ import { post } from './vscodeApi';
 
 export interface PushDialogOptions {
   roots: string[];
+  /** 推指定的 local branch（Branches 右鍵 Push…）；未指定為目前 branch */
+  branch?: string;
   /** Push All up to Here：只推到這個 commit */
   upTo?: { root: string; hash: string };
   onOpenDiff: (root: string, hash: string, parent: string | undefined, file: ChangedFile) => void;
@@ -90,7 +92,7 @@ class PushDialog {
     const cancel = el('button', { className: 'button secondary', text: 'Cancel', attrs: { type: 'button' } });
     cancel.addEventListener('click', () => this.close());
 
-    const title = opts.upTo ? `Push Commits up to ${opts.upTo.hash.slice(0, 8)}` : 'Push Commits';
+    const title = opts.upTo ? `Push Commits up to ${opts.upTo.hash.slice(0, 8)}` : opts.branch ? `Push ${opts.branch}` : 'Push Commits';
     const dialog = el(
       'div',
       { className: 'push-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': title } },
@@ -149,7 +151,7 @@ class PushDialog {
 
   private requestPreview(): void {
     this.previewRequest = nextRequest++;
-    post({ type: 'pushPreview', requestId: this.previewRequest, roots: this.opts.roots, upTo: this.opts.upTo, overrides: [...this.overrides.values()] });
+    post({ type: 'pushPreview', requestId: this.previewRequest, roots: this.opts.roots, branch: this.opts.branch, upTo: this.opts.upTo, overrides: [...this.overrides.values()] });
   }
 
   private findCommit(root: string, hash: string): PushCommit | undefined {
@@ -185,7 +187,7 @@ class PushDialog {
     if (!this.canPush()) return;
     const targets: PushTarget[] = this.plans
       .filter((p) => pushable(p) && this.checked.has(p.root))
-      .map((p) => ({ root: p.root, remote: p.remote!, remoteBranch: p.remoteBranch!, upTo: p.upTo }));
+      .map((p) => ({ root: p.root, branch: p.branch, remote: p.remote!, remoteBranch: p.remoteBranch!, upTo: p.upTo }));
     this.busy = true;
     this.updateButtons();
     this.confirmRequest = nextRequest++;
@@ -208,7 +210,7 @@ class PushDialog {
 
   /** 修改推送目標後重新預覽 */
   private retarget(p: PushPlan, change: Partial<PushTarget>): void {
-    const prev = this.overrides.get(p.root) ?? { root: p.root, remote: p.remote!, remoteBranch: p.remoteBranch! };
+    const prev = this.overrides.get(p.root) ?? { root: p.root, branch: p.branch, remote: p.remote!, remoteBranch: p.remoteBranch! };
     const next = { ...prev, ...change };
     // 換 remote 時，branch 名稱回到預設（由 extension 決定）
     if (change.remote && change.remote !== prev.remote && !change.remoteBranch) next.remoteBranch = '';

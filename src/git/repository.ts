@@ -205,9 +205,10 @@ export class GitRepository {
    * Push 預覽：目前 branch（或 upTo commit）要推到哪裡、會推哪些 commit。
    * 目標預設為 upstream；沒有 upstream 時為 origin（或第一個 remote）上的同名 branch。
    */
-  async getPushPlan(opts: { upTo?: string; remote?: string; remoteBranch?: string } = {}, limit = 500): Promise<Omit<PushPlan, 'name'>> {
+  async getPushPlan(opts: { branch?: string; upTo?: string; remote?: string; remoteBranch?: string } = {}, limit = 500): Promise<Omit<PushPlan, 'name'>> {
     const remotes = ((await this.tryRun(['remote'])) ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
-    const branch = (await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD']))?.trim() || undefined;
+    const branch = opts.branch ?? ((await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD']))?.trim() || undefined);
+    if (opts.branch && !(await this.isValidRefName(opts.branch, 'branch'))) throw new GitError(`Invalid branch name: ${opts.branch}`, null, '');
     const plan: Omit<PushPlan, 'name'> = { root: this.root, branch, remotes, hasUpstream: false, isNew: false, upTo: opts.upTo, commits: [], total: 0, behind: 0 };
     if (!branch) return { ...plan, problem: 'detached' };
     if (remotes.length === 0) return { ...plan, problem: 'noRemote' };
@@ -250,8 +251,7 @@ export class GitRepository {
    * force 一律使用 --force-with-lease：遠端若有本機沒看過的 commit 就拒絕，不提供無保護的 --force。
    */
   async pushTo(remote: string, src: string, remoteBranch: string, opts: { force?: boolean; tags?: boolean; setUpstream?: boolean } = {}): Promise<void> {
-    const remotes = ((await this.tryRun(['remote'])) ?? '').split('\n').map((s) => s.trim());
-    if (!remotes.includes(remote)) throw new GitError(`Unknown remote: ${remote}`, null, '');
+    await this.assertRemote(remote);
     if (!(await this.isValidRefName(remoteBranch, 'branch'))) throw new GitError(`Invalid branch name: ${remoteBranch}`, null, '');
     const isBranch = src.startsWith('refs/heads/') && (await this.isValidRefName(src.slice('refs/heads/'.length), 'branch'));
     if (!isBranch && !isHash(src)) throw new GitError(`Invalid push source: ${src}`, null, '');
@@ -320,6 +320,86 @@ export class GitRepository {
     if (!(await this.isValidRefName(name, 'tag'))) throw new GitError(`Invalid tag name: ${name}`, null, '');
     if (!isHash(target)) throw new GitError(`Invalid revision: ${target}`, null, '');
     await this.run(message ? ['tag', '-a', '-m', message, name, target] : ['tag', name, target]);
+  }
+
+  // ---------- Branch／Tag 操作 ----------
+
+  /** 只接受完整 ref 名稱（refs/…），避免被當成選項 */
+  private assertFullRef(ref: string): void {
+    if (!/^refs\/(heads|remotes|tags)\/[^\0\s]+$/.test(ref)) throw new GitError(`Invalid ref: ${ref}`, null, '');
+  }
+
+  /** 刪除 local branch；force 時即使尚未合併也刪除（-D） */
+  async deleteBranch(name: string, force: boolean): Promise<void> {
+    if (!(await this.isValidRefName(name, 'branch'))) throw new GitError(`Invalid branch name: ${name}`, null, '');
+    await this.run(['branch', force ? '-D' : '-d', name]);
+  }
+
+  /** 刪除遠端 branch（git push <remote> --delete <branch>） */
+  async deleteRemoteBranch(remote: string, branch: string): Promise<void> {
+    await this.assertRemote(remote);
+    if (!(await this.isValidRefName(branch, 'branch'))) throw new GitError(`Invalid branch name: ${branch}`, null, '');
+    await this.run(['push', remote, '--delete', `refs/heads/${branch}`]);
+  }
+
+  async deleteTag(name: string): Promise<void> {
+    if (!(await this.isValidRefName(name, 'tag'))) throw new GitError(`Invalid tag name: ${name}`, null, '');
+    await this.run(['tag', '-d', name]);
+  }
+
+  async pushTag(remote: string, name: string): Promise<void> {
+    await this.assertRemote(remote);
+    if (!(await this.isValidRefName(name, 'tag'))) throw new GitError(`Invalid tag name: ${name}`, null, '');
+    await this.run(['push', remote, `refs/tags/${name}`]);
+  }
+
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    if (!(await this.isValidRefName(oldName, 'branch')) || !(await this.isValidRefName(newName, 'branch'))) throw new GitError(`Invalid branch name: ${newName}`, null, '');
+    await this.run(['branch', '-m', oldName, newName]);
+  }
+
+  /** 把 ref 合併到目前 branch（不開編輯器，使用預設 merge message） */
+  async merge(ref: string): Promise<void> {
+    this.assertFullRef(ref);
+    await this.run(['merge', '--no-edit', ref]);
+  }
+
+  /** 把目前 branch rebase 到 ref 上 */
+  async rebase(ref: string): Promise<void> {
+    this.assertFullRef(ref);
+    await this.run(['rebase', ref]);
+  }
+
+  /**
+   * 更新 local branch：目前 branch 時執行 pull；其他 branch 則從 upstream fast-forward（不切換 branch）。
+   */
+  async updateBranch(branch: string): Promise<void> {
+    if (!(await this.isValidRefName(branch, 'branch'))) throw new GitError(`Invalid branch name: ${branch}`, null, '');
+    const remote = (await this.tryRun(['config', '--get', `branch.${branch}.remote`]))?.trim();
+    const merge = (await this.tryRun(['config', '--get', `branch.${branch}.merge`]))?.trim();
+    if (!remote || !merge?.startsWith('refs/heads/')) throw new GitError(`${branch} has no upstream`, null, '');
+    const current = (await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD']))?.trim();
+    if (current === branch) return this.pull();
+    await this.assertRemote(remote);
+    // 沒有 + 前綴：只允許 fast-forward
+    await this.run(['fetch', remote, `${merge}:refs/heads/${branch}`]);
+  }
+
+  /** 兩個 revision 之間的檔案差異（a → b） */
+  async diffBetween(a: string, b: string): Promise<ChangedFile[]> {
+    if (!isHash(a) || !isHash(b)) return [];
+    return parseNameStatusZ(await this.run(['diff', '-M', '--name-status', '-z', a, b, '--']));
+  }
+
+  /** ref 解析成 commit hash */
+  async resolve(ref: string): Promise<string | undefined> {
+    if (ref !== 'HEAD') this.assertFullRef(ref);
+    return (await this.tryRun(['rev-parse', '-q', '--verify', `${ref}^{commit}`]))?.trim() || undefined;
+  }
+
+  private async assertRemote(remote: string): Promise<void> {
+    const remotes = ((await this.tryRun(['remote'])) ?? '').split('\n').map((s) => s.trim());
+    if (!remote || !remotes.includes(remote)) throw new GitError(`Unknown remote: ${remote}`, null, '');
   }
 
   /** 指定 commit 與目前工作區（含未 stage 的修改）之間的差異檔案 */

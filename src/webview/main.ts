@@ -1,10 +1,10 @@
 // Webview 進入點：組合三欄、管理篩選與資料流
 import { MultiGraph } from '../shared/multiGraph';
-import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
-import { mergeRefs } from '../shared/refs';
+import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RefAction, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
+import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane } from './branchesPane';
 import { DetailsPane } from './detailsPane';
-import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu } from './dom';
+import { clear, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
 import { LogTable, type Columns, type Highlights } from './logTable';
 import { handlePushMessage, openPushDialog } from './pushDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
@@ -78,6 +78,7 @@ const branches = new BranchesPane(
     onCheckout: (ref, roots) => post({ type: 'checkout', ref, roots }),
     onRefresh: () => post({ type: 'refresh' }),
     onFetch: () => sync('fetch'),
+    onContextMenu: (ref, x, y) => showRefMenu(ref, x, y),
     onCollapsePane: () => setPaneVisible('left', false),
     onExpandedChange: (expanded) => {
       ui.expanded = expanded;
@@ -137,9 +138,10 @@ const viewButton = iconButton('eye', 'View options', () => showViewMenu());
 /** 同步：作用於目前 Paths 篩選下可見的 repository */
 const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
 /** Push 一律先開對話框確認；upTo 為「Push All up to Here」 */
-const openPush = (upTo?: { root: string; hash: string }) =>
+const openPush = (upTo?: { root: string; hash: string }, branch?: { name: string; roots: string[] }) =>
   openPushDialog({
-    roots: upTo ? [upTo.root] : visibleRepos().map((r) => r.root),
+    roots: upTo ? [upTo.root] : (branch?.roots ?? visibleRepos().map((r) => r.root)),
+    branch: branch?.name,
     upTo,
     onOpenDiff: (root, hash, parent, file) => post({ type: 'openDiff', root, hash, parent, file }),
   });
@@ -571,6 +573,39 @@ function showContextMenu(index: number, x: number, y: number): void {
     '-',
     { label: 'Compare with Local', action: act('compareLocal') },
   ]);
+}
+
+/** Branches 右鍵選單（對應 IntelliJ 的 branch 選單；同名 branch 跨 repo 一次處理） */
+function showRefMenu(ref: MergedRef, x: number, y: number): void {
+  const act = (action: RefAction) => () => post({ type: 'refAction', action, ref: ref.name, roots: ref.roots });
+  const name = ref.short;
+  const q = `'${name.length > 40 ? `${name.slice(0, 39)}…` : name}'`;
+  const isLocal = ref.type === 'local';
+  const current = isLocal && ref.current;
+  const items: MenuItem[] = [
+    { label: 'Checkout', disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
+    { label: `New Branch from ${q}…`, action: act('newBranch') },
+    { label: `Compare with Current`, disabled: current, action: act('compare') },
+    { label: `Show in Log`, action: () => setFilter({ branches: [ref.name] }) },
+    '-',
+    { label: `Merge ${q} into Current`, disabled: current, action: act('merge') },
+  ];
+  if (ref.type !== 'tag') items.push({ label: `Rebase Current onto ${q}`, disabled: current, action: act('rebase') });
+  if (isLocal) {
+    items.push(
+      '-',
+      { label: 'Update', disabled: !ref.upstream, action: act('update') },
+      { label: 'Push…', action: () => openPush(undefined, { name: ref.short, roots: ref.roots }) },
+      '-',
+      { label: 'Rename…', action: act('rename') },
+      { label: 'Delete', disabled: current, action: act('delete') },
+    );
+  } else if (ref.type === 'remote') {
+    items.push('-', { label: 'Delete', action: act('delete') });
+  } else {
+    items.push('-', { label: 'Push Tag…', action: act('pushTag') }, { label: 'Delete', action: act('delete') });
+  }
+  showMenu(x, y, items);
 }
 
 function showViewMenu(): void {

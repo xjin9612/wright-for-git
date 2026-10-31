@@ -7,7 +7,7 @@ import { isGraphFilter, isHash } from './git/parsers';
 import { GitRepository } from './git/repository';
 import { builtinRepositoryRoots, onRepositoryChange } from './gitExtension';
 import { revisionUri } from './diffProvider';
-import { buildPushPlans, runCommitAction, runPush, runSync, type RepoTarget } from './actions';
+import { buildPushPlans, runCommitAction, runPush, runRefAction, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
 import { promises as fsp } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
@@ -326,7 +326,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           await this.sync(m.action, m.roots);
           break;
         case 'pushPreview': {
-          const plans = await buildPushPlans(await this.freshTargets(m.roots), m.upTo, m.overrides);
+          const plans = await buildPushPlans(await this.freshTargets(m.roots), m.upTo, m.overrides, m.branch);
           // 依 webview 傳入的順序排列
           plans.sort((a, b) => m.roots.indexOf(a.root) - m.roots.indexOf(b.root));
           this.post({ type: 'pushPreview', requestId: m.requestId, plans });
@@ -347,6 +347,12 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           });
           const started = await runPush(entries, m.force, m.tags, () => this.post({ type: 'pushStatus', requestId: m.requestId, status: 'started' }));
           if (!started) this.post({ type: 'pushStatus', requestId: m.requestId, status: 'cancelled' });
+          await this.refresh(true);
+          break;
+        }
+        case 'refAction': {
+          const targets = (await this.freshTargets(m.roots)).filter((x) => x.state?.refs.some((r) => r.name === m.ref));
+          await runRefAction(m.action, m.ref, targets);
           await this.refresh(true);
           break;
         }

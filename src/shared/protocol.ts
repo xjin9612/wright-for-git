@@ -121,11 +121,13 @@ export type ToExtension =
   /** 同步：對 roots 中的 repository 執行 */
   | { type: 'sync'; action: SyncAction; roots: string[] }
   /** Push 對話框：取得各 repo 要推的內容；upTo 為「Push All up to Here」的 commit */
-  | { type: 'pushPreview'; requestId: number; roots: string[]; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
+  | { type: 'pushPreview'; requestId: number; roots: string[]; branch?: string; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
   /** Push 對話框中點選 commit：取得變更檔案 */
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
   /** Push 對話框確認 */
   | { type: 'pushConfirm'; requestId: number; targets: PushTarget[]; force: boolean; tags: boolean }
+  /** Branches 右鍵選單的操作：ref 為完整名稱，roots 為擁有此 ref 的 repository */
+  | { type: 'refAction'; action: RefAction; ref: string; roots: string[] }
   /** Commit 右鍵選單的操作 */
   | { type: 'commitAction'; action: CommitAction; root: string; hash: string; parents: string[]; subject: string };
 
@@ -134,6 +136,8 @@ export type SyncAction = 'fetch' | 'pull';
 /** Push 的目標：把 root 的目前 branch（或 upTo commit）推到 remote/remoteBranch */
 export interface PushTarget {
   root: string;
+  /** 要推的 local branch；未指定時為目前 branch */
+  branch?: string;
   remote: string;
   remoteBranch: string;
   upTo?: string;
@@ -172,6 +176,7 @@ export interface PushPlan {
   problem?: 'detached' | 'noRemote' | 'notAncestor' | 'error';
   message?: string;
 }
+export type RefAction = 'newBranch' | 'rename' | 'delete' | 'merge' | 'rebase' | 'compare' | 'update' | 'pushTag';
 export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'newTag' | 'compareLocal';
 
 /** Extension → Webview */
