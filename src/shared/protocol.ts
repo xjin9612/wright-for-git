@@ -247,7 +247,7 @@ export type ToExtension =
   /** 逐段提交面板：選取的 hunk（以內容辨識） */
   | { type: 'hunksSelect'; root: string; path: string; selected: number[] }
   /** 進行中的 rebase／merge 等：繼續、略過、中止 */
-  | { type: 'operation'; root: string; action: 'continue' | 'skip' | 'abort' }
+  | { type: 'operation'; root: string; action: 'continue' | 'skip' | 'abort'; /** 畫面上顯示的進行中操作；與實際不符時不執行 */ expected?: 'cherry-pick' | 'revert' | 'merge' | 'rebase' }
   /** 互動式 rebase */
   | { type: 'openRebase'; root: string; hash: string }
   | { type: 'rebaseStart'; root: string; base: string; entries: RebaseEntry[] }
@@ -340,7 +340,7 @@ export type ToWebview =
   | { type: 'commitState'; state: CommitState }
   | { type: 'commitLastMessage'; root: string; message: string }
   | { type: 'commitDone'; requestId: number; ok: boolean }
-  | { type: 'hunksData'; root: string; path: string; hunks: DiffHunk[]; selected: number[] }
+  | { type: 'stashChanged' }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */

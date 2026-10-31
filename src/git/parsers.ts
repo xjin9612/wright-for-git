@@ -189,7 +189,8 @@ export function parseStatusV2(text: string): import('../shared/protocol').Workin
   const parts = text.split('\0');
   const combined = (xy: string): FileStatus => {
     const [x, y] = [xy[0], xy[1]];
-    if (x === 'A') return 'A';
+    // y === 'A'：intent-to-add（git add -N），尚未在 HEAD 中
+    if (x === 'A' || y === 'A') return 'A';
     if (x === 'D' || y === 'D') return 'D';
     if (x === 'T' || y === 'T') return 'T';
     return 'M';
@@ -257,14 +258,6 @@ export function buildPatch(header: string[], hunks: readonly import('../shared/p
   const chosen = hunks.filter((h) => selected.has(h.index));
   if (chosen.length === 0) return undefined;
   return [...header, ...chosen.flatMap((h) => [h.header, ...h.lines]), ''].join('\n');
-}
-
-/** patch 所屬的檔案路徑（取 +++ b/ 或 --- a/） */
-export function patchPath(patch: string): string | undefined {
-  const plus = /^\+\+\+ b\/(.+)$/m.exec(patch);
-  if (plus) return plus[1];
-  const minus = /^--- a\/(.+)$/m.exec(patch);
-  return minus?.[1];
 }
 
 /**

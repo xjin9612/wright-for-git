@@ -388,7 +388,16 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'operation': {
           const e = this.find(m.root);
           const op = await e?.repo.operationInProgress();
-          if (!e || !op) break;
+          // 畫面過期（操作已結束或換成別的操作）：只重新整理
+          if (!e || !op || (m.expected && m.expected !== op)) {
+            await this.refresh(true);
+            break;
+          }
+          if (m.action === 'abort') {
+            const names = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
+            const ok = await confirm(t('Abort the {0} in {1}?', names[op], e.name), { detail: t('The repository returns to the state before the {0} started. Conflicts you have already resolved are lost.', names[op]), ok: t('Abort'), kind: 'danger' });
+            if (!ok) break;
+          }
           try {
             if (m.action === 'continue') await e.repo.continueOperation(op);
             else if (m.action === 'skip' && (op === 'rebase' || op === 'cherry-pick')) await e.repo.skipOperation(op);

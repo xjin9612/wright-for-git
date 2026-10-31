@@ -16,9 +16,18 @@ import {
   parseStatusV2,
   remoteWebUrl,
   parseFileDiff,
-  patchPath,
   REF_FORMAT,
 } from './parsers';
+
+/** 路徑一律當作字面名稱（[id].tsx、:memo.txt 這類檔名不會被當成 pathspec 樣式） */
+const LITERAL = { GIT_LITERAL_PATHSPECS: '1' };
+
+/** 只接受 repo 內的相對路徑 */
+function assertRelPath(p: string): void {
+  if (!p || p.startsWith('-') || p.startsWith('/') || /^[A-Za-z]:/.test(p) || p.includes('\0') || p.split(/[\\/]/).includes('..')) {
+    throw new GitError(`Invalid path: ${p}`, null, '');
+  }
+}
 
 export class GitRepository {
   private constructor(
@@ -300,7 +309,7 @@ export class GitRepository {
   }
 
   /** 互動式 rebase 結束後，移除留下的訊息檔 */
-  private async cleanupRebaseTemp(): Promise<void> {
+  async cleanupRebaseTemp(): Promise<void> {
     if (await this.operationInProgress()) return;
     const { promises: fsp } = await import('node:fs');
     const names = await fsp.readdir(this.gitDir).catch(() => [] as string[]);
@@ -351,6 +360,9 @@ export class GitRepository {
   async interactiveRebase(base: string, entries: { hash: string; action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; message?: string }[]): Promise<'done' | 'stopped'> {
     const { promises: fsp } = await import('node:fs');
     if (!isHash(base) || entries.some((e) => !isHash(e.hash))) throw new GitError('Invalid revision', null, '');
+    const ACTIONS = ['pick', 'reword', 'edit', 'squash', 'fixup', 'drop'];
+    if (entries.some((e) => !ACTIONS.includes(e.action))) throw new GitError('Invalid rebase action', null, '');
+    await this.cleanupRebaseTemp();
     const parent = (await this.tryRun(['rev-parse', '-q', '--verify', `${base}^`]))?.trim();
     const stamp = `${process.pid}-${Date.now()}`;
     const dir = path.join(this.gitDir, `gitworkbench-rebase-${stamp}`);
@@ -369,13 +381,15 @@ export class GitRepository {
       if ((e.action === 'reword' || (e.action === 'squash' && e.message !== undefined)) && e.message !== undefined) {
         const file = path.join(dir, `msg-${n++}.txt`);
         await fsp.writeFile(file, e.message, 'utf8');
-        lines.push(`exec git commit --amend --allow-empty --cleanup=strip -q -F ${q(file)}`);
+        // cleanup=whitespace：保留 # 開頭的行（如 #123 issue 編號）
+        lines.push(`exec git commit --amend --allow-empty --cleanup=whitespace -q -F ${q(file)}`);
       }
     }
     const todo = path.join(dir, 'todo.txt');
     await fsp.writeFile(todo, `${lines.join('\n')}\n`, 'utf8');
     try {
-      await runGit(this.gitPath, ['rebase', '-i', '--autostash', ...(parent ? [parent] : ['--root'])], {
+      // --reschedule-failed-exec：reword 的 exec 失敗（如 commit-msg hook）時，繼續會重新執行而不是略過
+      await runGit(this.gitPath, ['rebase', '-i', '--autostash', '--reschedule-failed-exec', ...(parent ? [parent] : ['--root'])], {
         cwd: this.root,
         env: { GIT_SEQUENCE_EDITOR: `cp ${q(todo)}`, GIT_EDITOR: 'true' },
       });
@@ -501,10 +515,21 @@ export class GitRepository {
 
   /** 檔案相對 HEAD 的 diff（各段 hunk），用於逐段選取提交 */
   async fileDiff(filePath: string): Promise<{ header: string[]; hunks: DiffHunk[] }> {
-    if (!filePath || filePath.startsWith('-')) throw new GitError(`Invalid path: ${filePath}`, null, '');
+    return parseFileDiff((await this.rawFileDiff(filePath)).toString('utf8'));
+  }
+
+  /**
+   * 原始位元組的 diff：組 patch 時以 latin1 拆行再轉回 Buffer，非 UTF-8 的檔案（Big5 等）才不會被改壞。
+   * 固定 a/ b/ 前綴、不用 textconv，不受使用者的 diff.noprefix、diff.mnemonicPrefix 等設定影響。
+   */
+  async rawFileDiff(filePath: string): Promise<Buffer> {
+    assertRelPath(filePath);
     const head = await this.headHash();
-    const out = await this.run(['diff', '--no-color', '--no-ext-diff', '-U3', head ?? '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '--', filePath]);
-    return parseFileDiff(out);
+    return runGitBuffer(
+      this.gitPath,
+      ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--no-relative', '--src-prefix=a/', '--dst-prefix=b/', '-U3', head ?? '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '--', filePath],
+      { cwd: this.root, env: LITERAL },
+    );
   }
 
   /**
@@ -513,14 +538,17 @@ export class GitRepository {
    * @param full 整個檔案提交的路徑（rename 需同時包含新舊路徑；含刪除與未追蹤檔案）
    * @param patches 只提交部分 hunk 的檔案：套用在 HEAD 上的 patch
    */
-  async commitSelected(opts: { full: string[]; patches: string[]; message: string; amend?: boolean; signOff?: boolean; noVerify?: boolean }): Promise<string> {
+  async commitSelected(opts: { full: string[]; patches: { path: string; patch: Buffer }[]; message: string; amend?: boolean; signOff?: boolean; noVerify?: boolean }): Promise<{ head: string; indexError?: string }> {
     const { existsSync, promises: fsp } = await import('node:fs');
     if (!opts.message.trim() && !opts.amend) throw new GitError('Commit message is empty', null, '');
-    if (opts.full.some((p) => !p || p.startsWith('-'))) throw new GitError('Invalid path', null, '');
+    for (const p of [...opts.full, ...opts.patches.map((x) => x.path)]) assertRelPath(p);
+    // merge／cherry-pick／revert 進行中時，只提交部分檔案會把另一邊的變更從歷史中丟掉
+    const op = await this.operationInProgress();
+    if (op && op !== 'rebase') throw new GitError(`A ${op} is in progress. Finish it with Continue (commits all resolved changes) or abort it first.`, null, '');
     const tmpIndex = path.join(this.gitDir, `gitworkbench-index-${process.pid}-${Date.now()}`);
     const msgFile = path.join(this.gitDir, `gitworkbench-msg-${process.pid}-${Date.now()}`);
-    const env = { GIT_INDEX_FILE: tmpIndex };
-    const git = (args: string[], input?: string) => runGit(this.gitPath, args, { cwd: this.root, env, input });
+    const env = { GIT_INDEX_FILE: tmpIndex, ...LITERAL };
+    const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env, input });
     try {
       const head = await this.headHash();
       // 暫時 index 從 HEAD 開始（amend 時也是：新的 commit = HEAD 的內容 + 勾選的變更）
@@ -529,9 +557,10 @@ export class GitRepository {
         // 一次加太多路徑時分批，避免超過命令列長度上限
         for (let i = 0; i < opts.full.length; i += 200) await git(['add', '-A', '--', ...opts.full.slice(i, i + 200)]);
       }
-      for (const patch of opts.patches) await git(['apply', '--cached', '--recount', '--whitespace=nowarn', '-'], patch);
+      for (const p of opts.patches) await git(['apply', '--cached', '--recount', '--whitespace=nowarn', '-'], p.patch);
       await fsp.writeFile(msgFile, opts.message, 'utf8');
-      const args = ['commit', '--quiet', '--cleanup=strip', '-F', msgFile];
+      // cleanup=whitespace（-F 的預設）：保留 # 開頭的行，如 #123 issue 編號
+      const args = ['commit', '--quiet', '--cleanup=whitespace', '-F', msgFile];
       if (opts.amend) args.push('--amend');
       if (opts.signOff) args.push('--signoff');
       if (opts.noVerify) args.push('--no-verify');
@@ -539,9 +568,16 @@ export class GitRepository {
       await git(args);
       const newHead = (await this.headHash()) ?? '';
       // 讓真正的 index 中這些路徑與新的 HEAD 一致（部分提交的檔案，剩下的變更留在工作區）
-      const touched = [...opts.full, ...opts.patches.map(patchPath).filter((p): p is string => !!p)];
-      for (let i = 0; i < touched.length; i += 200) await this.tryRun(['reset', '-q', '--', ...touched.slice(i, i + 200)]);
-      return newHead;
+      const touched = [...opts.full, ...opts.patches.map((p) => p.path)];
+      let indexError: string | undefined;
+      for (let i = 0; i < touched.length; i += 200) {
+        try {
+          await runGit(this.gitPath, ['reset', '-q', '--', ...touched.slice(i, i + 200)], { cwd: this.root, env: LITERAL });
+        } catch (e) {
+          indexError = e instanceof Error ? e.message : String(e);
+        }
+      }
+      return { head: newHead, indexError };
     } finally {
       for (const f of [tmpIndex, msgFile, `${tmpIndex}.lock`]) if (existsSync(f)) await fsp.rm(f, { force: true });
     }
@@ -554,18 +590,21 @@ export class GitRepository {
     const head = await this.headHash();
     const added = items.filter((x) => x.kind === 'changed' && x.status === 'A').map((x) => x.path);
     const tracked = items.filter((x) => (x.kind === 'changed' || x.kind === 'conflict') && x.status !== 'A').flatMap((x) => (x.oldPath ? [x.path, x.oldPath] : [x.path]));
-    if ([...added, ...tracked].some((p) => p.startsWith('-'))) throw new GitError('Invalid path', null, '');
-    for (let i = 0; i < added.length; i += 200) await this.run(['rm', '-q', '--cached', '-r', '--', ...added.slice(i, i + 200)]);
+    for (const p of [...added, ...tracked]) assertRelPath(p);
+    const lit = (args: string[]) => runGit(this.gitPath, args, { cwd: this.root, env: LITERAL });
+    for (let i = 0; i < added.length; i += 200) await lit(['rm', '-q', '--cached', '-r', '--', ...added.slice(i, i + 200)]);
     if (!head || tracked.length === 0) return;
     // rename：新路徑若不在 HEAD 中，restore 會失敗，改用 rm --cached 再刪除檔案
     for (let i = 0; i < tracked.length; i += 200) {
       const chunk = tracked.slice(i, i + 200);
-      const inHead = new Set(((await this.tryRun(['ls-tree', '-r', '--name-only', '-z', head, '--', ...chunk])) ?? '').split('\0').filter(Boolean));
+      const inHead = new Set((await lit(['ls-tree', '-r', '--name-only', '-z', head, '--', ...chunk])).split('\0').filter(Boolean));
       const restore = chunk.filter((p) => inHead.has(p));
-      const extra = chunk.filter((p) => !inHead.has(p));
-      if (restore.length > 0) await this.run(['restore', '--source', head, '--staged', '--worktree', '--', ...restore]);
+      // 不在 HEAD 的路徑（rename 的新路徑）：只刪除確實在 index 中的檔案
+      const inIndex = new Set((await lit(['ls-files', '-z', '--', ...chunk])).split('\0').filter(Boolean));
+      const extra = chunk.filter((p) => !inHead.has(p) && inIndex.has(p));
+      if (restore.length > 0) await lit(['restore', '--source', head, '--staged', '--worktree', '--', ...restore]);
       if (extra.length > 0) {
-        await this.tryRun(['rm', '-q', '--cached', '-r', '--', ...extra]);
+        await lit(['rm', '-q', '--cached', '-r', '--', ...extra]);
         const { promises: fsp } = await import('node:fs');
         for (const p of extra) await fsp.rm(path.join(this.root, p), { force: true });
       }

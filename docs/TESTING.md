@@ -189,12 +189,14 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] squash／fixup：合併進上一個 commit
 - [ ] edit：rebase 停下後 Log 上方出現「api-server：重訂基底進行中」列，按「繼續」完成
 - [ ] 有未提交的變更時仍可 rebase，結束後變更還在（自動儲藏）
+- [ ] rebase 分頁開著時另外提交一筆，再按開始：提示分支已變動並重新載入清單（不會丟掉新提交）
 - [ ] detached HEAD 或範圍內有 merge commit 時拒絕並說明
 
 ## 進行中的操作
 - [ ] web-app 把 `conflict/theme` 合併到 main 造成衝突：Log 上方出現「web-app：合併進行中」，有繼續／中止；在原始檔控制解決衝突後按繼續完成
 - [ ] Rebase 衝突時另有「略過」
-- [ ] 中止後恢復原狀，提示列消失
+- [ ] 按「中止」先跳出確認框（紅色按鈕）；確認後恢復原狀，提示列消失
+- [ ] 合併進行中時，在提交視窗只勾部分檔案提交：被拒絕並提示改用「繼續」
 
 ## Issue 連結
 - [ ] 設定 `"gitWorkbench.issueLinks": [{ "pattern": "PROJ-(\\d+)", "url": "https://tracker.example.com/browse/PROJ-$1" }]`：api-server `feat(auth): add API keys` 詳情中的 `PROJ-42` 變成連結，點擊以瀏覽器開啟

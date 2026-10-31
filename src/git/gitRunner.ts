@@ -18,8 +18,8 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** 額外的環境變數（如 GIT_INDEX_FILE） */
   env?: Record<string, string>;
-  /** 寫入 stdin 的內容 */
-  input?: string;
+  /** 寫入 stdin 的內容（字串以 UTF-8 寫入；Buffer 原樣寫入） */
+  input?: string | Buffer;
 }
 
 // i18n.logOutputEncoding 固定 UTF-8：使用者若設定 big5 等編碼，log／詳情的中文才不會變亂碼
@@ -35,7 +35,8 @@ function spawnGit(gitPath: string, args: string[], opts: RunOptions) {
   });
   if (opts.input !== undefined && child.stdin) {
     child.stdin.on('error', () => undefined);
-    child.stdin.end(opts.input, 'utf8');
+    if (typeof opts.input === 'string') child.stdin.end(opts.input, 'utf8');
+    else child.stdin.end(opts.input);
   }
   return child;
 }

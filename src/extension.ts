@@ -61,7 +61,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (e) {
     console.error('[Git Workbench] commit view init failed:', e);
   }
-  registerExplorerCommands(context, provider, () => void commitView?.refresh());
+  provider.dialogs.onStashChanged = () => commitView?.stashChanged();
+  registerExplorerCommands(context, provider, () => {
+    commitView?.stashChanged();
+    void commitView?.refresh();
+  });
   context.subscriptions.push(
     vscode.commands.registerCommand('gitWorkbench.stash.save', async () => {
       const repos = await provider.repositories();
@@ -75,6 +79,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       const repo = root ? provider.getRepository(root) : undefined;
       if (repo && (await stashChanges(repo))) {
+        commitView?.stashChanged();
         void commitView?.refresh();
         await provider.refresh(true);
       }

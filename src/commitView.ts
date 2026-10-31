@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { revisionUri } from './diffProvider';
 import { ConfirmHost, confirm } from './dialogs';
-import { buildPatch } from './git/parsers';
+import { buildPatch, parseFileDiff } from './git/parsers';
 import type { GitRepository } from './git/repository';
 import { onRepositoryChange } from './gitExtension';
 import { t } from './i18n';
@@ -29,6 +29,12 @@ const keyOf = (root: string, p: string) => `${root}\0${p}`;
 
 /** 以內容辨識 hunk（檔案在別處被修改後，段落序號可能改變） */
 const hunkId = (h: DiffHunk) => h.lines.join('\n');
+
+/** .gitignore 的一行：以 / 開頭只比對這個路徑，並跳脫 # ! * ? [ \\ 與結尾空白 */
+export function gitignoreEntry(p: string): string {
+  const escaped = p.replace(/[\\*?[]/g, (c) => `\\${c}`).replace(/ +$/, (sp) => sp.replace(/ /g, '\\ '));
+  return `/${escaped}`;
+}
 
 export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = 'gitWorkbench.commit';
@@ -102,6 +108,11 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       this.view = undefined;
       this.confirms.cancelAll();
     });
+  }
+
+  /** 儲藏清單有變動（其他地方套用、刪除或新增儲藏） */
+  stashChanged(): void {
+    this.post({ type: 'stashChanged' });
   }
 
   reload(): void {
@@ -226,7 +237,10 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
             root = pick?.root ?? '';
           }
           const repo = root ? this.provider.getRepository(root) : undefined;
-          if (repo && (await stashChanges(repo))) await this.refresh();
+          if (repo && (await stashChanges(repo))) {
+            this.post({ type: 'stashChanged' });
+            await this.refresh();
+          }
           break;
         }
         case 'confirmResult':
@@ -280,33 +294,49 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     if (!(await confirm(t('Roll back changes in {0} file(s)? Local modifications will be lost.', list.length), { detail, ok: t('Rollback'), kind: 'danger' }, this.confirms))) return;
     const byRoot = new Map<string, WorkingChange[]>();
     for (const x of list) byRoot.set(x.root, [...(byRoot.get(x.root) ?? []), x.change]);
-    for (const [root, changes] of byRoot) {
+    for (const [root, requested] of byRoot) {
       try {
-        await this.provider.getRepository(root)?.rollback(changes);
+        const repo = this.provider.getRepository(root);
+        if (!repo) continue;
+        // 以目前實際的狀態為準（webview 的清單可能已過期）
+        const changes = (await this.current(repo, requested)).filter((c) => c.kind === 'changed' || c.kind === 'conflict');
+        await repo.rollback(changes);
       } catch (e) {
         void vscode.window.showErrorMessage(errorMessage(e));
       }
-      for (const c of changes) this.partial.delete(keyOf(root, c.path));
+      for (const c of requested) this.partial.delete(keyOf(root, c.path));
     }
     await this.refresh();
     await this.provider.refresh(true);
   }
 
   private async addToGitignore(root: string, paths: string[]): Promise<void> {
+    const repo = this.provider.getRepository(root);
+    if (!repo) return;
+    // 只接受目前確實是未追蹤的檔案
+    const untracked = new Set((await repo.getWorkingChanges()).filter((c) => c.kind === 'untracked').map((c) => c.path));
+    const valid = paths.filter((p) => untracked.has(p) && !/[\r\n]/.test(p));
     const file = path.join(root, '.gitignore');
     const { existsSync, promises: fsp } = await import('node:fs');
     const current = existsSync(file) ? await fsp.readFile(file, 'utf8') : '';
-    const add = paths.map((p) => `/${p}`).filter((p) => !current.split(/\r?\n/).includes(p));
+    const add = valid.map(gitignoreEntry).filter((p) => !current.split(/\r?\n/).includes(p));
     if (add.length === 0) return;
     await fsp.writeFile(file, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${add.join('\n')}\n`, 'utf8');
     await this.refresh();
+  }
+
+  /** webview 傳來的變更 → 目前實際的狀態（只保留仍存在的路徑，狀態以 git 為準） */
+  private async current(repo: GitRepository, requested: WorkingChange[]): Promise<WorkingChange[]> {
+    const now = new Map((await repo.getWorkingChanges()).map((c) => [c.path, c]));
+    return requested.map((c) => now.get(c.path)).filter((c): c is WorkingChange => !!c);
   }
 
   // ---------- 提交 ----------
 
   private async commit(m: Extract<ToExtension, { type: 'commitRun' }>): Promise<void> {
     const done = (ok: boolean) => this.post({ type: 'commitDone', requestId: m.requestId, ok });
-    const items = m.items.filter((x) => x.changes.length > 0);
+    // 只改訊息的 amend 不帶任何檔案
+    const items = m.items.filter((x) => x.changes.length > 0 || m.amend);
     if (items.length === 0 && !m.amend) {
       void vscode.window.showWarningMessage(t('No changes selected to commit.'));
       return done(false);
@@ -327,8 +357,11 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         const repo = this.provider.getRepository(item.root);
         if (!repo) continue;
         try {
-          const { full, patches } = await this.collect(repo, item.root, item.changes);
-          await repo.commitSelected({ full, patches, message: m.message, amend: m.amend, signOff: m.signOff, noVerify: m.noVerify });
+          const changes = await this.current(repo, item.changes);
+          if (changes.length === 0 && !m.amend) continue;
+          const { full, patches } = await this.collect(repo, item.root, changes);
+          const result = await repo.commitSelected({ full, patches, message: m.message, amend: m.amend, signOff: m.signOff, noVerify: m.noVerify });
+          if (result.indexError) void vscode.window.showWarningMessage(t('{0}: committed, but the staging area could not be updated. Run "git reset" on the committed files before committing elsewhere.', path.basename(item.root)), { detail: result.indexError });
           committed.push(item.root);
           for (const c of item.changes) this.partial.delete(keyOf(item.root, c.path));
         } catch (e) {
@@ -345,16 +378,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   }
 
   /** 整理要提交的內容：整個檔案的路徑，以及逐段選取的檔案 patch */
-  private async collect(repo: GitRepository, root: string, changes: WorkingChange[]): Promise<{ full: string[]; patches: string[] }> {
+  private async collect(repo: GitRepository, root: string, changes: WorkingChange[]): Promise<{ full: string[]; patches: { path: string; patch: Buffer }[] }> {
     const full: string[] = [];
-    const patches: string[] = [];
+    const patches: { path: string; patch: Buffer }[] = [];
     for (const c of changes) {
       const sel = this.partial.get(keyOf(root, c.path));
       if (sel && c.kind === 'changed' && c.status === 'M') {
-        const diff = await repo.fileDiff(c.path);
-        const chosen = new Set(diff.hunks.filter((h) => sel.has(hunkId(h))).map((h) => h.index));
-        const patch = buildPatch(diff.header, diff.hunks, chosen);
-        if (patch) patches.push(patch);
+        // 以 UTF-8 解碼比對選取的段落，再用 latin1（逐位元組）組 patch，非 UTF-8 的內容才不會被改壞
+        const raw = await repo.rawFileDiff(c.path);
+        const shown = parseFileDiff(raw.toString('utf8'));
+        const bytes = parseFileDiff(raw.toString('latin1'));
+        if (bytes.hunks.length !== shown.hunks.length) throw new Error(t('{0} changed while committing. Try again.', c.path));
+        const chosen = new Set(shown.hunks.filter((h) => sel.has(hunkId(h))).map((h) => h.index));
+        if (chosen.size === 0) continue;
+        const patch = buildPatch(bytes.header, bytes.hunks, chosen);
+        if (patch) patches.push({ path: c.path, patch: Buffer.from(patch, 'latin1') });
         continue;
       }
       full.push(c.path);
@@ -377,11 +415,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     const sel = this.partial.get(key);
     const selected = diff.hunks.filter((h) => !sel || sel.has(hunkId(h))).map((h) => h.index);
     this.provider.dialogs.openHunks(root, filePath, diff.hunks, selected, async (indices) => {
+      // 序號對應對話框開啟時的 diff；檔案若在這期間被修改，以內容比對，不依位置
+      const ids = new Set(diff.hunks.filter((h) => indices.includes(h.index)).map(hunkId));
       const fresh = await repo.fileDiff(filePath);
-      const chosen = new Set(indices);
-      if (chosen.size === fresh.hunks.length) this.partial.delete(key);
-      else this.partial.set(key, new Set(fresh.hunks.filter((h) => chosen.has(h.index)).map(hunkId)));
-      this.partialCounts[key] = { selected: chosen.size, total: fresh.hunks.length };
+      const kept = fresh.hunks.filter((h) => ids.has(hunkId(h))).length;
+      if (kept === fresh.hunks.length) this.partial.delete(key);
+      else this.partial.set(key, ids);
+      this.partialCounts[key] = { selected: kept, total: fresh.hunks.length };
       await this.refresh();
     });
   }

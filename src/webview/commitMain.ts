@@ -856,6 +856,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       }
       syncButtons();
       break;
+    case 'stashChanged':
+      stash.load();
+      break;
     case 'unstashData':
       stash.onData(m);
       break;

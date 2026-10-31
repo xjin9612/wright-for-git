@@ -6,7 +6,7 @@ import { t } from './l10n';
 import { post } from './vscodeApi';
 
 type RepoStashes = { root: string; name: string; stashes: StashInfo[] };
-type Msg = Extract<ToWebview, { type: 'unstashData' | 'unstashFiles' }>;
+type Msg = Extract<ToWebview, { type: 'unstashData' | 'unstashFiles' | 'stashChanged' }>;
 
 let instance: UnstashDialog | undefined;
 let seq = 1;
@@ -57,11 +57,9 @@ class UnstashDialog {
     this.applyButton.addEventListener('click', () => this.apply());
     this.dropButton.addEventListener('click', () => {
       if (this.root && this.selected) post({ type: 'unstashDrop', root: this.root, hash: this.selected });
-      setTimeout(() => this.load(), 400);
     });
     this.clearButton.addEventListener('click', () => {
       if (this.root) post({ type: 'unstashClear', root: this.root });
-      setTimeout(() => this.load(), 400);
     });
     const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => post({ type: 'closeDialog' }));
@@ -97,7 +95,8 @@ class UnstashDialog {
   }
 
   onMessage(m: Msg): void {
-    if (m.type === 'unstashData' && m.requestId === this.loadRequest) {
+    if (m.type === 'stashChanged') this.load();
+    else if (m.type === 'unstashData' && m.requestId === this.loadRequest) {
       this.repos = m.repos;
       if (!this.root || !this.repos.some((r) => r.root === this.root)) this.root = (this.repos.find((r) => r.stashes.length > 0) ?? this.repos[0])?.root;
       this.render();

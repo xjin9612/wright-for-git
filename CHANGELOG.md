@@ -37,7 +37,7 @@
 - Select several commits with `Ctrl` / `Shift` (or `Shift+↑↓`, `Ctrl+A`): the right pane shows their combined changes, and the context menu can copy their hashes or cherry-pick / revert them in one go
 - Context menu: New Branch…, New Tag… (optionally annotated), Cherry-Pick, Revert Commit (asks for the mainline parent on merge commits), Reset Current Branch to Here… (soft / mixed / hard; hard asks first and warns about uncommitted changes), Compare with Local, Interactively Rebase from Here…
 - Interactive rebase in an editor tab: pick, reword (edit the message in place), edit, squash, fixup, drop; reorder by dragging or `Alt+↑↓`; single-key shortcuts. Local changes are stashed and restored automatically
-- While a rebase, merge, cherry-pick or revert is in progress, a bar above the log offers Continue, Skip and Abort
+- While a rebase, merge, cherry-pick or revert is in progress, a bar above the log offers Continue, Skip and Abort (Abort asks first)
 - Issue numbers in commit messages become links: `#123` opens the issue on the repository's remote (GitHub, GitLab, …) by default; `gitWorkbench.issueLinks` replaces this with your own patterns (e.g. `PROJ-123` → your tracker)
 - On conflicts, offers to open Source Control to resolve them, or to abort
 - Date filter: last 24 hours / 7 / 30 / 90 days / year, or a custom period

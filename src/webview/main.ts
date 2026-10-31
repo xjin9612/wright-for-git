@@ -438,7 +438,7 @@ function renderOperations(): void {
       const a = el('a', { className: 'link', text: label, attrs: { href: '#' } });
       a.addEventListener('click', (e) => {
         e.preventDefault();
-        post({ type: 'operation', root: r.root, action });
+        post({ type: 'operation', root: r.root, action, expected: op });
       });
       return a;
     };

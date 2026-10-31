@@ -27,7 +27,10 @@ function errorMessage(e: unknown): string {
 }
 
 export class DialogPanels {
-  private readonly panels = new Map<string, { panel: vscode.WebviewPanel; host: ConfirmHost }>();
+  private readonly panels = new Map<string, { panel: vscode.WebviewPanel; host: ConfirmHost; handler: Handler }>();
+
+  /** 儲藏清單變動時通知（提交視窗的儲藏分頁） */
+  onStashChanged: (() => void) | undefined;
 
   constructor(private readonly provider: WorkbenchViewProvider) {}
 
@@ -43,7 +46,7 @@ export class DialogPanels {
   openHunks(root: string, filePath: string, hunks: DiffHunk[], selected: number[], onApply: (indices: number[]) => Promise<void>): void {
     const name = filePath.slice(filePath.lastIndexOf('/') + 1);
     this.open('hunks', t('Select Changes: {0}', name), { kind: 'hunks', args: { root, path: filePath, hunks, selected } }, async (m) => {
-      if (m.type === 'hunksSelect') await onApply(m.selected);
+      if (m.type === 'hunksSelect' && m.root === root && m.path === filePath) await onApply(m.selected);
     });
   }
 
@@ -68,7 +71,16 @@ export class DialogPanels {
     }
     const state = await repo.getState();
     this.open('rebase', t('Interactive Rebase: {0}', state.head.branch ?? 'HEAD'), { kind: 'rebase', args: { root, base: hash, branch: state.head.branch, commits: info.commits } }, async (m, _reply, _host, close) => {
-      if (m.type !== 'rebaseStart') return;
+      if (m.type !== 'rebaseStart' || m.root !== root || m.base !== hash) return;
+      // 對話框開著時 HEAD 可能已移動（例如又提交了一筆）：清單不符就重新整理，避免新提交被 rebase 丟掉
+      const now = await repo.rebaseCommits(hash).catch(() => undefined);
+      const nowState = await repo.getState();
+      const same = now && nowState.head.branch === state.head.branch && now.commits.length === m.entries.length && now.commits.every((c) => m.entries.some((e) => e.hash === c.hash));
+      if (!same) {
+        void vscode.window.showWarningMessage(t('The branch changed since this dialog was opened. The list has been reloaded; review it and start again.'));
+        await this.openRebase(root, hash);
+        return;
+      }
       try {
         const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Rebasing…') }, () => repo.interactiveRebase(m.base, m.entries));
         close();
@@ -129,6 +141,8 @@ export class DialogPanels {
             await repo.stashApply(stash.ref, { pop: m.pop, index: m.index });
           }
           vscode.window.setStatusBarMessage(`$(check) ${m.branch ? t('Created and checked out {0}', m.branch) : m.pop ? t('Popped {0}', stash.ref) : t('Applied {0}', stash.ref)}`, 4000);
+          reply({ type: 'stashChanged' });
+          this.onStashChanged?.();
           close();
         } catch (e) {
           const msg = errorMessage(e);
@@ -149,6 +163,8 @@ export class DialogPanels {
         if (!stash) return;
         if (await confirm(t('Drop {0}? Its changes will be lost.', stash.ref), { detail: stash.message, ok: t('Drop'), kind: 'danger' }, host)) {
           await repoOf(m.root)?.stashDrop(stash.ref);
+          reply({ type: 'stashChanged' });
+          this.onStashChanged?.();
         }
         return;
       }
@@ -158,6 +174,8 @@ export class DialogPanels {
         if (!repo || count === 0) return;
         if (await confirm(t('Drop all {0} stashes? Their changes will be lost.', count), { ok: t('Clear'), kind: 'danger' }, host)) {
           await repo.stashClear();
+          reply({ type: 'stashChanged' });
+          this.onStashChanged?.();
         }
         return;
       }
@@ -167,7 +185,8 @@ export class DialogPanels {
   private open(key: string, title: string, config: DialogConfig, handler: Handler): void {
     const existing = this.panels.get(key);
     if (existing) {
-      // 已開啟：以新的內容重新載入並移到前面
+      // 已開啟：換成新的處理函式（對應新的檔案／repo），以新的內容重新載入並移到前面
+      existing.handler = handler;
       existing.panel.title = title;
       existing.host.cancelAll();
       existing.panel.webview.html = this.provider.dialogHtml(existing.panel.webview, config);
@@ -182,12 +201,13 @@ export class DialogPanels {
     panel.iconPath = vscode.Uri.joinPath(this.provider.extensionUri, 'media', 'activity.svg');
     const reply: Reply = (msg) => void panel.webview.postMessage(msg);
     const host = new ConfirmHost(reply, () => t('Cancel'));
-    this.panels.set(key, { panel, host });
+    const entry = { panel, host, handler };
+    this.panels.set(key, entry);
     panel.webview.onDidReceiveMessage(async (m: ToExtension) => {
       try {
         if (m.type === 'confirmResult') host.resolve(m.id, m.ok);
         else if (m.type === 'closeDialog') panel.dispose();
-        else await handler(m, reply, host, () => panel.dispose());
+        else await entry.handler(m, reply, host, () => panel.dispose());
       } catch (e) {
         void vscode.window.showErrorMessage(errorMessage(e));
       }

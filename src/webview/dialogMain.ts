@@ -38,6 +38,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'unstashData':
     case 'unstashFiles':
+    case 'stashChanged':
       handleUnstashMessage(m);
       break;
     case 'confirm':
