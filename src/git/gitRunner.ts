@@ -16,19 +16,28 @@ export class GitError extends Error {
 export interface RunOptions {
   cwd: string;
   signal?: AbortSignal;
+  /** 額外的環境變數（如 GIT_INDEX_FILE） */
+  env?: Record<string, string>;
+  /** 寫入 stdin 的內容 */
+  input?: string;
 }
 
 // i18n.logOutputEncoding 固定 UTF-8：使用者若設定 big5 等編碼，log／詳情的中文才不會變亂碼
 const BASE_ARGS = ['-c', 'core.quotepath=false', '-c', 'color.ui=false', '-c', 'i18n.logOutputEncoding=UTF-8', '--no-pager'];
 
 function spawnGit(gitPath: string, args: string[], opts: RunOptions) {
-  return spawn(gitPath, [...BASE_ARGS, ...args], {
+  const child = spawn(gitPath, [...BASE_ARGS, ...args], {
     cwd: opts.cwd,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', LC_ALL: process.env.LC_ALL ?? 'C.UTF-8' },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', LC_ALL: process.env.LC_ALL ?? 'C.UTF-8', ...opts.env },
+    stdio: [opts.input !== undefined ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     windowsHide: true,
     signal: opts.signal,
   });
+  if (opts.input !== undefined && child.stdin) {
+    child.stdin.on('error', () => undefined);
+    child.stdin.end(opts.input, 'utf8');
+  }
+  return child;
 }
 
 /**
@@ -48,7 +57,7 @@ export function streamGit(gitPath: string, args: string[], opts: RunOptions, onD
       else resolve();
     };
 
-    child.stdout.on('data', (buf: Buffer) => {
+    child.stdout!.on('data', (buf: Buffer) => {
       try {
         onData(decoder.write(buf));
       } catch (e) {
@@ -56,7 +65,7 @@ export function streamGit(gitPath: string, args: string[], opts: RunOptions, onD
         finish(e as Error);
       }
     });
-    child.stderr.on('data', (buf: Buffer) => {
+    child.stderr!.on('data', (buf: Buffer) => {
       stderr += errDecoder.write(buf);
     });
     child.on('error', (e) => finish(e));
@@ -84,8 +93,8 @@ export function runGitBuffer(gitPath: string, args: string[], opts: RunOptions):
     const child = spawnGit(gitPath, args, opts);
     const chunks: Buffer[] = [];
     let stderr = '';
-    child.stdout.on('data', (b: Buffer) => chunks.push(b));
-    child.stderr.on('data', (b: Buffer) => (stderr += b.toString('utf8')));
+    child.stdout!.on('data', (b: Buffer) => chunks.push(b));
+    child.stderr!.on('data', (b: Buffer) => (stderr += b.toString('utf8')));
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) resolve(Buffer.concat(chunks));

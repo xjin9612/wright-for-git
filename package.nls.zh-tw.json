@@ -19,15 +19,7 @@
   "command.fetch": "擷取",
   "command.pull": "提取",
   "command.push": "推送…",
-  "view.stashes": "儲藏",
   "command.stash.save": "儲藏變更…",
-  "command.stash.refresh": "重新整理",
-  "command.stash.apply": "套用",
-  "command.stash.applyIndex": "套用並還原暫存狀態",
-  "command.stash.pop": "套用並刪除",
-  "command.stash.drop": "刪除…",
-  "command.stash.branch": "從儲藏建立分支…",
-  "command.stash.openFile": "顯示差異",
   "command.diff.previousFile": "上一個變更檔案",
   "command.diff.nextFile": "下一個變更檔案",
   "config.language": "Git Workbench 面板、對話框與訊息的語言。指令名稱與設定說明一律跟隨 VS Code 的顯示語言。",
@@ -35,5 +27,7 @@
   "command.compareWithRef": "與分支或標籤比較…",
   "command.stashChangesIn": "儲藏變更…",
   "command.unstash": "取消儲藏…",
-  "submenu.explorer": "Git Workbench"
+  "submenu.explorer": "Git Workbench",
+  "view.commit": "提交",
+  "command.showCommit": "顯示提交視窗"
 }

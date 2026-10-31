@@ -45,6 +45,14 @@ const targets = args.has('--tests')
       },
       {
         ...common,
+        entryPoints: ['src/webview/commitMain.ts'],
+        outfile: 'dist/commit.js',
+        platform: 'browser',
+        format: 'iife',
+        target: 'es2022',
+      },
+      {
+        ...common,
         entryPoints: ['src/webview/dialogMain.ts'],
         outfile: 'dist/dialog.js',
         platform: 'browser',

@@ -466,3 +466,47 @@ body.dialog-page { overflow: hidden; }
 .unstash-header { display: flex; align-items: center; gap: 8px; }
 .unstash-branch { width: 180px; }
 .push-commit .hash { font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); flex: none; }
+
+/* ---------- 逐段選取 ---------- */
+.hunks-list { flex: 1; min-height: 0; overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 10px; }
+.hunk { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.hunk.excluded .hunk-body { opacity: 0.45; }
+.hunk-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--vscode-editorGroupHeader-tabsBackground, rgba(128, 128, 128, 0.1)); cursor: pointer; }
+.hunk-range { font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); }
+.hunk-ctx { font-family: var(--vscode-editor-font-family); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hunk-stat.add { color: var(--st-added); }
+.hunk-stat.del { color: var(--vscode-errorForeground, #f48771); }
+.hunk-body { margin: 0; padding: 2px 0; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); overflow-x: auto; }
+.hunk-line { padding: 0 8px; white-space: pre; }
+.hunk-line.add { background: var(--vscode-diffEditor-insertedLineBackground, rgba(155, 185, 85, 0.2)); }
+.hunk-line.del { background: var(--vscode-diffEditor-removedLineBackground, rgba(255, 0, 0, 0.2)); }
+.hunk-line.meta { color: var(--muted); }
+.hunk-total { font-weight: normal; }
+
+/* ---------- 提交視窗 ---------- */
+.commit-app { display: flex; flex-direction: column; height: 100vh; }
+.commit-tabs { display: flex; gap: 2px; padding: 4px 6px 0; flex: none; }
+.commit-tab { background: transparent; border: none; padding: 3px 10px; border-radius: 3px; cursor: pointer; color: var(--muted); }
+.commit-tab.active { background: var(--vscode-toolbar-activeBackground, var(--hover)); color: var(--vscode-foreground); }
+.commit-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.commit-toolbar { flex: none; }
+.commit-tree { min-height: 60px; overflow: auto; outline: none; }
+.commit-tree .tree-row.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
+.commit-check { margin: 0 4px 0 0; flex: none; }
+.commit-section { font-weight: 600; }
+.active-list { font-weight: 700; }
+.commit-partial { font-size: 0.85em; padding: 0 5px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-left: 6px; flex: none; }
+.commit-bottom { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 8px; min-height: 120px; }
+.commit-amend-row { display: flex; align-items: center; }
+.commit-summary { font-size: 0.9em; }
+.commit-message {
+  flex: 1; min-height: 48px; resize: none; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 13px);
+  background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 2px; padding: 4px 6px;
+}
+.commit-message:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.commit-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.stash-pane .stash-list { flex: 1 1 50%; min-height: 60px; overflow: auto; }
+.stash-files-pane { flex: 1 1 50%; min-height: 60px; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.stash-files { flex: 1; overflow: auto; }
+.stash-repo { font-weight: 600; }
+.toolbar-sep-h { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }

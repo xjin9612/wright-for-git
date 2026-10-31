@@ -4,14 +4,15 @@ import { resolveGitPath } from './gitExtension';
 import { WorkbenchViewProvider } from './provider';
 import { RevisionFileSystem, SCHEME } from './diffProvider';
 import { registerLaunchers } from './sidebar';
-import { registerStash, type StashTree } from './stashView';
-import { initI18n, resetI18n } from './i18n';
+import { registerCommitView, type CommitViewProvider } from './commitView';
+import { stashChanges } from './stashView';
+import { initI18n, resetI18n, t } from './i18n';
 import { registerExplorerCommands } from './explorerCommands';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   initI18n(context);
   const gitPath = await resolveGitPath();
-  let stashTree: StashTree | undefined;
+  let commitView: CommitViewProvider | undefined;
   const provider = new WorkbenchViewProvider(context, gitPath);
 
   context.subscriptions.push(
@@ -38,7 +39,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.affectsConfiguration('gitWorkbench.language')) {
         resetI18n();
         provider.reloadWebview();
-        stashTree?.refresh();
+        commitView?.reload();
       } else if (e.affectsConfiguration('gitWorkbench.scanDepth') || e.affectsConfiguration('gitWorkbench.scanExclude')) {
         void provider.rediscover(true);
       } else if (e.affectsConfiguration('gitWorkbench.autoRefresh')) {
@@ -56,11 +57,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     console.error('[Git Workbench] sidebar init failed:', e);
   }
   try {
-    stashTree = registerStash(context, provider);
+    commitView = registerCommitView(context, provider);
   } catch (e) {
-    console.error('[Git Workbench] stash view init failed:', e);
+    console.error('[Git Workbench] commit view init failed:', e);
   }
-  registerExplorerCommands(context, provider, () => stashTree?.refresh());
+  registerExplorerCommands(context, provider, () => void commitView?.refresh());
+  context.subscriptions.push(
+    vscode.commands.registerCommand('gitWorkbench.stash.save', async () => {
+      const repos = await provider.repositories();
+      let root = repos[0]?.root;
+      if (repos.length > 1) {
+        const pick = await vscode.window.showQuickPick(
+          repos.map((r) => ({ label: r.name, description: r.branch, root: r.root })),
+          { placeHolder: t('Stash changes in which repository?') },
+        );
+        root = pick?.root ?? '';
+      }
+      const repo = root ? provider.getRepository(root) : undefined;
+      if (repo && (await stashChanges(repo))) {
+        void commitView?.refresh();
+        await provider.refresh(true);
+      }
+    }),
+    vscode.commands.registerCommand('gitWorkbench.unstashChanges', () => provider.dialogs.openUnstash()),
+  );
 }
 
 export function deactivate(): void {

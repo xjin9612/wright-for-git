@@ -182,3 +182,87 @@ export function parseShortlog(text: string): UserInfo[] {
   }
   return users;
 }
+
+/** 解析 `git status --porcelain=v2 -z`（含 --untracked-files、--ignored） */
+export function parseStatusV2(text: string): import('../shared/protocol').WorkingChange[] {
+  const out: import('../shared/protocol').WorkingChange[] = [];
+  const parts = text.split('\0');
+  const combined = (xy: string): FileStatus => {
+    const [x, y] = [xy[0], xy[1]];
+    if (x === 'A') return 'A';
+    if (x === 'D' || y === 'D') return 'D';
+    if (x === 'T' || y === 'T') return 'T';
+    return 'M';
+  };
+  for (let i = 0; i < parts.length; i++) {
+    const rec = parts[i];
+    if (!rec) continue;
+    const type = rec[0];
+    if (type === '1') {
+      // 1 XY sub mH mI mW hH hI path
+      const f = splitN(rec, 9);
+      out.push({ path: f[8], status: combined(f[1]), kind: 'changed' });
+    } else if (type === '2') {
+      // 2 XY sub mH mI mW hH hI Xscore path \0 origPath
+      const f = splitN(rec, 10);
+      const orig = parts[++i];
+      out.push({ path: f[9], oldPath: orig, status: f[8].startsWith('C') ? 'C' : 'R', kind: 'changed' });
+    } else if (type === 'u') {
+      // u XY sub m1 m2 m3 mW h1 h2 h3 path
+      const f = splitN(rec, 11);
+      out.push({ path: f[10], status: 'U', kind: 'conflict' });
+    } else if (type === '?') {
+      out.push({ path: rec.slice(2), status: 'A', kind: 'untracked' });
+    } else if (type === '!') {
+      out.push({ path: rec.slice(2), status: 'X', kind: 'ignored' });
+    }
+  }
+  return out;
+}
+
+/** 以空白切成 n 段，最後一段保留剩餘內容（路徑可能含空白） */
+function splitN(s: string, n: number): string[] {
+  const out: string[] = [];
+  let rest = s;
+  for (let i = 0; i < n - 1; i++) {
+    const k = rest.indexOf(' ');
+    if (k < 0) break;
+    out.push(rest.slice(0, k));
+    rest = rest.slice(k + 1);
+  }
+  out.push(rest);
+  return out;
+}
+
+/** 解析單一檔案的 unified diff：檔頭（diff --git 到 +++）與各段 hunk */
+export function parseFileDiff(text: string): { header: string[]; hunks: import('../shared/protocol').DiffHunk[] } {
+  const lines = text.split('\n');
+  if (lines[lines.length - 1] === '') lines.pop();
+  const header: string[] = [];
+  const hunks: import('../shared/protocol').DiffHunk[] = [];
+  for (const line of lines) {
+    if (line.startsWith('@@')) {
+      hunks.push({ index: hunks.length, header: line, lines: [] });
+    } else if (hunks.length === 0) {
+      header.push(line);
+    } else {
+      hunks[hunks.length - 1].lines.push(line);
+    }
+  }
+  return { header, hunks };
+}
+
+/** 由選取的 hunk 組回 patch（套用在 HEAD 上；配合 git apply --recount） */
+export function buildPatch(header: string[], hunks: readonly import('../shared/protocol').DiffHunk[], selected: ReadonlySet<number>): string | undefined {
+  const chosen = hunks.filter((h) => selected.has(h.index));
+  if (chosen.length === 0) return undefined;
+  return [...header, ...chosen.flatMap((h) => [h.header, ...h.lines]), ''].join('\n');
+}
+
+/** patch 所屬的檔案路徑（取 +++ b/ 或 --- a/） */
+export function patchPath(patch: string): string | undefined {
+  const plus = /^\+\+\+ b\/(.+)$/m.exec(patch);
+  if (plus) return plus[1];
+  const minus = /^--- a\/(.+)$/m.exec(patch);
+  return minus?.[1];
+}

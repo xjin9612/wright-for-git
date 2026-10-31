@@ -60,13 +60,14 @@
       ],
       "gitWorkbenchBar": [
         {
-          "id": "gitWorkbench.repositories",
-          "name": "%view.repositories%",
+          "type": "webview",
+          "id": "gitWorkbench.commit",
+          "name": "%view.commit%",
           "icon": "media/activity.svg"
         },
         {
-          "id": "gitWorkbench.stashes",
-          "name": "%view.stashes%",
+          "id": "gitWorkbench.repositories",
+          "name": "%view.repositories%",
           "icon": "media/activity.svg"
         }
       ]
@@ -136,45 +137,6 @@
         "icon": "$(git-stash)"
       },
       {
-        "command": "gitWorkbench.stash.refresh",
-        "title": "%command.stash.refresh%",
-        "category": "Git Workbench",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "gitWorkbench.stash.apply",
-        "title": "%command.stash.apply%",
-        "category": "Git Workbench",
-        "icon": "$(git-stash-apply)"
-      },
-      {
-        "command": "gitWorkbench.stash.applyIndex",
-        "title": "%command.stash.applyIndex%",
-        "category": "Git Workbench"
-      },
-      {
-        "command": "gitWorkbench.stash.pop",
-        "title": "%command.stash.pop%",
-        "category": "Git Workbench",
-        "icon": "$(git-stash-pop)"
-      },
-      {
-        "command": "gitWorkbench.stash.drop",
-        "title": "%command.stash.drop%",
-        "category": "Git Workbench",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "gitWorkbench.stash.branch",
-        "title": "%command.stash.branch%",
-        "category": "Git Workbench"
-      },
-      {
-        "command": "gitWorkbench.stash.openFile",
-        "title": "%command.stash.openFile%",
-        "category": "Git Workbench"
-      },
-      {
         "command": "gitWorkbench.diff.previousFile",
         "title": "%command.diff.previousFile%",
         "category": "Git Workbench",
@@ -200,6 +162,16 @@
         "command": "gitWorkbench.unstash",
         "title": "%command.unstash%",
         "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.showCommit",
+        "title": "%command.showCommit%",
+        "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.unstashChanges",
+        "title": "%command.unstash%",
+        "category": "Git Workbench"
       }
     ],
     "menus": {
@@ -223,16 +195,6 @@
           "command": "gitWorkbench.refreshRepositories",
           "when": "view == gitWorkbench.repositories",
           "group": "navigation"
-        },
-        {
-          "command": "gitWorkbench.stash.save",
-          "when": "view == gitWorkbench.stashes",
-          "group": "navigation@1"
-        },
-        {
-          "command": "gitWorkbench.stash.refresh",
-          "when": "view == gitWorkbench.stashes",
-          "group": "navigation@2"
         }
       ],
       "explorer/context": [
@@ -269,82 +231,12 @@
           "when": "false"
         },
         {
-          "command": "gitWorkbench.stash.apply",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.applyIndex",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.pop",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.drop",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.branch",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.openFile",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.stash.refresh",
-          "when": "false"
-        },
-        {
           "command": "gitWorkbench.diff.previousFile",
           "when": "gitWorkbench.diffNav"
         },
         {
           "command": "gitWorkbench.diff.nextFile",
           "when": "gitWorkbench.diffNav"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "gitWorkbench.stash.apply",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "inline@1"
-        },
-        {
-          "command": "gitWorkbench.stash.pop",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "inline@2"
-        },
-        {
-          "command": "gitWorkbench.stash.drop",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "inline@3"
-        },
-        {
-          "command": "gitWorkbench.stash.apply",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "1_apply@1"
-        },
-        {
-          "command": "gitWorkbench.stash.applyIndex",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "1_apply@2"
-        },
-        {
-          "command": "gitWorkbench.stash.pop",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "1_apply@3"
-        },
-        {
-          "command": "gitWorkbench.stash.branch",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "2_branch@1"
-        },
-        {
-          "command": "gitWorkbench.stash.drop",
-          "when": "view == gitWorkbench.stashes && viewItem == stash",
-          "group": "3_drop@1"
         }
       ],
       "editor/title": [
@@ -465,6 +357,10 @@
         "key": "ctrl+alt+pageup",
         "mac": "cmd+alt+pageup",
         "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
+      },
+      {
+        "command": "gitWorkbench.showCommit",
+        "key": "alt+0"
       }
     ],
     "submenus": [

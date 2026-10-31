@@ -820,6 +820,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return this.renderHtml(webview, { script: 'dialog.js', config });
   }
 
+  /** 其他 webview（提交視窗）的 HTML：同一份樣式、翻譯與 CSP */
+  pageHtml(webview: vscode.Webview, script: string, config: unknown): string {
+    return this.renderHtml(webview, { script, config });
+  }
+
   // ---------- html ----------
 
   /** 介面語言變更：重新產生 webview（篩選、版面等狀態由 webview 的 state 保存） */

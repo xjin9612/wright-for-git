@@ -19,15 +19,7 @@
   "command.fetch": "Fetch",
   "command.pull": "Pull",
   "command.push": "Push…",
-  "view.stashes": "Stashes",
   "command.stash.save": "Stash Changes…",
-  "command.stash.refresh": "Refresh",
-  "command.stash.apply": "Apply",
-  "command.stash.applyIndex": "Apply with Index",
-  "command.stash.pop": "Pop",
-  "command.stash.drop": "Drop…",
-  "command.stash.branch": "Unstash as Branch…",
-  "command.stash.openFile": "Show Diff",
   "command.diff.previousFile": "Previous Changed File",
   "command.diff.nextFile": "Next Changed File",
   "config.language": "Language of the Git Workbench panel, dialogs and messages. Command names and settings always follow the VS Code display language.",
@@ -35,5 +27,7 @@
   "command.compareWithRef": "Compare with Branch or Tag…",
   "command.stashChangesIn": "Stash Changes…",
   "command.unstash": "Unstash Changes…",
-  "submenu.explorer": "Git Workbench"
+  "submenu.explorer": "Git Workbench",
+  "view.commit": "Commit",
+  "command.showCommit": "Show Commit Window"
 }

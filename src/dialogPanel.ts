@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { ConfirmHost, confirm } from './dialogs';
 import { t } from './i18n';
 import type { WorkbenchViewProvider } from './provider';
-import type { ToExtension, ToWebview } from './shared/protocol';
+import type { DiffHunk, ToExtension, ToWebview } from './shared/protocol';
 import { openStashFile } from './stashView';
 
 export interface PushDialogArgs {
@@ -13,7 +13,10 @@ export interface PushDialogArgs {
 }
 
 /** webview 端依 kind 決定要畫哪個對話框 */
-export type DialogConfig = { kind: 'push'; args: PushDialogArgs } | { kind: 'unstash'; args: { root?: string } };
+export type DialogConfig =
+  | { kind: 'push'; args: PushDialogArgs }
+  | { kind: 'unstash'; args: { root?: string } }
+  | { kind: 'hunks'; args: { root: string; path: string; hunks: DiffHunk[]; selected: number[] } };
 
 type Reply = (msg: ToWebview) => void;
 type Handler = (m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void) => Promise<void>;
@@ -35,11 +38,19 @@ export class DialogPanels {
     });
   }
 
+  /** 逐段選取要提交的 hunk（提交視窗開啟）；onApply 收到選取的段落序號 */
+  openHunks(root: string, filePath: string, hunks: DiffHunk[], selected: number[], onApply: (indices: number[]) => Promise<void>): void {
+    const name = filePath.slice(filePath.lastIndexOf('/') + 1);
+    this.open('hunks', t('Select Changes: {0}', name), { kind: 'hunks', args: { root, path: filePath, hunks, selected } }, async (m) => {
+      if (m.type === 'hunksSelect') await onApply(m.selected);
+    });
+  }
+
   openUnstash(root?: string): void {
     this.open('unstash', t('Unstash Changes'), { kind: 'unstash', args: { root } }, (m, reply, host, close) => this.handleUnstash(m, reply, host, close));
   }
 
-  private async handleUnstash(m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void): Promise<void> {
+  async handleUnstash(m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void): Promise<void> {
     const repoOf = (root: string) => this.provider.getRepository(root);
     const findStash = async (root: string, hash: string) => (await repoOf(root)?.listStashes())?.find((s) => s.hash === hash);
     switch (m.type) {

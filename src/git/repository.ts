@@ -1,6 +1,6 @@
 // 單一 git repository 的高階操作（不依賴 vscode，可在 Node 直接測試）
 import * as path from 'node:path';
-import type { ChangedFile, CommitDetails, CommitInfo, LogFilter, PushPlan, RepoState, StashInfo, UserInfo } from '../shared/protocol';
+import type { ChangedFile, CommitDetails, CommitInfo, DiffHunk, FileStatus, LogFilter, PushPlan, RepoState, StashInfo, UserInfo, WorkingChange } from '../shared/protocol';
 import { runGit, runGitBuffer, streamGit, GitError } from './gitRunner';
 import {
   buildLogArgs,
@@ -13,6 +13,9 @@ import {
   parseNameStatusZ,
   parseRefs,
   parseShortlog,
+  parseStatusV2,
+  parseFileDiff,
+  patchPath,
   REF_FORMAT,
 } from './parsers';
 
@@ -378,6 +381,97 @@ export class GitRepository {
       }
     }
     return result;
+  }
+
+  // ---------- 工作區變更與提交（提交視窗） ----------
+
+  /** 工作區相對 HEAD 的變更、未追蹤檔案，以及（選用）已忽略的檔案 */
+  async getWorkingChanges(includeIgnored = false, signal?: AbortSignal): Promise<WorkingChange[]> {
+    const args = ['status', '--porcelain=v2', '-z', '--untracked-files=all', '--find-renames'];
+    if (includeIgnored) args.push('--ignored=matching');
+    return parseStatusV2(await runGit(this.gitPath, args, { cwd: this.root, signal, env: { GIT_OPTIONAL_LOCKS: '0' } }));
+  }
+
+  /** HEAD 的 commit hash；尚未有任何 commit 時為 undefined */
+  async headHash(): Promise<string | undefined> {
+    return (await this.tryRun(['rev-parse', '-q', '--verify', 'HEAD^{commit}']))?.trim() || undefined;
+  }
+
+  async lastCommitMessage(): Promise<string> {
+    return ((await this.tryRun(['log', '-1', '--format=%B'])) ?? '').replace(/\s+$/, '');
+  }
+
+  /** 檔案相對 HEAD 的 diff（各段 hunk），用於逐段選取提交 */
+  async fileDiff(filePath: string): Promise<{ header: string[]; hunks: DiffHunk[] }> {
+    if (!filePath || filePath.startsWith('-')) throw new GitError(`Invalid path: ${filePath}`, null, '');
+    const head = await this.headHash();
+    const out = await this.run(['diff', '--no-color', '--no-ext-diff', '-U3', head ?? '4b825dc642cb6eb9a060e54bf8d69288fbee4904', '--', filePath]);
+    return parseFileDiff(out);
+  }
+
+  /**
+   * 提交勾選的變更（對應 IntelliJ 提交視窗）：以暫時的 index 只放入勾選的內容，
+   * 不會動到使用者在內建原始檔控制暫存（stage）的其他檔案。
+   * @param full 整個檔案提交的路徑（rename 需同時包含新舊路徑；含刪除與未追蹤檔案）
+   * @param patches 只提交部分 hunk 的檔案：套用在 HEAD 上的 patch
+   */
+  async commitSelected(opts: { full: string[]; patches: string[]; message: string; amend?: boolean; signOff?: boolean; noVerify?: boolean }): Promise<string> {
+    const { existsSync, promises: fsp } = await import('node:fs');
+    if (!opts.message.trim() && !opts.amend) throw new GitError('Commit message is empty', null, '');
+    if (opts.full.some((p) => !p || p.startsWith('-'))) throw new GitError('Invalid path', null, '');
+    const tmpIndex = path.join(this.gitDir, `gitworkbench-index-${process.pid}-${Date.now()}`);
+    const msgFile = path.join(this.gitDir, `gitworkbench-msg-${process.pid}-${Date.now()}`);
+    const env = { GIT_INDEX_FILE: tmpIndex };
+    const git = (args: string[], input?: string) => runGit(this.gitPath, args, { cwd: this.root, env, input });
+    try {
+      const head = await this.headHash();
+      // 暫時 index 從 HEAD 開始（amend 時也是：新的 commit = HEAD 的內容 + 勾選的變更）
+      await git(head ? ['read-tree', head] : ['read-tree', '--empty']);
+      if (opts.full.length > 0) {
+        // 一次加太多路徑時分批，避免超過命令列長度上限
+        for (let i = 0; i < opts.full.length; i += 200) await git(['add', '-A', '--', ...opts.full.slice(i, i + 200)]);
+      }
+      for (const patch of opts.patches) await git(['apply', '--cached', '--recount', '--whitespace=nowarn', '-'], patch);
+      await fsp.writeFile(msgFile, opts.message, 'utf8');
+      const args = ['commit', '--quiet', '--cleanup=strip', '-F', msgFile];
+      if (opts.amend) args.push('--amend');
+      if (opts.signOff) args.push('--signoff');
+      if (opts.noVerify) args.push('--no-verify');
+      if (!head || opts.amend) args.push('--allow-empty');
+      await git(args);
+      const newHead = (await this.headHash()) ?? '';
+      // 讓真正的 index 中這些路徑與新的 HEAD 一致（部分提交的檔案，剩下的變更留在工作區）
+      const touched = [...opts.full, ...opts.patches.map(patchPath).filter((p): p is string => !!p)];
+      for (let i = 0; i < touched.length; i += 200) await this.tryRun(['reset', '-q', '--', ...touched.slice(i, i + 200)]);
+      return newHead;
+    } finally {
+      for (const f of [tmpIndex, msgFile, `${tmpIndex}.lock`]) if (existsSync(f)) await fsp.rm(f, { force: true });
+    }
+  }
+
+  /**
+   * 捨棄變更（Rollback）：已追蹤的檔案還原成 HEAD 的內容；新增（已加入 index）的檔案移出 index，保留檔案本身。
+   */
+  async rollback(items: { path: string; oldPath?: string; status: FileStatus; kind: string }[]): Promise<void> {
+    const head = await this.headHash();
+    const added = items.filter((x) => x.kind === 'changed' && x.status === 'A').map((x) => x.path);
+    const tracked = items.filter((x) => (x.kind === 'changed' || x.kind === 'conflict') && x.status !== 'A').flatMap((x) => (x.oldPath ? [x.path, x.oldPath] : [x.path]));
+    if ([...added, ...tracked].some((p) => p.startsWith('-'))) throw new GitError('Invalid path', null, '');
+    for (let i = 0; i < added.length; i += 200) await this.run(['rm', '-q', '--cached', '-r', '--', ...added.slice(i, i + 200)]);
+    if (!head || tracked.length === 0) return;
+    // rename：新路徑若不在 HEAD 中，restore 會失敗，改用 rm --cached 再刪除檔案
+    for (let i = 0; i < tracked.length; i += 200) {
+      const chunk = tracked.slice(i, i + 200);
+      const inHead = new Set(((await this.tryRun(['ls-tree', '-r', '--name-only', '-z', head, '--', ...chunk])) ?? '').split('\0').filter(Boolean));
+      const restore = chunk.filter((p) => inHead.has(p));
+      const extra = chunk.filter((p) => !inHead.has(p));
+      if (restore.length > 0) await this.run(['restore', '--source', head, '--staged', '--worktree', '--', ...restore]);
+      if (extra.length > 0) {
+        await this.tryRun(['rm', '-q', '--cached', '-r', '--', ...extra]);
+        const { promises: fsp } = await import('node:fs');
+        for (const p of extra) await fsp.rm(path.join(this.root, p), { force: true });
+      }
+    }
   }
 
   // ---------- Stash ----------

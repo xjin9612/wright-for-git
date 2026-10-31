@@ -104,6 +104,44 @@ export interface CommitDetails {
   files: ChangedFile[];
 }
 
+/** 工作區變更（提交視窗） */
+export type ChangeKind = 'changed' | 'untracked' | 'ignored' | 'conflict';
+
+export interface WorkingChange {
+  /** 相對 repo 根目錄，'/' 分隔；已忽略的資料夾以 '/' 結尾 */
+  path: string;
+  /** rename 的原路徑 */
+  oldPath?: string;
+  /** 相對 HEAD 的狀態（A／M／D／R／C／T／U） */
+  status: FileStatus;
+  kind: ChangeKind;
+}
+
+export interface Changelist {
+  id: string;
+  name: string;
+}
+
+/** 提交視窗的資料 */
+export interface CommitState {
+  repos: { root: string; name: string; branch?: string; changes: (WorkingChange & { module?: string })[] }[];
+  changelists: Changelist[];
+  activeList: string;
+  /** `${root}\0${path}` → changelist id；沒有指定的屬於目前使用中的 changelist */
+  assign: Record<string, string>;
+  /** 只提交部分 hunk 的檔案：`${root}\0${path}` → 選取的段數／總段數 */
+  partial: Record<string, { selected: number; total: number }>;
+  showIgnored: boolean;
+}
+
+/** diff 的一段（hunk） */
+export interface DiffHunk {
+  /** 在檔案 diff 中的序號 */
+  index: number;
+  header: string;
+  lines: string[];
+}
+
 export interface StashInfo {
   /** stash@{n} */
   ref: string;
@@ -157,6 +195,26 @@ export type ToExtension =
   | { type: 'unstashDrop'; root: string; hash: string }
   | { type: 'unstashClear'; root: string }
   | { type: 'openStashDiff'; root: string; hash: string; file: ChangedFile & { untracked?: boolean } }
+  /** 提交視窗 */
+  | { type: 'commitReady' }
+  | { type: 'commitRefresh'; showIgnored: boolean }
+  | { type: 'commitDiff'; root: string; change: WorkingChange }
+  | { type: 'commitOpenFile'; root: string; path: string }
+  | { type: 'commitRollback'; items: { root: string; change: WorkingChange }[] }
+  | { type: 'commitLastMessage'; root: string }
+  | { type: 'commitRun'; requestId: number; message: string; amend: boolean; signOff: boolean; noVerify: boolean; push: boolean; items: { root: string; changes: WorkingChange[] }[] }
+  | { type: 'commitHunks'; root: string; path: string }
+  | { type: 'commitClearPartial'; keys: string[] }
+  | { type: 'commitAddIgnore'; root: string; paths: string[] }
+  | { type: 'changelistNew'; keys?: string[] }
+  | { type: 'changelistRename'; id: string }
+  | { type: 'changelistDelete'; id: string }
+  | { type: 'changelistActivate'; id: string }
+  | { type: 'changelistMove'; keys: string[]; id?: string }
+  | { type: 'stashSave' }
+  | { type: 'openUnstash'; root?: string }
+  /** 逐段提交面板：選取的 hunk（以內容辨識） */
+  | { type: 'hunksSelect'; root: string; path: string; selected: number[] }
   /** 編輯器分頁的對話框要求關閉 */
   | { type: 'closeDialog' }
   /** 面板內確認框的結果 */
@@ -243,6 +301,10 @@ export type ToWebview =
   | { type: 'pushStatus'; requestId: number; status: 'started' | 'cancelled' }
   | { type: 'unstashData'; requestId: number; repos: { root: string; name: string; stashes: StashInfo[] }[] }
   | { type: 'unstashFiles'; requestId: number; root: string; hash: string; files: (ChangedFile & { untracked?: boolean })[] }
+  | { type: 'commitState'; state: CommitState }
+  | { type: 'commitLastMessage'; root: string; message: string }
+  | { type: 'commitDone'; requestId: number; ok: boolean }
+  | { type: 'hunksData'; root: string; path: string; hunks: DiffHunk[]; selected: number[] }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */
