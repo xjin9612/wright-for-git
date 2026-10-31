@@ -10,7 +10,7 @@ import { revisionUri } from './diffProvider';
 import { buildPushPlans, runCommitAction, runCommitsAction, runPush, runRefAction, runSync, type RepoTarget } from './actions';
 import { mapLimit } from './util';
 import { combineChanges } from './shared/combine';
-import { promises as fsp } from 'node:fs';
+import { promises as fsp, statSync } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
 import { confirm, setWebviewConfirm, type ConfirmOptions } from './dialogs';
@@ -798,8 +798,16 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   private renderHtml(webview: vscode.Webview): string {
     const nonce = makeNonce();
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js'));
-    const style = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.css'));
+    // 加上檔案時間當版本參數：同版本號重新安裝時，避免 webview 沿用快取的舊檔
+    const stamp = (rel: string[]) => {
+      try {
+        return String(Math.floor(statSync(vscode.Uri.joinPath(this.context.extensionUri, ...rel).fsPath).mtimeMs));
+      } catch {
+        return '0';
+      }
+    };
+    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js')).with({ query: `v=${stamp(['dist', 'webview.js'])}` });
+    const style = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview.css')).with({ query: `v=${stamp(['media', 'webview.css'])}` });
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,

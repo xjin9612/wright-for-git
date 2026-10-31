@@ -28,24 +28,30 @@ function configuredLanguage(): Language {
 export function currentBundle(): Record<string, string> | undefined {
   const language = configuredLanguage();
   if (cached?.language === language) return cached.bundle;
+  // auto 時依 VS Code 的顯示語言自行讀取翻譯檔（不依賴 vscode.l10n.bundle，面板與通知用同一份）
+  const effective = language === 'auto' ? fromVscodeLanguage(vscode.env.language) : language;
   let bundle: Record<string, string> | undefined;
-  if (language === 'auto') {
-    bundle = vscode.l10n.bundle;
-  } else if (language === 'zh-tw') {
+  if (effective === 'zh-tw') {
     try {
       bundle = JSON.parse(readFileSync(path.join(extensionPath, 'l10n', 'bundle.l10n.zh-tw.json'), 'utf8')) as Record<string, string>;
     } catch {
-      bundle = undefined;
+      bundle = vscode.l10n.bundle;
     }
   }
   cached = { language, bundle };
   return bundle;
 }
 
+/** VS Code 顯示語言 → 支援的介面語言（目前只有繁中翻譯） */
+function fromVscodeLanguage(lang: string | undefined): 'en' | 'zh-tw' {
+  const l = (lang ?? 'en').toLowerCase();
+  return l === 'zh-tw' || l === 'zh-hant' || l.startsWith('zh-hant') || l === 'zh-hk' || l === 'zh-mo' ? 'zh-tw' : 'en';
+}
+
 /** 目前介面語言代碼（給 webview 的 lang 屬性） */
 export function currentLanguage(): string {
   const language = configuredLanguage();
-  return language === 'auto' ? vscode.env.language : language;
+  return language === 'auto' ? fromVscodeLanguage(vscode.env.language) : language;
 }
 
 /** 與 vscode.l10n.t 相同用法：t('Deleted branch {0}', name) */
