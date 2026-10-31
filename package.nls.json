@@ -18,5 +18,14 @@
   "command.showAllRepositories": "Show All Repositories",
   "command.fetch": "Fetch",
   "command.pull": "Pull",
-  "command.push": "Push…"
+  "command.push": "Push…",
+  "view.stashes": "Stashes",
+  "command.stash.save": "Stash Changes…",
+  "command.stash.refresh": "Refresh",
+  "command.stash.apply": "Apply",
+  "command.stash.applyIndex": "Apply with Index",
+  "command.stash.pop": "Pop",
+  "command.stash.drop": "Drop…",
+  "command.stash.branch": "Unstash as Branch…",
+  "command.stash.openFile": "Show Diff"
 }

@@ -72,6 +72,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   /** 依 root 取得 repository（供 diff 內容提供者使用） */
+  /** 目前所有 repository */
+  repositoryList(): GitRepository[] {
+    return this.entries.map((e) => e.repo);
+  }
+
   getRepository(root: string): GitRepository | undefined {
     return this.find(root)?.repo;
   }

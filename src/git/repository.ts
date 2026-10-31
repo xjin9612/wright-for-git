@@ -1,6 +1,6 @@
 // 單一 git repository 的高階操作（不依賴 vscode，可在 Node 直接測試）
 import * as path from 'node:path';
-import type { ChangedFile, CommitDetails, CommitInfo, LogFilter, PushPlan, RepoState, UserInfo } from '../shared/protocol';
+import type { ChangedFile, CommitDetails, CommitInfo, LogFilter, PushPlan, RepoState, StashInfo, UserInfo } from '../shared/protocol';
 import { runGit, runGitBuffer, streamGit, GitError } from './gitRunner';
 import {
   buildLogArgs,
@@ -320,6 +320,69 @@ export class GitRepository {
     if (!(await this.isValidRefName(name, 'tag'))) throw new GitError(`Invalid tag name: ${name}`, null, '');
     if (!isHash(target)) throw new GitError(`Invalid revision: ${target}`, null, '');
     await this.run(message ? ['tag', '-a', '-m', message, name, target] : ['tag', name, target]);
+  }
+
+  // ---------- Stash ----------
+
+  private assertStash(ref: string): void {
+    if (!/^stash@\{\d+\}$/.test(ref)) throw new GitError(`Invalid stash: ${ref}`, null, '');
+  }
+
+  async listStashes(): Promise<StashInfo[]> {
+    const out = (await this.tryRun(['stash', 'list', '--format=%gd%x1f%H%x1f%P%x1f%ct%x1f%gs%x1e'])) ?? '';
+    return out
+      .split('\x1e')
+      .map((r) => r.replace(/^\n/, ''))
+      .filter(Boolean)
+      .map((r) => {
+        const [ref, hash, parents, ct, message = ''] = r.split('\x1f');
+        const branch = /^(?:WIP on|On) ([^:]+):/.exec(message)?.[1];
+        return { ref, hash, parents: parents ? parents.split(' ') : [], time: Number(ct), message, branch: branch === '(no branch)' ? undefined : branch };
+      });
+  }
+
+  /** stash 的檔案：已追蹤檔案相對 stash 當時的 HEAD（parent 1），加上 -u 存入的未追蹤檔案（parent 3） */
+  async getStashFiles(stash: StashInfo): Promise<(ChangedFile & { untracked?: boolean })[]> {
+    const files: (ChangedFile & { untracked?: boolean })[] = await this.getChangedFiles(stash.hash, stash.parents.slice(0, 1));
+    const untrackedCommit = stash.parents[2];
+    if (untrackedCommit && isHash(untrackedCommit)) {
+      const out = await this.run(['ls-tree', '-r', '-z', '--name-only', untrackedCommit]);
+      for (const p of out.split('\0').filter(Boolean)) files.push({ status: 'A', path: p, untracked: true });
+    }
+    return files;
+  }
+
+  /** 暫存目前變更；includeUntracked 時一併存入未追蹤檔案（-u） */
+  async stashPush(message: string, includeUntracked: boolean, keepIndex = false): Promise<void> {
+    const args = ['stash', 'push'];
+    if (includeUntracked) args.push('--include-untracked');
+    if (keepIndex) args.push('--keep-index');
+    if (message.trim()) args.push('-m', message.trim());
+    await this.run(args);
+  }
+
+  /** 套用 stash；pop 時成功後刪除；index 時同時還原 staged 狀態 */
+  async stashApply(ref: string, opts: { pop?: boolean; index?: boolean } = {}): Promise<void> {
+    this.assertStash(ref);
+    await this.run(['stash', opts.pop ? 'pop' : 'apply', ...(opts.index ? ['--index'] : []), ref]);
+  }
+
+  async stashDrop(ref: string): Promise<void> {
+    this.assertStash(ref);
+    await this.run(['stash', 'drop', ref]);
+  }
+
+  /** 從 stash 建立 branch（以 stash 當時的 commit 為起點），成功後刪除該 stash */
+  async stashBranch(name: string, ref: string): Promise<void> {
+    this.assertStash(ref);
+    if (!(await this.isValidRefName(name, 'branch'))) throw new GitError(`Invalid branch name: ${name}`, null, '');
+    await this.run(['stash', 'branch', name, ref]);
+  }
+
+  /** 工作區是否有可 stash 的變更（含未追蹤檔案） */
+  async hasChanges(includeUntracked: boolean): Promise<boolean> {
+    const out = await this.run(['status', '--porcelain', includeUntracked ? '--untracked-files=normal' : '--untracked-files=no']);
+    return out.trim() !== '';
   }
 
   // ---------- Branch／Tag 操作 ----------

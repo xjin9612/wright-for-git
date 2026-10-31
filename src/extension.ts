@@ -4,6 +4,7 @@ import { resolveGitPath } from './gitExtension';
 import { WorkbenchViewProvider } from './provider';
 import { RevisionFileSystem, SCHEME } from './diffProvider';
 import { registerLaunchers } from './sidebar';
+import { registerStash } from './stashView';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const gitPath = await resolveGitPath();
@@ -43,6 +44,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (e) {
     // 側邊欄入口失敗（例如更新後尚未重新載入視窗）不應影響 Log 面板本身
     console.error('[Git Workbench] sidebar init failed:', e);
+  }
+  try {
+    registerStash(context, provider);
+  } catch (e) {
+    console.error('[Git Workbench] stash view init failed:', e);
   }
 }
 

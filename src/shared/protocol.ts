@@ -96,6 +96,19 @@ export interface CommitDetails {
   files: ChangedFile[];
 }
 
+export interface StashInfo {
+  /** stash@{n} */
+  ref: string;
+  hash: string;
+  parents: string[];
+  /** Unix 秒 */
+  time: number;
+  /** 例如「On main: message」或「WIP on main: abc123 subject」 */
+  message: string;
+  /** stash 時所在的 branch */
+  branch?: string;
+}
+
 export interface UserInfo {
   name: string;
   email: string;

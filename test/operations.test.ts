@@ -283,3 +283,40 @@ test('branch 操作：rename、delete（未合併需 force）、merge、rebase�
   assert.deepEqual(files.map((f) => f.path).sort(), ['s.txt', 't.txt']);
   assert.equal(await repo.resolve('refs/heads/nope'), undefined);
 });
+
+test('stash：push（含未追蹤）、list、檔案、apply、pop、drop、branch', async () => {
+  const a = makeRepo();
+  a.commit('init', { 'a.txt': '1\n' });
+  const repo = (await GitRepository.open('git', a.dir))!;
+  assert.deepEqual(await repo.listStashes(), []);
+
+  writeFileSync(path.join(a.dir, 'a.txt'), '2\n');
+  writeFileSync(path.join(a.dir, 'new.txt'), 'n');
+  assert.equal(await repo.hasChanges(true), true);
+  await repo.stashPush('work in progress', true);
+  assert.equal(await repo.hasChanges(true), false);
+  writeFileSync(path.join(a.dir, 'a.txt'), '3\n');
+  await repo.stashPush('', false);
+
+  const list = await repo.listStashes();
+  assert.equal(list.length, 2);
+  assert.equal(list[1].ref, 'stash@{1}');
+  assert.match(list[1].message, /On main: work in progress/);
+  assert.equal(list[1].branch, 'main');
+  assert.match(list[0].message, /^WIP on main/);
+  const files = await repo.getStashFiles(list[1]);
+  assert.deepEqual(files.map((f) => `${f.status}:${f.path}${f.untracked ? ' (u)' : ''}`).sort(), ['A:new.txt (u)', 'M:a.txt']);
+
+  await repo.stashDrop('stash@{0}');
+  await repo.stashApply('stash@{0}');
+  assert.equal((await repo.listStashes()).length, 1, 'apply 不刪除');
+  a.git('checkout', '-q', '--', 'a.txt');
+  execFileSync('git', ['clean', '-fdq'], { cwd: a.dir });
+  await repo.stashApply('stash@{0}', { pop: true });
+  assert.equal((await repo.listStashes()).length, 0, 'pop 後刪除');
+
+  await repo.stashPush('to branch', true);
+  await repo.stashBranch('from-stash', 'stash@{0}');
+  assert.equal(a.git('rev-parse', '--abbrev-ref', 'HEAD'), 'from-stash');
+  await assert.rejects(repo.stashDrop('--all'), /Invalid stash/);
+});

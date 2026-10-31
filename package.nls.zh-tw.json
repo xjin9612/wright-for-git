@@ -18,5 +18,14 @@
   "command.showAllRepositories": "顯示全部 Repository",
   "command.fetch": "Fetch",
   "command.pull": "Pull",
-  "command.push": "Push…"
+  "command.push": "Push…",
+  "view.stashes": "Stash",
+  "command.stash.save": "Stash 變更…",
+  "command.stash.refresh": "重新整理",
+  "command.stash.apply": "套用（Apply）",
+  "command.stash.applyIndex": "套用並還原 Staged 狀態",
+  "command.stash.pop": "套用並刪除（Pop）",
+  "command.stash.drop": "刪除（Drop）…",
+  "command.stash.branch": "從 Stash 建立 Branch…",
+  "command.stash.openFile": "顯示差異"
 }
