@@ -69,6 +69,9 @@ export interface LogFilter {
   paths: string[];
   /** 只顯示這些 repository（root 路徑）；空陣列表示全部 */
   roots: string[];
+  /** 日期範圍（git 日期字串，如 7.days.ago、2026-01-31）；比對 committer 日期 */
+  since?: string;
+  until?: string;
 }
 
 export const EMPTY_FILTER: LogFilter = { text: '', regex: false, matchCase: false, branches: [], users: [], paths: [], roots: [] };

@@ -93,7 +93,7 @@ export class GitRepository {
     // 搜尋字串像 hash（≥ 7 碼）且確實是某個 commit 的前綴時，先把它放在最前面；
     // 有 branch／User／Paths 篩選時不放，避免出現不符合篩選的 commit
     const text = filter.text.trim();
-    const otherFilters = filter.branches.length > 0 || filter.users.length > 0 || filter.paths.length > 0;
+    const otherFilters = filter.branches.length > 0 || filter.users.length > 0 || filter.paths.length > 0 || !!filter.since || !!filter.until;
     if (looksLikeHash(text) && !otherFilters) {
       const hit = await this.tryRun(['log', '-1', '--no-color', `--format=${LOG_FORMAT}`, `${text}^{commit}`, '--']);
       if (hit) {

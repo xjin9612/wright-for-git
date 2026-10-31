@@ -101,3 +101,11 @@ test('buildLogArgs：paths 放在 -- 之後並加 --parents', () => {
   assert.ok(args.includes('--parents'));
   assert.ok(!buildLogArgs(EMPTY_FILTER, 10).includes('--parents'));
 });
+
+test('buildLogArgs：日期篩選', () => {
+  const args = buildLogArgs({ ...EMPTY_FILTER, since: '7.days.ago', until: '2026-01-31 23:59:59' }, 100);
+  assert.ok(args.includes('--since=7.days.ago'));
+  assert.ok(args.includes('--until=2026-01-31 23:59:59'));
+  const bad = buildLogArgs({ ...EMPTY_FILTER, since: 'x --output=/tmp/a' }, 100);
+  assert.ok(!bad.some((a) => a.startsWith('--since')));
+});

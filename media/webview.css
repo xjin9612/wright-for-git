@@ -383,3 +383,10 @@ select.push-remote {
 .multi-commit:hover { background: var(--hover); }
 .multi-commit .hash { font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); flex: none; }
 .multi-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 日期區間 ---------- */
+.date-range { padding: 8px; gap: 6px; min-width: 220px; }
+.date-field { display: flex; align-items: center; gap: 8px; }
+.date-field span { width: 36px; color: var(--muted); }
+.date-field input { flex: 1; color-scheme: light dark; }
+.date-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }

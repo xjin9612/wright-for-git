@@ -138,6 +138,7 @@ searchInput.addEventListener('keydown', (e) => {
 const branchChip = filterChip('Branch', () => openBranchPicker(), () => setFilter({ branches: [] }));
 const userChip = filterChip('User', () => openUserPicker(), () => setFilter({ users: [] }));
 const pathsChip = filterChip('Paths', () => openPathsPicker(), () => setFilter({ paths: [], roots: [] }));
+const dateChip = filterChip('Date', () => openDatePicker(), () => setFilter({ since: undefined, until: undefined }));
 const viewButton = iconButton('eye', 'View options', () => showViewMenu());
 
 /** 同步：作用於目前 Paths 篩選下可見的 repository */
@@ -175,6 +176,7 @@ const filterBar = el(
   branchChip.element,
   userChip.element,
   pathsChip.element,
+  dateChip.element,
   el('div', { className: 'toolbar-spacer' }),
   syncGroup,
   el('div', { className: 'toolbar-divider' }),
@@ -286,6 +288,7 @@ function renderChips(): void {
   branchChip.set(f.branches.map(shortRefName).join('|'));
   userChip.set(f.users.join('|'));
   pathsChip.set(pathsLabel());
+  dateChip.set(dateLabel());
   regexToggle.sync();
   caseToggle.sync();
   branches.setSelectedRef(f.branches.length === 1 ? f.branches[0] : undefined);
@@ -315,6 +318,79 @@ function renderHeadHint(): void {
     setFilter({ branches: [] });
   });
   headHint.append(icon('head'), el('span', { text: `The current branch (${names}) is not in the filter.` }), add, all);
+}
+
+const DATE_PRESETS: { label: string; since: string }[] = [
+  { label: 'Last 24 hours', since: '1.day.ago' },
+  { label: 'Last 7 days', since: '7.days.ago' },
+  { label: 'Last 30 days', since: '30.days.ago' },
+  { label: 'Last 90 days', since: '90.days.ago' },
+  { label: 'Last year', since: '1.year.ago' },
+];
+
+/** 自訂區間的值：since 為當天 00:00，until 為當天 23:59:59 */
+const dayOf = (v: string | undefined) => v?.slice(0, 10) ?? '';
+
+function dateLabel(): string {
+  const { since, until } = ui.filter;
+  if (!since && !until) return '';
+  const preset = !until && DATE_PRESETS.find((p) => p.since === since);
+  if (preset) return preset.label;
+  if (since && until) return `${dayOf(since)} – ${dayOf(until)}`;
+  return since ? `since ${dayOf(since)}` : `until ${dayOf(until)}`;
+}
+
+function openDatePicker(): void {
+  const r = dateChip.element.getBoundingClientRect();
+  const { since, until } = ui.filter;
+  showMenu(r.left, r.bottom + 2, [
+    ...DATE_PRESETS.map((p) => ({ label: p.label, checked: !until && since === p.since, action: () => setFilter({ since: p.since, until: undefined }) })),
+    '-',
+    { label: 'Select Period…', checked: !!until || (!!since && !DATE_PRESETS.some((p) => p.since === since)), action: () => openDateRange() },
+  ]);
+}
+
+/** 自訂日期區間的小視窗（兩個日期欄位） */
+function openDateRange(): void {
+  document.querySelector('.date-range')?.remove();
+  const r = dateChip.element.getBoundingClientRect();
+  const isDay = (v: string | undefined) => !!v && /^\d{4}-\d{2}-\d{2}/.test(v);
+  const from = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': 'From' } });
+  const to = el('input', { className: 'text-input', attrs: { type: 'date', 'aria-label': 'To' } });
+  if (isDay(ui.filter.since)) from.value = dayOf(ui.filter.since);
+  if (isDay(ui.filter.until)) to.value = dayOf(ui.filter.until);
+  const apply = el('button', { className: 'button primary', text: 'Apply', attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary', text: 'Cancel', attrs: { type: 'button' } });
+  const box = el(
+    'div',
+    { className: 'date-range context-menu', attrs: { role: 'dialog', 'aria-label': 'Select period' } },
+    el('label', { className: 'date-field' }, el('span', { text: 'From' }), from),
+    el('label', { className: 'date-field' }, el('span', { text: 'To' }), to),
+    el('div', { className: 'date-actions' }, cancel, apply),
+  );
+  const close = () => {
+    box.remove();
+    document.removeEventListener('mousedown', outside, true);
+  };
+  const outside = (e: MouseEvent) => {
+    if (!box.contains(e.target as Node)) close();
+  };
+  apply.addEventListener('click', () => {
+    let [a, b] = [from.value, to.value];
+    if (a && b && a > b) [a, b] = [b, a];
+    close();
+    setFilter({ since: a ? `${a} 00:00:00` : undefined, until: b ? `${b} 23:59:59` : undefined });
+  });
+  cancel.addEventListener('click', close);
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'Enter') apply.click();
+  });
+  document.body.append(box);
+  box.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - box.offsetWidth - 4))}px`;
+  box.style.top = `${r.bottom + 2}px`;
+  setTimeout(() => document.addEventListener('mousedown', outside, true));
+  from.focus();
 }
 
 function openBranchPicker(): void {
@@ -542,7 +618,7 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
 
 function hasActiveFilter(): boolean {
   const f = ui.filter;
-  return f.text.trim() !== '' || f.users.length > 0 || f.branches.length > 0 || f.paths.length > 0 || f.roots.length > 0;
+  return f.text.trim() !== '' || f.users.length > 0 || f.branches.length > 0 || f.paths.length > 0 || f.roots.length > 0 || !!f.since || !!f.until;
 }
 
 const requestDetails = debounce((root: string, hash: string) => post({ type: 'selectCommit', root, hash }), 60);

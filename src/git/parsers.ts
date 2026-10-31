@@ -39,6 +39,9 @@ export function buildLogArgs(filter: LogFilter, maxCount: number, opts: LogArgOp
     if (v) args.push(`--author=${useRegex ? escapeRegex(v) : v}`);
   }
 
+  if (filter.since && isDateValue(filter.since)) args.push(`--since=${filter.since}`);
+  if (filter.until && isDateValue(filter.until)) args.push(`--until=${filter.until}`);
+
   // 防止以 '-' 開頭的值被 git 當成選項
   const branches = filter.branches.filter((b) => b && !b.startsWith('-') && (hasHead || b !== 'HEAD'));
   if (branches.length > 0) {
@@ -56,6 +59,11 @@ export function buildLogArgs(filter: LogFilter, maxCount: number, opts: LogArgOp
     args.push('--');
   }
   return args;
+}
+
+/** 日期篩選值：相對時間（7.days.ago）或日期（2026-01-31、2026-01-31 23:59:59） */
+export function isDateValue(v: string): boolean {
+  return /^(\d+\.(hours?|days?|weeks?|months?|years?)\.ago|\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?)$/.test(v);
 }
 
 /** 可能是 hash 的搜尋字串 */
