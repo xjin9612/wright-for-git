@@ -250,7 +250,10 @@ const vscode = {
         return key in calls.config ? calls.config[key] : d;
       },
       update: async (k, v) => {
-        calls.config[section ? `${section}.${k}` : k] = v;
+        const key = section ? `${section}.${k}` : k;
+        calls.config[key] = v;
+        // 與 VS Code 相同：寫入設定後通知 onDidChangeConfiguration
+        for (const h of calls.configListeners) await h({ affectsConfiguration: (s) => key === s || key.startsWith(`${s}.`) });
       },
     }),
     createFileSystemWatcher: (pattern) => {

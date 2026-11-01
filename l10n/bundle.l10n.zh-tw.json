@@ -413,5 +413,17 @@
   "Show Git Console": "顯示 Git 主控台",
   "cancelled": "已取消",
   "exit code {0}": "結束代碼 {0}",
-  "Clear filters": "清除篩選"
+  "Clear filters": "清除篩選",
+  "Settings": "設定",
+  "Git Workbench Settings": "Git Workbench 設定",
+  "Follow VS Code": "跟隨 VS Code",
+  "Language": "語言",
+  "Max commits": "最多載入提交數",
+  "Maximum number of commits loaded (total across repositories)": "記錄最多載入的提交數（所有儲存庫合計）",
+  "Repository scan depth": "儲存庫掃描深度",
+  "How many folder levels below each workspace folder are scanned for repositories": "在每個工作區資料夾底下往下掃描幾層來尋找儲存庫",
+  "Refresh automatically when branches, tags or HEAD change": "分支、標籤或 HEAD 變動時自動重新整理",
+  "Issue link rules ({0})…": "Issue 連結規則（{0}）…",
+  "Issue link rules…": "Issue 連結規則…",
+  "All settings…": "所有設定…"
 }

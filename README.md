@@ -60,6 +60,8 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 
 ## Settings
 
+Most of these can be changed from the gear button in the Git log or the Commit window, and take effect immediately.
+
 | Setting | Default | Description |
 |---|---|---|
 | `gitWorkbench.maxCommits` | `50000` | Maximum number of commits loaded (total across repositories, up to 200000) |

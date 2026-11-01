@@ -193,7 +193,21 @@ export interface UserInfo {
 }
 
 /** Webview → Extension */
+/** 面板內設定框顯示的設定值 */
+export interface SettingsValues {
+  language: 'auto' | 'en' | 'zh-tw';
+  autoRefresh: boolean;
+  maxCommits: number;
+  scanDepth: number;
+  /** 自訂 issue 連結規則的數量 */
+  issueLinks: number;
+}
+
 export type ToExtension =
+  | { type: 'getSettings' }
+  | { type: 'setSetting'; key: string; value: unknown }
+  | { type: 'openSettingsPage' }
+  | { type: 'editIssueLinks' }
   | { type: 'ready' }
   /** generation：送出時 webview 持有的 repos 版本；與 extension 不一致時忽略（新的 repos 訊息已在路上） */
   | { type: 'loadLog'; requestId: number; generation: number; filter: LogFilter }
@@ -320,6 +334,7 @@ export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'ne
 
 /** Extension → Webview */
 export type ToWebview =
+  | { type: 'settings'; values: SettingsValues; open?: boolean }
   /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */
   | { type: 'repos'; states: RepoState[]; generation: number; message?: string; issueLinks?: IssueLinkRule[] }
   /** warnings：部分 repo 讀取失敗時的訊息（只在 done 時帶） */

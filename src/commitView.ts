@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { revisionUri } from './diffProvider';
 import { ConfirmHost, confirm } from './dialogs';
+import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { buildPatch, parseFileDiff } from './git/parsers';
 import type { GitRepository } from './git/repository';
 import { onRepositoryChange } from './gitExtension';
@@ -182,10 +183,17 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     this.post({ type: 'commitState', state: { repos, changelists: store.lists, activeList: store.active, assign, partial: counts, showIgnored: this.showIgnored } });
   }
 
+  /** 標題列齒輪：打開提交視窗內的設定框 */
+  openSettingsPanel(): void {
+    openSettingsIn((msg) => this.post(msg));
+  }
+
   private async onMessage(m: ToExtension): Promise<void> {
     try {
+      if (await handleSettingsMessage(m, 'commit', (msg) => this.post(msg))) return;
       switch (m.type) {
         case 'commitReady':
+          settingsAfterReady('commit', (msg) => this.post(msg));
           this.confirms.cancelAll();
           await this.refresh();
           break;

@@ -16,6 +16,7 @@ import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type IssueLinkRule, ty
 import { currentBundle, currentLanguage, t } from './i18n';
 import { showGitError } from './gitConsole';
 import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
+import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { DialogPanels } from './dialogPanel';
 
 interface RepoEntry {
@@ -313,13 +314,21 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     void this.view?.webview.postMessage(msg);
   }
 
+  /** 標題列齒輪：顯示 Log 面板並打開面板內的設定框 */
+  async openSettingsPanel(): Promise<void> {
+    await vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`);
+    openSettingsIn((msg) => this.post(msg));
+  }
+
   private async onMessage(m: ToExtension): Promise<void> {
     try {
+      if (await handleSettingsMessage(m, 'log', (msg) => this.post(msg))) return;
       switch (m.type) {
         case 'confirmResult':
           this.confirms.resolve(m.id, m.ok);
           break;
         case 'ready':
+          settingsAfterReady('log', (msg) => this.post(msg));
           // webview 重新載入時，尚未回覆的確認框視為取消
           this.confirms.cancelAll();
           if (this.pendingFilter) {

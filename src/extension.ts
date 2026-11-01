@@ -87,7 +87,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     // 開啟本擴充套件的設定（語系、Issue 連結等）
-    vscode.commands.registerCommand('gitWorkbench.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${context.extension.id}`)),
+    // 標題列齒輪：打開面板內的設定框（語言等設定立即生效）
+    vscode.commands.registerCommand('gitWorkbench.openSettings', () => provider.openSettingsPanel()),
+    vscode.commands.registerCommand('gitWorkbench.commit.openSettings', () => commitView?.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.unstashChanges', () => provider.dialogs.openUnstash()),
     // Annotate：VS Code 1.96 起內建 git blame，這裡只切換內建的編輯器標註，不重複實作
     vscode.commands.registerCommand('gitWorkbench.toggleBlame', async () => {

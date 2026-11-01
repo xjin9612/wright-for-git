@@ -47,6 +47,33 @@ test('切換語言為 en：面板以英文重新載入', async () => {
   await h.until(() => /推送/.test(bundle()));
 });
 
+test('面板內設定框：齒輪打開，切換語言立即生效、其他設定寫入使用者設定', async () => {
+  const bundle = () => /id="l10n-bundle">([\s\S]*?)<\/script>/.exec(app.logView.webview.html)?.[1] ?? '';
+  await page.locator('.filter-bar .icon-button[title="設定"]').click();
+  await page.waitForSelector('.settings-popover select');
+  assert.equal(await page.locator('#gwb-language').inputValue(), 'zh-tw');
+  const options = await page.locator('#gwb-language option').allInnerTexts();
+  assert.deepEqual(options.slice(1), ['English', '繁體中文']);
+  await page.locator('#gwb-max').selectOption('100000');
+  await h.until(() => app.calls.config['gitWorkbench.maxCommits'] === 100000);
+  await page.locator('#gwb-auto').uncheck();
+  await h.until(() => app.calls.config['gitWorkbench.autoRefresh'] === false);
+  await page.locator('#gwb-language').selectOption('en');
+  await h.until(() => app.calls.config['gitWorkbench.language'] === 'en' && !/推送/.test(bundle()));
+  // 改回中文（直接寫設定，避免依賴重新載入後的頁面）
+  await app.setConfig('gitWorkbench.language', 'zh-tw');
+  await app.setConfig('gitWorkbench.autoRefresh', true);
+  await page.keyboard.press('Escape');
+});
+
+test('標題列齒輪指令：打開面板內設定框', async () => {
+  await page.evaluate(() => document.querySelector('.settings-popover')?.remove());
+  await app.run('gitWorkbench.openSettings');
+  await page.waitForSelector('.settings-popover');
+  await page.locator('.settings-popover .link').last().click();
+  await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openSettings'));
+});
+
 test('顯示 Git 歷史：切到檔案所屬 repo 並以路徑篩選', async () => {
   await app.run('gitWorkbench.showHistory', fileUri(path.join(api, 'src/orders/pricing.ts')));
   await page.waitForTimeout(1200);
@@ -99,12 +126,6 @@ test('切換 Git Blame：改變內建的 git.blame.editorDecoration.enabled', as
   assert.equal(app.calls.config['git.blame.editorDecoration.enabled'], true);
   await app.run('gitWorkbench.toggleBlame');
   assert.equal(app.calls.config['git.blame.editorDecoration.enabled'], false);
-});
-
-test('開啟設定：只列出本擴充套件的設定', async () => {
-  await app.run('gitWorkbench.openSettings');
-  const call = app.calls.executed.find((c) => c[0] === 'workbench.action.openSettings');
-  assert.equal(call[1], '@ext:xjin9612.vscode-git-workbench');
 });
 
 test('Fetch／Pull 指令：多 repo 一次執行並彙整', async () => {

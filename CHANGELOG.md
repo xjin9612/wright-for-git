@@ -74,7 +74,7 @@
 ### Other
 - English and Traditional Chinese UI. The new `gitWorkbench.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
 - Confirmations triggered from the panel or a dialog tab (delete, force push, hard reset, checkout a tag or revision, rollback, …) are shown inside it in the same style as the Push dialog; destructive actions use a red button with Cancel focused
-- Gear button in the Git log, Commit and Repositories title bars opens Git Workbench's settings (language, issue links, …)
+- A gear button in the Git log and the Commit window (and their title bars) opens a settings popover right in the panel: language (Follow VS Code / English / 繁體中文), max commits, repository scan depth and auto refresh take effect immediately; links lead to the issue link rules and all settings
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
 - UI end-to-end tests (`npm run test:ui`, Playwright) run in CI on Windows and Linux
 - New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Previous Changed File / Next Changed File

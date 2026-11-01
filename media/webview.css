@@ -537,3 +537,27 @@ body.dialog-page { overflow: hidden; }
 /* Windows：主要按鈕在左、取消在右 */
 .os-windows .dialog-cancel { order: 1; }
 .empty-text .link { display: inline-block; margin-top: 4px; }
+
+/* ---------- 面板內設定框 ---------- */
+.settings-popover {
+  position: fixed; z-index: 110; width: 300px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  background: var(--vscode-editorWidget-background, var(--vscode-quickInput-background));
+  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, var(--border))); border-radius: 6px;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
+}
+.settings-title { font-weight: 600; margin-bottom: 4px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-label { flex: 1; min-width: 0; }
+.settings-select {
+  width: 140px; flex: none; height: 24px; font: inherit; padding: 0 4px; border-radius: 2px;
+  background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, var(--border));
+}
+.settings-select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.settings-check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; line-height: 1.4; }
+.settings-check input { margin: 2px 0 0; flex: none; }
+.settings-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.settings-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.commit-tabs { align-items: center; }
+:is(.vscode-high-contrast, .vscode-high-contrast-light) .settings-popover { border-color: var(--vscode-contrastBorder); }

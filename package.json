@@ -189,6 +189,12 @@
         "title": "%command.showConsole%",
         "category": "Git Workbench",
         "icon": "$(output)"
+      },
+      {
+        "command": "gitWorkbench.commit.openSettings",
+        "title": "%command.openSettings%",
+        "category": "Git Workbench",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
@@ -219,7 +225,7 @@
           "group": "navigation@9"
         },
         {
-          "command": "gitWorkbench.openSettings",
+          "command": "gitWorkbench.commit.openSettings",
           "when": "view == gitWorkbench.commit",
           "group": "navigation@9"
         },
@@ -279,6 +285,10 @@
         {
           "command": "gitWorkbench.diff.nextFile",
           "when": "gitWorkbench.diffNav"
+        },
+        {
+          "command": "gitWorkbench.commit.openSettings",
+          "when": "false"
         }
       ],
       "editor/title": [

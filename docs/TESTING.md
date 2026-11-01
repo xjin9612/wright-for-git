@@ -30,7 +30,7 @@ npm run test:ui
 | `test/ui/sync.test.js` | Push 分頁（目標、commit、檔案、警告）；推送成功與被拒；Pull；Force Push 確認；新分支 New 與改名後設定 upstream；Push 到這裡為止；Fetch |
 | `test/ui/commit.test.js` | 提交視窗的清單與預設勾選；分組（模組、平鋪）；逐段提交且不動內建暫存區；跨 repo 提交；Amend（只改訊息）；捨棄變更；加入 .gitignore；Changelist；儲藏分頁（分組、未追蹤、diff、刪除後即時更新）；儲藏變更 |
 | `test/ui/rebase.test.js` | reword（保留 `#` 開頭的行）、squash、調整順序、drop、自動儲藏；edit 停下後「繼續」；分支變動時拒絕；detached HEAD 拒絕 |
-| `test/ui/misc.test.js` | 繁中介面與即時切換語言；顯示 Git 歷史；與分支或標籤比較；取消儲藏分頁（以新分支取消儲藏）；沒有變更時的儲藏提示；切換 Git Blame；開啟設定；Fetch 指令 |
+| `test/ui/misc.test.js` | 繁中介面與即時切換語言；面板內設定框；顯示 Git 歷史；與分支或標籤比較；取消儲藏分頁（以新分支取消儲藏）；沒有變更時的儲藏提示；切換 Git Blame；開啟設定；Fetch 指令 |
 
 ---
 
@@ -59,7 +59,8 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 ## 1. 開啟與版面
 - [ ] 點活動列的 Git Workbench 圖示：側邊欄依序出現「提交」與「儲存庫」，底部同時開啟 Git 記錄面板
 - [ ] 狀態列「Git Log」按鈕與 `Alt+9` 開啟記錄面板；`Alt+0` 開啟提交視窗
-- [ ] 記錄面板、提交、儲存庫的標題列都有齒輪按鈕，按下後開啟設定頁，且只列出 Git Workbench 的設定
+- [ ] 記錄面板工具列（👁 右邊）與提交視窗分頁列右側的齒輪：在面板內彈出設定框；標題列的齒輪也會打開同一個設定框
+- [ ] 設定框切換語言：面板立即以新語言重新載入，設定框自動再打開；「所有設定…」開啟 VS Code 設定頁並只列出 Git Workbench 的設定
 - [ ] 記錄面板三欄的分隔線可拖曳；左右兩欄可收合再展開。重新載入視窗後，寬度、收合狀態、欄寬、分組選項、我的最愛都保留
 - [ ] 切換淺色、深色、高對比主題（「喜好設定: 色彩佈景主題」）：面板、選單、對話框分頁顏色都正常、文字看得清楚；高對比時選取與滑過的列有邊框
 - [ ] 對話框按鈕順序：Windows 上主要按鈕在左、取消在右（與 VS Code 的對話框相同）
