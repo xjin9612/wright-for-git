@@ -54,7 +54,7 @@ webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴
 |---|---|
 | `test/vscode/suite/activation.test.ts` | 指令都已註冊；`Alt+9`、`Alt+0` 的指令；偵測 repo（含巢狀、排除一般資料夾） |
 | `test/vscode/suite/diff.test.ts` | 從記錄開 diff：新增的左邊空、刪除的右邊空、中文檔名內容正確、標題的「1/2」；← → 切換檔案；提交視窗的 diff 右邊是可編輯的實際檔案 |
-| `test/vscode/suite/commands.test.ts` | 顯示 Git 歷史（切 repo 並篩選路徑）；切換 Git Blame；顯示 Git 主控台 |
+| `test/vscode/suite/commands.test.ts` | 顯示 Git 歷史（切 repo 並篩選路徑）；切換 Git Blame（1.96 以前只提示）；顯示 Git 主控台；最佳化儲存庫 |
 | `test/vscode/suite/watch.test.ts` | 在 VS Code 外面建立分支、commit、stash，記錄與提交視窗自動更新；存檔後提交視窗出現檔案 |
 | `test/vscode/suite/repos.test.ts` | 儲存庫勾選與記錄的 repo 篩選同步 |
 | `test/vscode/suite/merge.test.ts` | 合併衝突的種類；「在 VS Code 合併編輯器開啟」打開內建合併編輯器；採用一邊後繼續合併 |

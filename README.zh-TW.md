@@ -59,6 +59,12 @@
 | `Alt+0`（任何地方） | 開啟 Commit 視窗 |
 | `Ctrl+Enter`（提交訊息中） | 提交 |
 
+## 大型 repo
+
+10 萬筆 commit 的 repo，Log 載入 5 萬筆約 1 秒。有 git 的 commit-graph 會更快：實測首屏從約 0.6 秒變成 0.1 秒，以單一檔案路徑篩選從約 1.2 秒變成 0.2 秒。
+
+git 平常自動執行 `git gc` 時多半會寫入 commit-graph，但不含加快路徑篩選的那部分。從指令面板執行 **Git Workbench: 最佳化儲存庫**，會寫入完整的 commit-graph（`git commit-graph write --reachable --changed-paths`）。它只在 `.git/objects/info` 底下新增一個檔案，不改動任何 commit 或檔案、不會被推到遠端，git 本身與其他 git 工具也會一起變快；刪掉這個檔案就回到原狀。
+
 ## 設定
 
 大部分設定可以直接在 Git 記錄或提交視窗標題列的齒輪裡調整，立即生效。

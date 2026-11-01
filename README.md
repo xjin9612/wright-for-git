@@ -59,6 +59,12 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 | `Ctrl+Enter` (in the commit message) | Commit |
 | `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown` (in a diff) | Previous / next changed file |
 
+## Large repositories
+
+The log loads 50,000 commits of a 100,000-commit repository in about a second. Git's commit-graph file makes it faster still: in our measurements the first screen appeared in about 0.1 s instead of 0.6 s, and filtering by a file path took about 0.2 s instead of 1.2 s.
+
+Git usually writes a commit-graph during its automatic `git gc`, but not the part that speeds up path filters. Run **Git Workbench: Optimize Repository** from the Command Palette to write the full commit-graph (`git commit-graph write --reachable --changed-paths`). It only adds a file under `.git/objects/info`, changes no commits or files, is not pushed, and also speeds up git itself and other git tools. Deleting the file undoes it.
+
 ## Settings
 
 Most of these can be changed from the gear in the Git log's or the Commit window's title bar, and take effect immediately.
