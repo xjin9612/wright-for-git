@@ -445,6 +445,17 @@ async function launch(workspace, opts = {}) {
       calls.config[key] = value;
       for (const h of calls.configListeners) await h({ affectsConfiguration: (k) => key === k || key.startsWith(`${k}.`) });
     },
+    /**
+     * 等 Log 上方的進行中操作列出現或消失：持續觸發重新整理（真實 VS Code 由檔案監看觸發），
+     * Windows 上 git 較慢，不能只等固定時間。
+     */
+    async waitOps(visible) {
+      await until(async () => {
+        for (const w of calls.watchers) for (const h of w.handlers) h(Uri.file(workspace));
+        await page.waitForTimeout(800);
+        return (await page.locator(visible ? '.log-ops:not(.hidden)' : '.log-ops.hidden').count()) > 0;
+      }, 40000, 0);
+    },
     /** 模擬檔案系統變動（觸發自動重新整理） */
     fireWatchers(uri) {
       for (const w of calls.watchers) for (const h of w.handlers) h(uri ?? Uri.file(workspace));

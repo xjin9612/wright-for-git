@@ -1,6 +1,6 @@
 // 互動式 rebase 與進行中的操作（對應 docs/TESTING.md「互動式 rebase」「進行中的操作」）
 'use strict';
-const { test, before, after } = require('node:test');
+const { test, before, after, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const h = require('./host');
@@ -17,6 +17,11 @@ before(async () => {
   page = app.page;
 });
 after(async () => app && (await app.close()));
+// 測試失敗時不留下進行中的 rebase，避免連帶後面的測試
+afterEach(() => {
+  if (api && rebasing()) h.git(api, 'rebase', '--abort');
+  for (const p of app?.calls.panels ?? []) if (!p.disposed) p.dispose();
+});
 
 async function refresh() {
   app.fireWatchers();
@@ -84,13 +89,11 @@ test('edit 停下：Log 上方出現進行中列，按「繼續」完成', async
   await d.page.keyboard.press('e');
   await d.page.locator('.button.primary').click();
   await h.until(() => rebasing(), 40000);
-  await refresh();
-  await page.waitForSelector('.log-ops:not(.hidden)');
+  await app.waitOps(true);
   assert.match(await page.locator('.log-ops').innerText(), /api-server.*Rebase/);
   await page.locator('.log-ops .link', { hasText: 'Continue' }).click();
   await h.until(() => !rebasing(), 40000);
-  await refresh();
-  assert.ok(await page.locator('.log-ops.hidden').count());
+  await app.waitOps(false);
   assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('gitworkbench-')), [], '沒有殘留的暫存檔');
 });
 

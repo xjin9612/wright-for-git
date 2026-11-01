@@ -159,8 +159,7 @@ test('合併衝突：Log 上方顯示合併進行中；中止需確認', async (
   await page.waitForTimeout(500);
   if (await page.locator('.confirm-dialog').count()) await confirmPanel(true);
   await h.until(() => h.git(web, 'status', '--porcelain').includes('UU'));
-  await refresh();
-  await page.waitForSelector('.log-ops:not(.hidden)');
+  await app.waitOps(true);
   assert.match(await page.locator('.log-ops').innerText(), /web-app.*Merge/);
   await page.locator('.log-ops .link', { hasText: 'Abort' }).click();
   await confirmPanel(false);
@@ -169,8 +168,7 @@ test('合併衝突：Log 上方顯示合併進行中；中止需確認', async (
   await page.locator('.log-ops .link', { hasText: 'Abort' }).click();
   await confirmPanel(true);
   await h.until(() => !h.git(web, 'status', '--porcelain').includes('UU'));
-  await refresh();
-  assert.ok(await page.locator('.log-ops.hidden').count());
+  await app.waitOps(false);
   // 中止後原本未提交的修改還在
   assert.match(h.git(web, 'status', '--porcelain'), /Login\.tsx/);
 });
