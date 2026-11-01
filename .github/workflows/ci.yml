@@ -12,6 +12,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -22,7 +24,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       # UI 端對端測試（Playwright + Chromium；webview 與 git 都是真的，VS Code API 為模擬）
-      - run: npx playwright install --with-deps chromium
+      # Chromium 放在固定資料夾並依 package-lock.json（Playwright 版本）快取；Linux 另外安裝系統相依套件（無法快取）
+      - uses: actions/cache@v6
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: runner.os == 'Linux'
+        run: npx playwright install-deps chromium
+      - run: npx playwright install chromium
       - run: npm run test:ui
       # 下載的 VS Code（每個約 350 MB）依作業系統與週次快取，同一週內不重複下載
       - id: week
