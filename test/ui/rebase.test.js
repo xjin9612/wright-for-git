@@ -102,6 +102,8 @@ test('分支在對話框開啟後變動：拒絕開始並重新載入清單', as
   h.git(api, 'commit', '-q', '--allow-empty', '-m', 'sneaky commit');
   await d.page.locator('.button.primary').click();
   await h.until(() => app.calls.warnings.some((w) => /branch changed/.test(w)));
+  // 等清單重新載入完成（包含新提交），否則下一個測試開始時重新載入可能還在進行
+  await h.until(() => d.panel.webview.html.includes('sneaky commit'));
   assert.equal(subjects(1)[0], 'sneaky commit', '新提交沒有被丟掉');
 });
 
