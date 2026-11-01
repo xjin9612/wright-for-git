@@ -156,9 +156,11 @@ test('合併衝突：Log 上方顯示合併進行中；中止需確認', async (
   await page.locator('.branch-tree .tree-row', { hasText: /^\s*theme\b/ }).first().click({ button: 'right' });
   app.calls.picks.push((x) => /web-app/.test(typeof x === 'string' ? x : x.label));
   await h.menu(page, 'Merge');
-  await page.waitForTimeout(500);
-  if (await page.locator('.confirm-dialog').count()) await confirmPanel(true);
-  await h.until(() => h.git(web, 'status', '--porcelain').includes('UU'));
+  // 合併前可能先跳確認框（Windows 上較慢出現）：等到確認框出現就按確認，或直接進入衝突
+  await h.until(async () => {
+    if (await page.locator('.confirm-dialog').count()) await confirmPanel(true);
+    return h.git(web, 'status', '--porcelain').includes('UU');
+  }, 40000);
   await app.waitOps(true);
   assert.match(await page.locator('.log-ops').innerText(), /web-app.*Merge/);
   await page.locator('.log-ops .link', { hasText: 'Abort' }).click();
@@ -171,6 +173,26 @@ test('合併衝突：Log 上方顯示合併進行中；中止需確認', async (
   await app.waitOps(false);
   // 中止後原本未提交的修改還在
   assert.match(h.git(web, 'status', '--porcelain'), /Login\.tsx/);
+});
+
+test('確認框：破壞性操作預設焦點在取消、Tab 切換、Esc 取消', async () => {
+  await tool('Expand all').click();
+  // 建一個未合併、也沒有 upstream 的分支：刪除時以紅色按鈕確認
+  const sha = h.git(api, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'unmerged work');
+  h.git(api, 'update-ref', 'refs/heads/tmp/unmerged', sha);
+  await refresh();
+  await tool('Expand all').click();
+  await page.locator('.branch-tree .tree-row', { hasText: /^\s*unmerged\b/ }).first().click();
+  await tool('Delete').click();
+  await page.waitForSelector('.confirm-dialog');
+  assert.ok(await page.locator('.confirm-dialog .button.danger').count(), '紅色按鈕');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Cancel');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('danger')), true);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('.confirm-dialog').count(), 0);
+  assert.notEqual(h.git(api, 'branch', '--list', 'tmp/unmerged'), '', 'Esc 不刪除');
 });
 
 test('沒有 webview 錯誤', () => {

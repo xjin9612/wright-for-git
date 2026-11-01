@@ -184,6 +184,27 @@ test('儲藏變更：從工具列儲藏 web-app 的修改', async () => {
   await h.until(async () => (await h.texts(cv.locator('.stash-list .tree-row'))).some((s) => s.startsWith('from ui test')));
 });
 
+test('鍵盤：空白鍵切換勾選；提交訊息中 Ctrl+Enter 提交', async () => {
+  await cv.locator('.commit-tab', { hasText: 'Commit' }).click();
+  fs.appendFileSync(path.join(web, 'src/App.css'), '/* keyboard */\n');
+  await reload();
+  await fileRow('App.css').click();
+  const before = await box('App.css').isChecked();
+  await cv.keyboard.press(' ');
+  await h.until(async () => (await box('App.css').isChecked()) !== before);
+  if (!(await box('App.css').isChecked())) await cv.keyboard.press(' ');
+  for (let i = 0; i < 20; i++) {
+    const others = cv.locator('.commit-tree .tree-row').filter({ hasNot: cv.locator('text=App.css') }).locator('input.commit-check:checked');
+    if ((await others.count()) === 0) break;
+    const row = await others.first().evaluate((el) => el.closest('.tree-row')?.textContent ?? '');
+    if (/App\.css|web-app|src|Changes/.test(row)) break;
+    await others.first().click();
+  }
+  await cv.locator('.commit-message').fill('style: keyboard commit');
+  await cv.locator('.commit-message').press('Control+Enter');
+  await h.until(() => h.git(web, 'log', '-1', '--format=%s') === 'style: keyboard commit');
+});
+
 test('沒有 webview 錯誤', () => {
   assert.deepEqual(h.pageErrors(app.log), []);
 });

@@ -97,7 +97,8 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
         el('span', { className: 'push-commit-subject', text: subject }),
         el('span', { className: 'muted push-commit-meta', text: `${it.commit.author} · ${formatDate(it.commit.authorTime)}` }),
       );
-      row.addEventListener('mousedown', (e) => {
+      // 用 click 而非 mousedown 選取：mousedown 時重繪會把正要拖曳的列換掉，拖曳就開始不了
+      row.addEventListener('click', (e) => {
         if ((e.target as HTMLElement).tagName === 'SELECT') return;
         current = i;
         editing = it.action === 'reword' ? i : undefined;

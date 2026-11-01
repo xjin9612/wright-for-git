@@ -443,6 +443,12 @@ function render(): void {
       post({ type: 'commitRefresh', showIgnored: ui.showIgnored });
     });
     tree.append(el('div', { className: 'empty-text' }, t('No local changes'), el('br'), refreshLink));
+    // 只有預設的 changelist 時，不再多顯示一個空的「變更 0 個檔案」
+    if ((state.changelists.length ?? 0) <= 1) {
+      tree.scrollTop = 0;
+      syncButtons();
+      return;
+    }
   }
   const frag = document.createDocumentFragment();
   for (const r of rows) frag.append(renderRow(r));

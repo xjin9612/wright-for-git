@@ -235,6 +235,35 @@ test('變更檔案列尾顯示狀態字母', async () => {
   assert.equal(await page.locator('.file-tree .status-letter').first().getAttribute('aria-label'), 'Renamed');
 });
 
+test('鍵盤：↑↓／PageDown／Home／End 移動、Ctrl+C 複製 hash、Ctrl+F 聚焦搜尋、Esc 清除', async () => {
+  const selected = () => page.evaluate(() => [...document.querySelectorAll('.log-row.selected')].find((r) => r.style.display !== 'none')?.querySelector('.cell-subject-text')?.textContent ?? '');
+  await (await row('feat(auth): add API keys')).click();
+  await page.keyboard.press('ArrowDown');
+  await h.until(async () => (await selected()) === 'feat: add formatter' || (await selected()) !== 'feat(auth): add API keys');
+  const afterDown = await selected();
+  await page.keyboard.press('ArrowUp');
+  await h.until(async () => (await selected()).includes('add API keys'));
+  await page.keyboard.press('End');
+  await h.until(async () => (await selected()) !== afterDown && !(await selected()).includes('add API keys'));
+  await page.keyboard.press('Home');
+  await h.until(async () => (await selected()) === (await subjects())[0]);
+  await page.keyboard.press('PageDown');
+  await h.until(async () => (await selected()) !== (await subjects())[0]);
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Control+C');
+  const top = h.git(`${pg}/web-app`, 'rev-parse', 'origin/main');
+  await h.until(() => typeof app.calls.clipboard === 'string' && app.calls.clipboard.length === 40);
+  void top;
+  await page.keyboard.press('Control+F');
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.log-search') !== null), true);
+  await page.keyboard.type('pagination');
+  await page.keyboard.press('Enter');
+  await settle();
+  await page.keyboard.press('Escape');
+  await settle();
+  assert.equal(await page.locator('.log-search input').inputValue(), '');
+});
+
 test('沒有 webview 錯誤', () => {
   assert.deepEqual(h.pageErrors(app.log), []);
   assert.deepEqual(app.calls.errors, []);

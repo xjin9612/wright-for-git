@@ -97,6 +97,18 @@ test('edit 停下：Log 上方出現進行中列，按「繼續」完成', async
   assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('gitworkbench-')), [], '沒有殘留的暫存檔');
 });
 
+test('滑鼠拖曳列調整順序', async () => {
+  // 前面的測試已改寫歷史：從 docs 開始有兩筆可以調整
+  const d = await openRebase('docs: key rotation (rewritten)');
+  assert.ok((await d.page.locator('.rebase-row').count()) >= 2);
+  const first = await d.page.locator('.rebase-row').first().innerText();
+  const last = d.page.locator('.rebase-row').last();
+  await last.dragTo(d.page.locator('.rebase-row').first());
+  await d.page.waitForTimeout(200);
+  assert.notEqual(await d.page.locator('.rebase-row').first().innerText(), first, '拖曳後順序改變');
+  d.panel.dispose();
+});
+
 test('分支在對話框開啟後變動：拒絕開始並重新載入清單', async () => {
   const d = await openRebase('feat(sdk): add client package');
   h.git(api, 'commit', '-q', '--allow-empty', '-m', 'sneaky commit');
