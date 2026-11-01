@@ -76,6 +76,6 @@
 |---|---|---|
 | 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
-| 5.3 | 整合測試 | `@vscode/test-electron` 在真實 VS Code 中跑主要流程 |
+| 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬），CI 執行；真實 VS Code 中的流程（`@vscode/test-electron`）未做 |
 | 5.4 | 大型 repo 效能 | 模擬環境 10 萬 commit：首屏約 1.4 秒、全部載入約 6.4 秒；待實測 VS Code 內的數字，再評估提示 `git commit-graph write` |
 | 5.5 | Marketplace 發佈 | publisher 帳號、英文 CHANGELOG |

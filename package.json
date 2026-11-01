@@ -428,6 +428,7 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p src/webview",
     "test": "node esbuild.mjs --tests && node --test \"out/test/*.test.js\"",
+    "test:ui": "node esbuild.mjs && node --test --test-concurrency=1 \"test/ui/*.test.js\"",
     "vscode:prepublish": "node esbuild.mjs --production",
     "package": "vsce package --no-dependencies"
   },
@@ -436,6 +437,7 @@
     "@types/vscode": "~1.90.0",
     "@vscode/vsce": "~4.1.0",
     "esbuild": "~0.28.2",
+    "playwright": "~1.63.0",
     "typescript": "~5.9.3"
   }
 }

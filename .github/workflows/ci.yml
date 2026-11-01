@@ -21,6 +21,9 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # UI 端對端測試（Playwright + Chromium；webview 與 git 都是真的，VS Code API 為模擬）
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
       - run: npm run package
       - uses: actions/upload-artifact@v7
         if: matrix.os == 'ubuntu-latest'

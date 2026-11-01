@@ -79,6 +79,7 @@ npm install
 npm run build       # 建置 dist/
 npm run typecheck   # 型別檢查（extension 與 webview）
 npm test            # 單元與整合測試（需要 git）
+npm run test:ui     # UI 端對端測試（Chromium；第一次先執行 npx playwright install chromium）
 npm run package     # 打包 .vsix
 ```
 

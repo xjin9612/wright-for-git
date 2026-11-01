@@ -60,6 +60,7 @@
 - Confirmations triggered from the panel or a dialog tab (delete, force push, hard reset, checkout a tag or revision, rollback, …) are shown inside it in the same style as the Push dialog; destructive actions use a red button with Cancel focused
 - Gear button in the Git log, Commit and Repositories title bars opens Git Workbench's settings (language, issue links, …)
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
+- UI end-to-end tests (`npm run test:ui`, Playwright) run in CI on Windows and Linux
 - New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Previous Changed File / Next Changed File
 
 ## 1.0.0
