@@ -9,7 +9,7 @@
 // 產生的結構（預設在 ../vscode-git-workbench-test/ 底下）：
 //   playground/                 ← 用 VS Code 開這個資料夾（本身不是 git repo）
 //     api-server/               ← repo；main 領先遠端 2 筆、有沒有 upstream 的新 branch、未合併的 branch、tag、
-//                                  未提交的變更（Commit 視窗）、packages/sdk 子模組
+//                                  未提交的變更（Commit 視窗）、packages/sdk 模組
 //       libs/shared/            ← 巢狀 repo
 //     web-app/                  ← repo；main 落後遠端 1 筆、2 個 stash、會衝突的 branch、與 api-server 同名的 branch、
 //                                  1 個未提交的修改
@@ -150,7 +150,7 @@ function buildApiServer(root, remotes) {
   commit(dir, 'dave', 20, 'fix(release): hotfix order total rounding', { 'src/orders/pricing.ts': 'export const price = (n: number) => Math.round(n * 1.05);\n' });
   git(dir, 'checkout', '-q', 'main');
   commit(dir, 'bob', 10, 'feat(auth): add API keys\n\nCloses #31, see PROJ-42 for the design.', { 'src/auth/keys.ts': 'export const keys = new Map<string, string>();\n' });
-  // 子模組（變更檔案依「模組」分組）與多行設定檔（部分提交：兩段相隔很遠的修改）
+  // 模組 packages/sdk（有 package.json，變更檔案依「模組」分組）與多行設定檔（部分提交：兩段相隔很遠的修改）
   commit(dir, 'carol', 9, 'feat(sdk): add client package', {
     'packages/sdk/package.json': '{\n  "name": "@example/sdk"\n}\n',
     'packages/sdk/index.ts': 'export const client = {};\n',
@@ -176,7 +176,7 @@ function buildApiServer(root, remotes) {
   // 已合併、可直接刪除的 branch
   git(dir, 'branch', 'old/merged-work', 'v1.0.0');
 
-  // 未提交的變更（Commit 視窗）：同一檔案兩段修改、刪除、新增未追蹤、已忽略、子模組內的修改
+  // 未提交的變更（Commit 視窗）：同一檔案兩段修改、刪除、新增未追蹤、已忽略、模組 packages/sdk 內的修改
   const lines = [...CONFIG_LINES];
   lines[1] = 'export const port = 8080;';
   lines[18] = 'export const logLevel = "debug";';

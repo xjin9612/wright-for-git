@@ -21,7 +21,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
   - Virtual scrolling with streamed loading; tested with 100,000 commits
   - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), push up to here, compare with the working tree, interactively rebase from here
   - Multi-select with `Ctrl` / `Shift`: combined changes in the right pane, cherry-pick or revert several commits at once
-  - Interactive rebase: pick, reword, edit, squash, fixup, drop, reorder by drag or `Alt+↑↓`. An in-progress rebase / merge / cherry-pick shows a bar with Resolve Conflicts…, Continue, Skip and Abort
+  - Interactive rebase: pick, reword, edit, squash, fixup, drop, reorder by drag or `Alt+↑↓`. An in-progress rebase / merge / cherry-pick / revert shows a bar with Resolve Conflicts…, Continue, Skip and Abort
   - Issue numbers in messages become links (`gitWorkbench.issueLinks`); selecting a commit dims the rows outside its path; Collapse Linear Branches (👁 menu) folds long runs of branch commits into a dotted `⋯ N commits` row, click it to expand
 - **Commit window** (`Alt+0`) — check the files to commit, or pick single hunks; changelists; unversioned and ignored files; group by directory, repository or module; amend, sign-off, skip hooks, Commit and Push…; rollback, add to `.gitignore`. Commits through a temporary index, so the staging area you use in VS Code's Source Control is left alone. A Stash tab lists every repository's stashes
 - **Merge conflicts** — a Conflicts tab (Accept Yours / Accept Theirs / Merge…, then Continue) and a three-way Merge tab: Yours, an editable Result and Theirs, with ≫ ✕ per change or per line (Line by Line), Apply Non-Conflicting Changes, and undo / redo. Works for merge, rebase, cherry-pick, revert and stash conflicts
@@ -31,7 +31,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
 - **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path. The Explorer's Git Workbench submenu also has Compare with Branch or Tag…, Stash Changes… and Unstash Changes…
 - **Git console** — every git command, its output and the reason it failed, in the Output panel's *Git Workbench* channel (button in the log panel's title bar)
-- **Toggle Git Blame** in the editor context menu switches VS Code's built-in blame annotations
+- **Annotate with Git Blame (toggle)** in the editor context menu switches VS Code's built-in blame annotations
 - English and Traditional Chinese UI, switchable on its own with `gitWorkbench.language`
 - Refreshes automatically when branches, tags or HEAD change
 
@@ -63,7 +63,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 
 The log loads 50,000 commits of a 100,000-commit repository in about a second. Git's commit-graph file makes it faster still: in our measurements the first screen appeared in about 0.1 s instead of 0.6 s, and filtering by a file path took about 0.2 s instead of 1.2 s.
 
-Git usually writes a commit-graph during its automatic `git gc`, but not the part that speeds up path filters. Run **Git Workbench: Optimize Repository** from the Command Palette to write the full commit-graph (`git commit-graph write --reachable --changed-paths`). It only adds a file under `.git/objects/info`, changes no commits or files, is not pushed, and also speeds up git itself and other git tools. Deleting the file undoes it.
+Git usually writes a commit-graph during its automatic `git gc`, but not the part that speeds up path filters. Run **Git Workbench: Optimize Repository (speed up history)** from the Command Palette to write the full commit-graph (`git commit-graph write --reachable --changed-paths`). It only adds a file under `.git/objects/info`, changes no commits or files, is not pushed, and also speeds up git itself and other git tools. Deleting the file undoes it.
 
 ## Settings
 
@@ -93,6 +93,7 @@ npm run typecheck   # type-check the extension and the webview
 npm test            # unit and integration tests (requires git)
 npm run test:ui     # UI end-to-end tests in Chromium (first run: npx playwright install chromium)
 npm run test:vscode # tests inside a real VS Code (downloads VS Code on the first run)
+npm run bench:vscode # log loading benchmark on a large repository (see docs/TESTING.md)
 npm run package     # create the .vsix
 ```
 
@@ -100,28 +101,37 @@ Open this folder in VS Code and press `F5` to launch an Extension Development Ho
 
 ### Releasing
 
-1. Bump `version` in `package.json` and add a matching section at the top of `CHANGELOG.md` (`## 1.1.0`) — it becomes the release notes
-2. Commit, then tag and push: `git tag v1.1.0 && git push origin v1.1.0`
+1. Bump `version` in `package.json` and add a matching section at the top of `CHANGELOG.md` (`## 1.2.0`; changes in progress go under `## Unreleased` — rename it when releasing) — it becomes the release notes
+2. Commit, then tag and push: `git tag v1.2.0 && git push origin v1.2.0`
 3. GitHub Actions (`.github/workflows/release.yml`) checks the version, runs the tests, packages the `.vsix`, and publishes a GitHub Release using that CHANGELOG section as the notes
 
-The release fails if the tag does not match `package.json` or the CHANGELOG has no section for the version. Versions containing `-` (e.g. `v1.1.0-beta.1`) are published as pre-releases.
+The release fails if the tag does not match `package.json` or the CHANGELOG has no section for the version. Versions containing `-` (e.g. `v1.2.0-beta.1`) are published as pre-releases.
 
 ### Architecture
 
 ```
 src/
-  extension.ts        entry point: registers the webview view, read-only file system and commands
+  extension.ts        entry point: registers the webview views, read-only file system and commands
   provider.ts         Git log webview view: repository management, messaging, auto refresh, checkout
   commitView.ts       Commit window webview view: working-tree changes, changelists, commit
-  dialogPanel.ts      dialogs opened as editor tabs: Push, Unstash, hunk selection, interactive rebase
+  dialogPanel.ts      dialogs opened as editor tabs: Push, Unstash, hunk selection, interactive rebase, conflicts, three-way merge
+  conflicts.ts        merge conflicts: conflict list, three-way merge, accept a side, mark as resolved
   actions.ts          branch, commit and push actions shared by the panel and the dialogs
+  dialogs.ts          confirm dialogs shown inside the log panel (VS Code modal as fallback)
+  stashView.ts        stash actions shared by the Commit window and the Explorer menu
+  explorerCommands.ts Explorer context menu: compare with branch or tag, stash, unstash
+  gitConsole.ts       Git Console: logs every git command to the Output panel
+  optimize.ts         Optimize Repository command (writes the commit-graph)
+  settingsBridge.ts   in-panel settings popup
+  modules.ts          "module" grouping (nearest folder with a project file)
   i18n.ts             UI language (follows VS Code or gitWorkbench.language)
   sidebar.ts          Repositories view in the Activity Bar and the status bar item
   diffProvider.ts     git-workbench: read-only file system serving file contents at a revision for vscode.diff
   gitExtension.ts     git path and state events from the built-in Git extension
-  git/                runs the git CLI and parses its output (no vscode dependency, directly testable)
-  shared/             shared by extension and webview: message protocol, graph layout, ref labels, trees
-  webview/            the three-pane UI (plain TypeScript + Canvas, no framework)
+  testApi.ts          state and actions exposed to the real VS Code tests only
+  git/                runs the git CLI, parses its output, three-way merge (no vscode dependency, directly testable)
+  shared/             shared by extension and webview: message protocol, graph layout, linear-branch collapsing, ref labels, trees
+  webview/            the log panel, Commit window and dialog UIs (plain TypeScript + Canvas, no framework)
 media/webview.css     styles; every color comes from VS Code theme variables
 ```
 

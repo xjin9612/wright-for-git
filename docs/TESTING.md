@@ -41,10 +41,10 @@ npm run test:ui
 npm run test:vscode
 ```
 
-- 第一次會下載 VS Code（約 100～200 MB，存在專案的 `.vscode-test/`，之後沿用）。
+- 第一次會下載 VS Code（解壓後約 350 MB，存在專案的 `.vscode-test/`，之後沿用）。
 - 測試期間會開出一個 VS Code 視窗，跑完自動關閉；請不要操作它。
 - 使用全新的使用者設定與暫存的 playground，不會動到你自己的 VS Code 設定與手動測試用的範例 repo。
-- `VSCODE_VERSION=1.90.0` 指定版本（預設 stable）；`GWB_GREP=diff` 只跑名稱含這段文字的測試。PowerShell 寫法：`$env:GWB_GREP="diff"; npm run test:vscode`。
+- `VSCODE_VERSION=1.90.0` 指定版本（預設 stable）；`GWB_GREP=diff` 只跑名稱含這段文字的測試（同一檔內的測試有先後依賴，只跑其中一項可能失敗，建議以整個檔案的主題篩選）。PowerShell 寫法：`$env:GWB_GREP="diff"; npm run test:vscode`。
 - 等待逾時會附上診斷：各 repo 的 `git status`、使用中的分頁、記錄的篩選、最近的 git 指令。
 
 webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴充功能啟用時會回傳一組只給測試用的介面（`src/testApi.ts`），一般使用不會用到。
@@ -53,10 +53,10 @@ webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴
 
 | 檔案 | 內容 |
 |---|---|
-| `test/vscode/suite/activation.test.ts` | 指令都已註冊；`Alt+9`、`Alt+0` 的指令；偵測 repo（含巢狀、排除一般資料夾） |
+| `test/vscode/suite/activation.test.ts` | 指令都已註冊；`Alt+9`、`Alt+0` 的指令打開記錄與提交視窗；偵測 repo（含巢狀、排除一般資料夾） |
 | `test/vscode/suite/diff.test.ts` | 從記錄開 diff：新增的左邊空、刪除的右邊空、中文檔名內容正確、標題的「1/2」；← → 切換檔案；提交視窗的 diff 右邊是可編輯的實際檔案 |
 | `test/vscode/suite/commands.test.ts` | 顯示 Git 歷史（切 repo 並篩選路徑）；切換 Git Blame（1.96 以前只提示）；顯示 Git 主控台；最佳化儲存庫 |
-| `test/vscode/suite/watch.test.ts` | 在 VS Code 外面建立分支、commit、stash，記錄與提交視窗自動更新；存檔後提交視窗出現檔案 |
+| `test/vscode/suite/watch.test.ts` | 在 VS Code 外面建立分支、commit，記錄自動更新；存檔後提交視窗出現檔案、還原後消失；外部 stash 後提交視窗更新 |
 | `test/vscode/suite/repos.test.ts` | 儲存庫勾選與記錄的 repo 篩選同步 |
 | `test/vscode/suite/merge.test.ts` | 合併衝突的種類；「在 VS Code 合併編輯器開啟」打開內建合併編輯器；採用一邊後繼續合併 |
 
@@ -107,7 +107,7 @@ node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 r
 
 用 VS Code 開啟 `playground` 資料夾（不是 `playground-remotes`）。內容：
 - `api-server`：main 領先遠端 2 筆；`feature/rate-limit` 尚未推送；`experiment/cache` 未合併；tag `v1.0.0`、`v1.1.0`；有 rename、刪除、中文檔名（`docs/中文說明.md`）
-- `api-server` 未提交的變更：`src/config.ts` 兩段修改、刪除 `config/db.yml`、未追蹤 `src/todo.ts`、已忽略 `node_modules/`、子模組 `packages/sdk` 內的修改
+- `api-server` 未提交的變更：`src/config.ts` 兩段修改、刪除 `config/db.yml`、未追蹤 `src/todo.ts`、已忽略 `node_modules/`、模組 `packages/sdk`（一般資料夾，提交視窗依模組分組時自成一組）內的修改
 - `api-server/libs/shared`：巢狀 repo
 - `web-app`：main 落後遠端 1 筆；2 個 stash；`src/pages/Login.tsx` 有未提交的修改；合併 `conflict/theme` 會產生兩個衝突：`src/theme.ts` 兩邊都改了第 2～3 行（另有兩處只有一邊改、不衝突），`src/legacy.ts` 我這邊修改、他們刪除
 - `notes`：一般資料夾，不是 repo
@@ -137,7 +137,8 @@ node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 r
   - **應該看到**：
     - 面板右上角彈出設定框。
     - 改語言後面板立刻換成新語言，設定框自動再打開。
-    - 提交視窗的齒輪也會打開同一個設定框，面板內部沒有其他齒輪按鈕。
+    - 提交視窗標題列的齒輪在提交視窗內打開內容相同的設定框。
+    - 面板內另外兩個齒輪不是設定框：Branches 工具列的齒輪是分組選項，提交視窗 Commit 按鈕列右邊的齒輪是提交選項（Amend、Sign-off…）。
 - [ ] **主題**
   - **做**：按 `Ctrl+K` `Ctrl+T`，依序切換淺色、深色、高對比主題。每換一次，在 Branches 樹的 `experiment/cache` 上按右鍵 → Delete（刪除），出現確認框後按取消。
   - **應該看到**：

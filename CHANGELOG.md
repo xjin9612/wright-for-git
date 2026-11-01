@@ -6,12 +6,12 @@
 - Collapse Linear Branches / Expand Linear Branches in the 👁 menu, like IntelliJ's Graph Options: long runs of branch commits fold into one `⋯ N commits` row drawn with a dotted line. The branch's newest and oldest commits stay visible, the main line (HEAD's first-parent history) and commits with a branch or tag are never folded, and only runs of at least 3 commits are folded. Click the row (or press `Enter`) to expand it; click a branch line, or use Collapse Linear Branch in the context menu, to fold one run. Jumping to a folded commit expands its run
 
 ### Large repositories
-- New command **Git Workbench: Optimize Repository** writes git's commit-graph (`--changed-paths`), which makes the first screen of the log about 6× faster and file path filters about 5× faster in a 100,000-commit repository. It is never suggested automatically; see "Large repositories" in the README
+- New command **Git Workbench: Optimize Repository (speed up history)** writes git's commit-graph (`--changed-paths`), which makes the first screen of the log about 6× faster and file path filters about 5× faster in a 100,000-commit repository. It is never suggested automatically; see "Large repositories" in the README
 
 ### Other
 - `npm run bench:vscode` measures log loading in a generated 100,000-commit repository inside a real VS Code, with and without a commit-graph
 - Tests that run inside a real VS Code (`npm run test:vscode`): native diffs, commands, file watching and the built-in Git integration, in CI on Windows and Linux and on the minimum supported version 1.90.0
-- Toggle Git Blame on VS Code older than 1.96 (which has no built-in blame) now says so instead of failing with a settings error
+- Annotate with Git Blame (toggle) on VS Code older than 1.96 (which has no built-in blame) now says so instead of failing with a settings error
 - Accepting a side of a conflict no longer waits for the "all conflicts are resolved" notification to be dismissed
 
 ## 1.1.0

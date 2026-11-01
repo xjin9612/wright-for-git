@@ -33,12 +33,12 @@
 | # | 項目 | 說明 |
 |---|---|---|
 | 2.1 | ✅ 同步（1.1.0） | Fetch 在 Branches 工具列；Pull／Push 在 Log 工具列；Push 先開對話框（待推 commit、檔案、Push tags、下拉 Force Push）；右鍵 Push All up to Here；Branches 樹顯示 ahead／behind（↑↓）；多 repo 時一次對所選 repo 執行 |
-| 2.2 | ✅ Branch 右鍵選單 | Checkout、New Branch from…、Rename、Delete、Merge into Current、Rebase Current onto、Compare with Current、Push、Pull |
+| 2.2 | ✅ Branch 右鍵選單 | Checkout、New Branch from…、Rename、Delete、Merge into Current、Rebase Current onto、Compare with Current、Push、Update（有 upstream 時） |
 | 2.3 | ✅ Commit 右鍵選單（1.1.0） | Cherry-pick、Revert、Reset Current Branch to Here（soft／mixed／hard）、New Branch、New Tag、Compare with Local |
 | 2.4 | ✅ Stash | Commit 視窗的「儲藏」分頁：清單、檢視內容、Apply／Pop／Drop／Clear、從 Stash 建立 Branch、Stash 目前變更；檔案總管右鍵取消儲藏對話框 |
 | 2.5 | ✅ 多選 commit | `Ctrl`／`Shift` 多選，右欄顯示合併後的變更 |
 | 2.6 | ✅ 篩選提示 | 目前 branch 被 Branch 篩選排除時提示「HEAD 不在篩選中」，一鍵切回 |
-| 2.7 | ✅ Date 篩選 | 最近 24 小時／7 天／30 天、自訂區間 |
+| 2.7 | ✅ Date 篩選 | 最近 24 小時／7 天／30 天／90 天／1 年、自訂區間 |
 | 2.8 | ✅ Favorite | 手動標記或取消 ★、置頂、「只顯示 favorite」 |
 
 ## 階段三：體驗補強

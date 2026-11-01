@@ -18,10 +18,10 @@
   - 多個 Log 分頁，各自保留篩選條件
   - Highlight：Conventional Commits 類型上色、我的 commit 粗體、merge commit 淡化
   - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換，拖曳欄位左緣調整寬度
-  - 虛擬捲動，串流分批載入
+  - 虛擬捲動，串流分批載入；以 10 萬筆 commit 測試過
   - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、Push 到這裡為止、與工作區比較、從這裡互動式 rebase
   - `Ctrl`／`Shift` 多選：右欄顯示合併後的變更，可一次 cherry-pick 或 revert 多個 commit
-  - 互動式 rebase：pick、reword、edit、squash、fixup、drop，拖曳或 `Alt+↑↓` 調整順序；rebase／merge／cherry-pick 進行中時，Log 上方顯示解決衝突、繼續、略過、中止
+  - 互動式 rebase：pick、reword、edit、squash、fixup、drop，拖曳或 `Alt+↑↓` 調整順序；rebase／merge／cherry-pick／revert 進行中時，Log 上方顯示解決衝突、繼續、略過、中止
   - 提交訊息中的 issue 編號轉連結（`gitWorkbench.issueLinks`）；選取 commit 時淡化不在其路徑上的列；👁 選單「收合線性分支」把分支上連續的 commit 收成一列虛線的「⋯ N commits」，點一下展開
 - **Commit 視窗**（`Alt+0`）：勾選要提交的檔案或只提交部分 hunk；Changelist；未追蹤與已忽略檔案；依目錄／repo／模組分組；Amend、Sign-off、略過 hooks、提交並推送；捨棄變更、加入 `.gitignore`。透過暫時 index 提交，不影響內建原始檔控制的暫存區。另有「儲藏」分頁列出所有 repo 的 stash
 - **合併衝突**：衝突清單分頁（採用我的／採用他們的／合併…，解決完直接繼續）與三方合併分頁：左邊我的、中間可直接編輯的結果、右邊他們的，每個變更有 ≫ ✕，「逐行」模式每一行各有 ≫ ✕；套用所有不衝突的變更、復原／重做。merge、rebase、cherry-pick、revert、套用儲藏的衝突都適用
@@ -31,14 +31,14 @@
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
 - 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」
 - **Git 主控台**：在「輸出」面板的 *Git Workbench* 頻道記錄每個 git 指令、輸出與失敗原因（Log 面板標題列有按鈕）
-- 編輯器右鍵切換 Git Blame 標註（沿用 VS Code 內建 blame）
+- 編輯器右鍵「切換 Git Blame 標註」（沿用 VS Code 內建 blame）
 - 英文／繁體中文介面，可用 `gitWorkbench.language` 獨立切換
 - branch、tag、HEAD 變動時自動重新整理
 
 ## 多 repo
 
-- 自動掃描每個工作區資料夾底下的 repo（`gitWorkbench.scanDepth`、`gitWorkbench.scanExclude`），包含 repo 內的巢狀 repo
-- 多個 repo 的 commit 依時間合併顯示，每列左側色條標示所屬 repo（滑鼠移上去顯示名稱）
+- 自動掃描每個工作區資料夾底下的 repo（`gitWorkbench.scanDepth`、`gitWorkbench.scanExclude`），工作區資料夾本身不是 repo 也可以，包含 repo 內的巢狀 repo
+- 多個 repo 的 commit 依時間合併顯示，每個 repo 有各自的 graph lane，每列左側色條標示所屬 repo（滑鼠移上去顯示名稱）
 - **Paths** 篩選：在 Roots 勾選 repo（`Ctrl+點選` 只看一個），或「選擇資料夾…」跨 repo 勾選資料夾（等同 IntelliJ 多 root 的 Paths）
 - 點左側色條切換 repo 名稱欄
 - 側邊欄 **Repositories** 的勾選與 Paths 篩選同步
@@ -63,7 +63,7 @@
 
 10 萬筆 commit 的 repo，Log 載入 5 萬筆約 1 秒。有 git 的 commit-graph 會更快：實測首屏從約 0.6 秒變成 0.1 秒，以單一檔案路徑篩選從約 1.2 秒變成 0.2 秒。
 
-git 平常自動執行 `git gc` 時多半會寫入 commit-graph，但不含加快路徑篩選的那部分。從指令面板執行 **Git Workbench: 最佳化儲存庫**，會寫入完整的 commit-graph（`git commit-graph write --reachable --changed-paths`）。它只在 `.git/objects/info` 底下新增一個檔案，不改動任何 commit 或檔案、不會被推到遠端，git 本身與其他 git 工具也會一起變快；刪掉這個檔案就回到原狀。
+git 平常自動執行 `git gc` 時多半會寫入 commit-graph，但不含加快路徑篩選的那部分。從指令面板執行 **Git Workbench: 最佳化儲存庫（加快歷史讀取）**，會寫入完整的 commit-graph（`git commit-graph write --reachable --changed-paths`）。它只在 `.git/objects/info` 底下新增一個檔案，不改動任何 commit 或檔案、不會被推到遠端，git 本身與其他 git 工具也會一起變快；刪掉這個檔案就回到原狀。
 
 ## 設定
 
@@ -82,6 +82,8 @@ git 平常自動執行 `git gc` 時多半會寫入 commit-graph，但不含加�
 
 從 [Releases](https://github.com/xjin9612/vscode-git-workbench/releases) 下載 `.vsix`，在 VS Code 執行「延伸模組: 從 VSIX 安裝…」，安裝或更新後請「重新載入視窗」。
 
+需要 VS Code 1.90 以上，以及 `PATH` 中的 Git（或在內建 Git 擴充套件設定的路徑）。
+
 ## 開發
 
 ```bash
@@ -91,6 +93,7 @@ npm run typecheck   # 型別檢查（extension 與 webview）
 npm test            # 單元與整合測試（需要 git）
 npm run test:ui     # UI 端對端測試（Chromium；第一次先執行 npx playwright install chromium）
 npm run test:vscode # 在真實 VS Code 中執行的測試（第一次會下載 VS Code）
+npm run bench:vscode # 大型 repo 載入效能量測（見 docs/TESTING.md）
 npm run package     # 打包 .vsix
 ```
 
@@ -98,11 +101,11 @@ npm run package     # 打包 .vsix
 
 ### 發佈新版本
 
-1. 修改 `package.json` 的 `version`，並在 `CHANGELOG.md`（英文，作為 Release 說明）最上方新增同版本的段落（`## 1.1.0`）
-2. commit 後打 tag 並推送：`git tag v1.1.0 && git push origin v1.1.0`
+1. 修改 `package.json` 的 `version`，並在 `CHANGELOG.md`（英文，作為 Release 說明）最上方新增同版本的段落（`## 1.2.0`；開發中的變更先記在 `## Unreleased`，發佈時改成版本號）
+2. commit 後打 tag 並推送：`git tag v1.2.0 && git push origin v1.2.0`
 3. GitHub Actions（`.github/workflows/release.yml`）會檢查版本、跑測試、打包 `.vsix`，並以 CHANGELOG 該段落建立 Release
 
-tag 版本與 `package.json` 不一致、或 CHANGELOG 沒有對應段落時，發佈會失敗。版本含 `-`（如 `v1.1.0-beta.1`）會標為 pre-release。
+tag 版本與 `package.json` 不一致、或 CHANGELOG 沒有對應段落時，發佈會失敗。版本含 `-`（如 `v1.2.0-beta.1`）會標為 pre-release。
 
 ### 架構
 
@@ -111,15 +114,24 @@ src/
   extension.ts        進入點：註冊 WebviewView、唯讀檔案系統、指令
   provider.ts         Git Log WebviewView：repo 管理、訊息處理、自動重新整理、checkout
   commitView.ts       Commit 視窗 WebviewView：工作區變更、Changelist、提交
-  dialogPanel.ts      開在編輯器分頁的對話框：Push、取消儲藏、選擇 hunk、互動式 rebase
+  dialogPanel.ts      開在編輯器分頁的對話框：Push、取消儲藏、選擇 hunk、互動式 rebase、衝突清單、三方合併
+  conflicts.ts        合併衝突：衝突清單、三方合併、整個檔案採用某一邊、標記已解決
   actions.ts          面板與對話框共用的 branch、commit、push 操作
+  dialogs.ts          確認框：顯示在 Log 面板內（退回 VS Code 的 modal）
+  stashView.ts        提交視窗與檔案總管共用的儲藏操作
+  explorerCommands.ts 檔案總管右鍵：與分支或標籤比較、儲藏、取消儲藏
+  gitConsole.ts       Git 主控台：在「輸出」面板記錄每個 git 指令
+  optimize.ts         「最佳化儲存庫」指令（寫入 commit-graph）
+  settingsBridge.ts   面板內的設定框
+  modules.ts          「模組」分組（最近一個含專案檔的資料夾）
   i18n.ts             介面語言（跟隨 VS Code 或 gitWorkbench.language）
   diffProvider.ts     git-workbench: 唯讀檔案系統，提供某 revision 的檔案內容給 vscode.diff
   sidebar.ts          活動列 Repositories 清單與狀態列按鈕
   gitExtension.ts     取得內建 Git 擴充套件的 git 路徑與狀態事件
-  git/                git CLI 執行與輸出解析（不依賴 vscode，可直接測試）
-  shared/             extension 與 webview 共用：訊息協定、graph 佈局、ref 標籤、樹
-  webview/            三欄 UI（原生 TypeScript + Canvas，無前端框架）
+  testApi.ts          只給真實 VS Code 測試用的狀態與操作介面
+  git/                git CLI 執行、輸出解析、三方合併（不依賴 vscode，可直接測試）
+  shared/             extension 與 webview 共用：訊息協定、graph 佈局、長線性分支折疊、ref 標籤、樹
+  webview/            Log 面板、提交視窗與對話框的 UI（原生 TypeScript + Canvas，無前端框架）
 media/webview.css     樣式，顏色全部取自 VS Code 主題變數
 ```
 
