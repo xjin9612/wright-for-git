@@ -91,7 +91,7 @@
 |---|---|---|
 | 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
-| 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬），CI 執行；真實 VS Code 中的流程（`@vscode/test-electron`）未做 |
+| 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬）；◐ `npm run test:vscode`：真實 VS Code（`@vscode/test-electron`）中的 diff、指令、檔案監看、內建 Git 整合，已加入 CI，待第一次在 Windows／CI 上驗證 |
 | 5.4 | 大型 repo 效能 | 模擬環境 10 萬 commit：首屏約 1.4 秒、全部載入約 6.4 秒；待實測 VS Code 內的數字，再評估提示 `git commit-graph write` |
 | 5.5 | Marketplace 發佈 | publisher 帳號、英文 CHANGELOG |
 
@@ -102,6 +102,6 @@
 | # | 項目 | 說明 |
 |---|---|---|
 | 4.4 | 長線性分支折疊 | 路徑高亮已完成；折疊需要調整 graph 版面 |
-| 5.3 | 真實 VS Code 測試 | `@vscode/test-electron` 跑原生 diff、選單、快捷鍵；目前由手動清單涵蓋 |
+| 5.3 | ◐ 真實 VS Code 測試 | 進行中（見上方 5.3） |
 | 5.4 | 大型 repo 效能實測 | 在 VS Code 內量測後再評估提示 `git commit-graph write` |
 | 5.5 | Marketplace 發佈 | 建立 publisher 帳號；目前以 GitHub Release 發佈 |

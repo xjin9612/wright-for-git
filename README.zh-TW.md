@@ -84,6 +84,7 @@ npm run build       # 建置 dist/
 npm run typecheck   # 型別檢查（extension 與 webview）
 npm test            # 單元與整合測試（需要 git）
 npm run test:ui     # UI 端對端測試（Chromium；第一次先執行 npx playwright install chromium）
+npm run test:vscode # 在真實 VS Code 中執行的測試（第一次會下載 VS Code）
 npm run package     # 打包 .vsix
 ```
 
