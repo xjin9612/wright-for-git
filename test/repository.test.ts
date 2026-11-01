@@ -128,3 +128,20 @@ test('simplifiedParents：篩選結果之間以最近的符合祖先相連', asy
   assert.deepEqual(new Set(map.get(d)), new Set([b, c]));
   assert.equal(await repo.simplifiedParents(EMPTY_FILTER, new Set([a]), 2), undefined, '超過上限時不計算');
 });
+
+test('寫入指令遇到 index.lock 時稍等重試；一直鎖住才失敗', async () => {
+  const { runGit, isIndexLocked } = await import('../src/git/gitRunner');
+  const { writeFileSync, rmSync } = await import('node:fs');
+  const path = await import('node:path');
+  const r = makeRepo();
+  r.commit('init', { 'a.txt': '1\n' });
+  writeFileSync(path.join(r.dir, 'a.txt'), '2\n');
+  const lock = path.join(r.dir, '.git', 'index.lock');
+  writeFileSync(lock, '');
+  setTimeout(() => rmSync(lock, { force: true }), 300);
+  await runGit('git', ['add', '--', 'a.txt'], { cwd: r.dir });
+  assert.equal(r.git('diff', '--cached', '--name-only'), 'a.txt');
+  writeFileSync(lock, '');
+  await assert.rejects(runGit('git', ['reset', '-q'], { cwd: r.dir }), (e) => isIndexLocked(e));
+  rmSync(lock, { force: true });
+});

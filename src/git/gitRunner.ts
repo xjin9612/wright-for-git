@@ -140,17 +140,41 @@ export function streamGit(gitPath: string, args: string[], opts: RunOptions, onD
   });
 }
 
+/**
+ * 另一個 git 程序（內建 Git 擴充、終端機、Windows 上延遲釋放檔案的防毒或索引服務）還拿著 index.lock 時，
+ * 寫入指令會在動手前就失敗；稍等後重試，與 VS Code 內建 Git 的做法相同。
+ */
+export const isIndexLocked = (e: unknown): boolean => e instanceof GitError && /index\.lock'?: File exists/i.test(e.message);
+
+async function withLockRetry<T>(args: string[], run: () => Promise<T>): Promise<T> {
+  if (isReadOnlyCommand(args)) return run();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (e) {
+      if (!isIndexLocked(e) || attempt >= 6) throw e;
+      await new Promise((r) => setTimeout(r, 150 * attempt));
+    }
+  }
+}
+
 /** 執行 git 並回傳完整 stdout */
 export async function runGit(gitPath: string, args: string[], opts: RunOptions): Promise<string> {
-  let out = '';
-  await streamGit(gitPath, args, opts, (t) => {
-    out += t;
+  return withLockRetry(args, async () => {
+    let out = '';
+    await streamGit(gitPath, args, opts, (t) => {
+      out += t;
+    });
+    return out;
   });
-  return out;
 }
 
 /** 執行 git 並回傳原始位元組（檔案內容交給 VS Code 依編碼設定解碼） */
 export function runGitBuffer(gitPath: string, args: string[], opts: RunOptions): Promise<Buffer> {
+  return withLockRetry(args, () => runGitBufferOnce(gitPath, args, opts));
+}
+
+function runGitBufferOnce(gitPath: string, args: string[], opts: RunOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const child = spawnGit(gitPath, args, opts);
     const chunks: Buffer[] = [];
