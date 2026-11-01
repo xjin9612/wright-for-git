@@ -332,6 +332,23 @@ export class GitRepository {
     await this.cleanupRebaseTemp();
   }
 
+  // ---------- 效能 ----------
+
+  /**
+   * 寫入 commit-graph（git 自己的索引檔，加快讀取歷史；--changed-paths 另外加快路徑篩選）。
+   * 只新增 .git/objects/info 底下的檔案，不改動任何 commit 或工作區。git 2.27 以前沒有 --changed-paths，改用基本的寫法。
+   */
+  async writeCommitGraph(): Promise<{ changedPaths: boolean }> {
+    try {
+      await this.run(['commit-graph', 'write', '--reachable', '--changed-paths']);
+      return { changedPaths: true };
+    } catch (e) {
+      if (!(e instanceof GitError) || !/changed-paths|unknown option/i.test(e.message)) throw e;
+      await this.run(['commit-graph', 'write', '--reachable']);
+      return { changedPaths: false };
+    }
+  }
+
   // ---------- 衝突 ----------
 
   /** 尚未解決的衝突檔案 */

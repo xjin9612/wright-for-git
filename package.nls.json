@@ -26,6 +26,7 @@
   "config.language.auto": "Follow the VS Code display language",
   "command.compareWithRef": "Compare with Branch or Tag…",
   "command.stashChangesIn": "Stash Changes…",
+  "command.optimizeRepository": "Optimize Repository (speed up history)",
   "command.resolveConflicts": "Resolve Conflicts…",
   "command.unstash": "Unstash Changes…",
   "submenu.explorer": "Git Workbench",

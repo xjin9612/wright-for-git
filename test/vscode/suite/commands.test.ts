@@ -39,3 +39,12 @@ test('切換 Git Blame：1.96 以上切換內建的 git.blame.editorDecoration.e
 test('顯示 Git 主控台：指令可執行', async () => {
   await vscode.commands.executeCommand('gitWorkbench.showConsole');
 });
+
+test('最佳化儲存庫：寫入 commit-graph', async () => {
+  const { existsSync } = await import('node:fs');
+  const a = await api();
+  const root = (await a.repositories()).find((r) => same(r.root, API))!.root;
+  const file = path.join(API, '.git', 'objects', 'info', 'commit-graph');
+  await vscode.commands.executeCommand('gitWorkbench.optimizeRepository', [root]);
+  await until(() => existsSync(file), 'api-server 有 commit-graph');
+});

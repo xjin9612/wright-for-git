@@ -26,6 +26,7 @@
   "config.language.auto": "跟隨 VS Code 的顯示語言",
   "command.compareWithRef": "與分支或標籤比較…",
   "command.stashChangesIn": "儲藏變更…",
+  "command.optimizeRepository": "最佳化儲存庫（加快歷史讀取）",
   "command.resolveConflicts": "解決衝突…",
   "command.unstash": "取消儲藏…",
   "submenu.explorer": "Git Workbench",

@@ -145,3 +145,19 @@ test('寫入指令遇到 index.lock 時稍等重試；一直鎖住才失敗', as
   await assert.rejects(runGit('git', ['reset', '-q'], { cwd: r.dir }), (e) => isIndexLocked(e));
   rmSync(lock, { force: true });
 });
+
+test('writeCommitGraph：寫入 commit-graph，不改動 commit 與工作區', async () => {
+  const { existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const r = makeRepo();
+  r.commit('a', { 'a.txt': '1\n' });
+  r.commit('b', { 'a.txt': '2\n' });
+  const head = r.git('rev-parse', 'HEAD');
+  const repo = (await GitRepository.open('git', r.dir))!;
+  const result = await repo.writeCommitGraph();
+  const file = path.resolve(r.dir, r.git('rev-parse', '--git-path', 'objects/info/commit-graph'));
+  assert.ok(existsSync(file), file);
+  assert.equal(typeof result.changedPaths, 'boolean');
+  assert.equal(r.git('rev-parse', 'HEAD'), head);
+  assert.equal(r.git('status', '--porcelain'), '');
+});

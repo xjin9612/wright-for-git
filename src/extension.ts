@@ -10,6 +10,7 @@ import { initI18n, resetI18n, t } from './i18n';
 import { registerGitConsole } from './gitConsole';
 import { registerExplorerCommands } from './explorerCommands';
 import { createTestApi, type TestApi } from './testApi';
+import { optimizeRepositories } from './optimize';
 
 export async function activate(context: vscode.ExtensionContext): Promise<TestApi> {
   initI18n(context);
@@ -93,6 +94,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     vscode.commands.registerCommand('gitWorkbench.openSettings', () => provider.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.commit.openSettings', () => commitView?.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.unstashChanges', () => provider.dialogs.openUnstash()),
+    // 最佳化儲存庫：寫入 commit-graph（大型 repo 的歷史與路徑篩選變快）；roots 給自動化測試略過選擇
+    vscode.commands.registerCommand('gitWorkbench.optimizeRepository', (roots?: unknown) => optimizeRepositories(provider, Array.isArray(roots) ? roots.filter((r): r is string => typeof r === 'string') : undefined)),
     // 衝突清單分頁（指令面板、衝突提示的按鈕）；root 為字串時只是預設選取的 repo
     vscode.commands.registerCommand('gitWorkbench.resolveConflicts', (root?: unknown) => provider.dialogs.conflicts.openList(typeof root === 'string' ? root : undefined)),
     // Annotate：VS Code 1.96 起內建 git blame，這裡只切換內建的編輯器標註，不重複實作

@@ -164,6 +164,11 @@
         "category": "Git Workbench"
       },
       {
+        "command": "gitWorkbench.optimizeRepository",
+        "title": "%command.optimizeRepository%",
+        "category": "Git Workbench"
+      },
+      {
         "command": "gitWorkbench.resolveConflicts",
         "title": "%command.resolveConflicts%",
         "category": "Git Workbench"
