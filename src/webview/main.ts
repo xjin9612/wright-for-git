@@ -11,7 +11,7 @@ import { setIssueLinkRules } from './issueLinks';
 import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
 import { t } from './l10n';
-import { handleSettings, settingsButton } from './settingsPanel';
+import { handleSettings } from './settingsPanel';
 import { loadState, post, saveState } from './vscodeApi';
 
 interface Persisted {
@@ -244,7 +244,6 @@ const filterBar = el(
   el('div', { className: 'toolbar-divider' }),
   iconButton('refresh', t('Refresh'), () => post({ type: 'refresh' })),
   viewButton,
-  settingsButton(),
 );
 
 // ---------- Log 分頁 ----------

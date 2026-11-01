@@ -47,9 +47,9 @@ test('切換語言為 en：面板以英文重新載入', async () => {
   await h.until(() => /推送/.test(bundle()));
 });
 
-test('面板內設定框：齒輪打開，切換語言立即生效、其他設定寫入使用者設定', async () => {
+test('面板內設定框：標題列齒輪打開，切換語言立即生效、其他設定寫入使用者設定', async () => {
   const bundle = () => /id="l10n-bundle">([\s\S]*?)<\/script>/.exec(app.logView.webview.html)?.[1] ?? '';
-  await page.locator('.filter-bar .icon-button[title="設定"]').click();
+  await app.run('gitWorkbench.openSettings');
   await page.waitForSelector('.settings-popover select');
   assert.equal(await page.locator('#gwb-language').inputValue(), 'zh-tw');
   const options = await page.locator('#gwb-language option').allInnerTexts();

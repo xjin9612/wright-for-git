@@ -230,11 +230,6 @@
           "group": "navigation@9"
         },
         {
-          "command": "gitWorkbench.openSettings",
-          "when": "view == gitWorkbench.repositories",
-          "group": "navigation@9"
-        },
-        {
           "command": "gitWorkbench.showConsole",
           "when": "view == gitWorkbench.log",
           "group": "navigation@8"

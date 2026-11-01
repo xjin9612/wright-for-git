@@ -1,39 +1,28 @@
-// 面板內的設定框（Log 面板與提交視窗共用）：下拉選單與勾選框，變更立即生效
+// 面板內的設定框（Log 面板與提交視窗共用）：由 VS Code 標題列的齒輪打開，顯示在面板右上角；下拉選單與勾選框，變更立即生效
 import type { SettingsValues } from '../shared/protocol';
-import { el, iconButton } from './dom';
+import { el } from './dom';
 import { t } from './l10n';
 import { post } from './vscodeApi';
 
 let popover: HTMLElement | undefined;
-let anchor: HTMLElement | undefined;
 let values: SettingsValues | undefined;
 
 const MAX_COMMITS = [10000, 25000, 50000, 100000, 200000];
 
-/** 齒輪按鈕：點一下開關設定框 */
-export function settingsButton(): HTMLButtonElement {
-  const b = iconButton('gear', t('Settings'), () => {
-    if (popover) close();
-    else open(b);
-  });
-  anchor = b;
-  return b;
-}
-
 /** extension 回傳設定值；open 為 true 時（標題列齒輪、切換語言後重新載入）打開設定框 */
 export function handleSettings(m: { values: SettingsValues; open?: boolean }): void {
   values = m.values;
-  if (m.open && !popover) open(anchor);
+  if (m.open && !popover) open();
   else if (popover) render();
 }
 
-function open(at: HTMLElement | undefined): void {
+function open(): void {
   close();
   popover = el('div', { className: 'settings-popover', attrs: { role: 'dialog', 'aria-label': t('Settings') } });
   document.body.append(popover);
-  const r = at?.getBoundingClientRect();
-  popover.style.top = `${Math.round((r?.bottom ?? 8) + 4)}px`;
-  popover.style.right = `${Math.max(8, Math.round(window.innerWidth - (r?.right ?? window.innerWidth - 8)))}px`;
+  // 齒輪在 VS Code 的標題列（webview 外），設定框貼齊面板右上角
+  popover.style.top = '8px';
+  popover.style.right = '8px';
   render();
   if (!values) post({ type: 'getSettings' });
   setTimeout(() => {
@@ -52,7 +41,7 @@ function close(): void {
 
 function onOutside(e: Event): void {
   const target = e.target as Node | null;
-  if (popover && target && !popover.contains(target) && !anchor?.contains(target)) close();
+  if (popover && target && !popover.contains(target)) close();
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -60,7 +49,6 @@ function onKey(e: KeyboardEvent): void {
   e.preventDefault();
   e.stopPropagation();
   close();
-  anchor?.focus();
 }
 
 const set = (key: keyof SettingsValues, value: unknown) => post({ type: 'setSetting', key, value });

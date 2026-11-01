@@ -5,7 +5,7 @@ import { clear, el, formatDate, icon, iconButton, isContextMenuKey, openContextM
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
-import { handleSettings, settingsButton } from './settingsPanel';
+import { handleSettings } from './settingsPanel';
 import { loadState, post, saveState } from './vscodeApi';
 
 type Change = WorkingChange & { module?: string };
@@ -72,7 +72,7 @@ tabCommit.addEventListener('click', () => setTab('commit'));
 tabStash.addEventListener('click', () => setTab('stash'));
 const commitPane = el('div', { className: 'commit-pane' });
 const stashPane = el('div', { className: 'commit-pane stash-pane' });
-app.append(el('div', { className: 'commit-tabs', attrs: { role: 'tablist' } }, tabCommit, tabStash, el('div', { className: 'toolbar-spacer' }), settingsButton()), commitPane, stashPane);
+app.append(el('div', { className: 'commit-tabs', attrs: { role: 'tablist' } }, tabCommit, tabStash), commitPane, stashPane);
 
 function setTab(tab: 'commit' | 'stash'): void {
   ui.tab = tab;

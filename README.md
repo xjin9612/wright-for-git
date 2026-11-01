@@ -60,7 +60,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 
 ## Settings
 
-Most of these can be changed from the gear button in the Git log or the Commit window, and take effect immediately.
+Most of these can be changed from the gear in the Git log's or the Commit window's title bar, and take effect immediately.
 
 | Setting | Default | Description |
 |---|---|---|
