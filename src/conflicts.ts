@@ -135,7 +135,8 @@ export class ConflictResolver {
       }
     }
     await this.changed();
-    for (const root of touched) await this.offerContinue(root);
+    // 不等使用者回應通知，呼叫端（右鍵選單、衝突清單）不會因此卡住
+    for (const root of touched) void this.offerContinue(root);
   }
 
   /** 這個 repo 的衝突都解決了：提示繼續進行中的操作（衝突清單開著時由清單上的按鈕處理） */
@@ -212,15 +213,20 @@ export class ConflictResolver {
         case 'mergeOpenEditor': {
           if (m.root !== root || m.path !== filePath) return;
           close();
-          const uri = vscode.Uri.file(path.join(root, filePath));
-          try {
-            await vscode.commands.executeCommand('git.openMergeEditor', uri);
-          } catch {
-            await vscode.commands.executeCommand('vscode.open', uri);
-          }
+          await this.openInMergeEditor(root, filePath);
           return;
         }
       }
     });
+  }
+
+  /** 改用 VS Code 內建的合併編輯器（內建 Git 擴充的指令）；無法開啟時直接開檔案 */
+  async openInMergeEditor(root: string, filePath: string): Promise<void> {
+    const uri = vscode.Uri.file(path.join(root, filePath));
+    try {
+      await vscode.commands.executeCommand('git.openMergeEditor', uri);
+    } catch {
+      await vscode.commands.executeCommand('vscode.open', uri);
+    }
   }
 }
