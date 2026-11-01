@@ -112,8 +112,10 @@ test('點分支線（中間 commit 的節點位置）收合那一段；其他地
 });
 
 test('全部展開；文字篩選時選單項目停用', async () => {
+  await viewMenu('Collapse Linear Branches');
+  await find(collapsedRow());
   await viewMenu('Expand Linear Branches');
-  assert.equal(await page.locator('.log-row.is-collapsed').count(), 0);
+  await h.eventually(async () => assert.equal(await page.locator('.log-row.is-collapsed').count(), 0));
   await page.locator('.log-search input').fill('change 1');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(800);
@@ -123,6 +125,6 @@ test('全部展開；文字篩選時選單項目停用', async () => {
   await page.keyboard.press('Escape');
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

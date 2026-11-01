@@ -1,4 +1,4 @@
-// 儲存庫清單與 Paths 篩選同步（對應手動清單第 4 節）
+// 儲存庫清單與 Paths 篩選同步
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';

@@ -219,6 +219,6 @@ test('確認框：破壞性操作預設焦點在取消、Tab 切換、Esc 取消
   assert.notEqual(h.git(api, 'branch', '--list', 'tmp/unmerged'), '', 'Esc 不刪除');
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

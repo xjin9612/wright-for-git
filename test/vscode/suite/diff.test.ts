@@ -1,4 +1,4 @@
-// 原生 diff：從記錄開 diff、新增／刪除檔案、中文檔名、← → 切換、分頁標題的位置、提交視窗的可編輯 diff（對應手動清單第 2 節）
+// 原生 diff：從記錄開 diff、新增／刪除檔案、中文檔名、← → 切換、分頁標題的位置、提交視窗的可編輯 diff
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { api, git, repoPath, test, until } from './harness';

@@ -79,14 +79,18 @@ test('Push 對話框：列出各 repo 的目標與待推 commit；點 commit 列
   await d.page.close();
 });
 
-test('Push：web-app 被拒（遠端較新），api-server 推送成功', async () => {
+test('Push：web-app 被拒（遠端較新），api-server 推送成功；錯誤通知可開啟主控台', async () => {
   const before = remoteHead('api-server');
   const d = await openPush();
+  // 失敗通知上按「Show Git Console」
+  app.calls.consoleShown = false;
+  app.calls.errorAnswers.push('Show Git Console');
   await d.page.locator('.push-main').click();
   await h.until(() => remoteHead('api-server') !== before, 40000);
   assert.equal(remoteHead('api-server'), h.git(api, 'rev-parse', 'main'));
-  await h.until(() => app.calls.errors.length + app.calls.warnings.length > 0, 40000);
-  assert.match([...app.calls.errors, ...app.calls.warnings].join('\n'), /web-app/);
+  await h.until(() => app.calls.errors.length > 0, 40000);
+  assert.match(app.calls.errors.join('\n'), /web-app/);
+  await h.until(() => app.calls.consoleShown, 5000);
   await d.page.close();
   await refresh();
 });
@@ -166,7 +170,7 @@ test('Fetch：取得遠端新 commit', async () => {
   await h.until(() => h.git(web, 'rev-parse', 'origin/main') === remote, 40000);
 });
 
-test('Git 主控台：記錄會改變狀態的指令與失敗原因；錯誤通知可開啟主控台', async () => {
+test('Git 主控台：記錄會改變狀態的指令與失敗原因；指令可開啟主控台', async () => {
   const lines = app.calls.console.filter(([level]) => level === 'info' || level === 'error').map(([level, text]) => `${level} ${text}`);
   const all = lines.join('\n');
   assert.match(all, /info \[api-server\] git push/);
@@ -176,10 +180,11 @@ test('Git 主控台：記錄會改變狀態的指令與失敗原因；錯誤通�
   // 只讀取的指令不出現在一般層級
   assert.doesNotMatch(all, /git log /);
   assert.ok(app.calls.console.some(([level, text]) => level === 'trace' && /git (log|status|for-each-ref)/.test(text)));
+  app.calls.consoleShown = false;
   await app.run('gitWorkbench.showConsole');
   assert.ok(app.calls.consoleShown);
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

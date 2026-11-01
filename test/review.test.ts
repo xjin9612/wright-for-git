@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, realpathSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { buildLogArgs, looksLikeHash } from '../src/git/parsers';
@@ -50,7 +50,7 @@ test('#4 i18n.logOutputEncoding=big5 時 log 中文仍正確', async () => {
   assert.equal((await repo.getDetails(out[0].hash)).message, '修正中文顯示');
 });
 
-test('#7 locate：子資料夾 prefix 與經過 symlink 的路徑', async () => {
+test('#7 locate：子資料夾 prefix 與經過 symlink 的路徑', async (t) => {
   const { dir, commit } = makeRepo();
   commit('c', { 'src/main/a.txt': '1' });
   const loc = (await GitRepository.locate('git', path.join(dir, 'src', 'main')))!;
@@ -60,7 +60,8 @@ test('#7 locate：子資料夾 prefix 與經過 symlink 的路徑', async () => 
     // Windows 用 junction，不需要系統管理員權限
     symlinkSync(dir, link, process.platform === 'win32' ? 'junction' : 'dir');
   } catch {
-    return; // 無法建立連結的環境略過此段
+    t.skip('無法建立連結，略過經過連結的路徑');
+    return;
   }
   const viaLink = (await GitRepository.locate('git', path.join(link, 'src')))!;
   assert.equal(viaLink.prefix, 'src/');
@@ -102,11 +103,4 @@ test('mapLimit：結果順序正確且並行數受限', async () => {
   });
   assert.deepEqual(out, [50, 10, 40, 20, 30]);
   assert.equal(peak, 2);
-});
-
-test('helpers 建立的暫存 repo 目錄存在', () => {
-  const d = mkdtempSync(path.join(tmpdir(), 'x-'));
-  mkdirSync(path.join(d, 'a'));
-  writeFileSync(path.join(d, 'a', 'b'), '');
-  assert.ok(existsSync(path.join(d, 'a', 'b')));
 });

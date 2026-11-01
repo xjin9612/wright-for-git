@@ -333,7 +333,8 @@ test('多個 commit 一次 cherry-pick／revert', async () => {
   assert.equal(a.git('log', '--format=%s', '-2'), 'two\none');
   const [h2, h1] = a.git('log', '--format=%H', '-2').split('\n');
   await repo.revertMany([h2, h1]);
-  assert.match(a.git('log', '--format=%s', '-2'), /Revert "two"\nRevert "one"|Revert "one"/);
+  // 依序 revert h2、h1：最新的是 revert one
+  assert.equal(a.git('log', '--format=%s', '-2'), 'Revert "one"\nRevert "two"');
   await assert.rejects(repo.cherryPickMany(['--abort']));
 });
 

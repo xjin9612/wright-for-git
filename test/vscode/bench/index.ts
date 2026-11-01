@@ -36,7 +36,10 @@ async function measure(filter: Partial<LogFilter>): Promise<{ firstBatchMs: numb
 const EMPTY: Partial<LogFilter> = { text: '', users: [], paths: [], branches: [] };
 
 async function scenarios(): Promise<[string, Partial<LogFilter>][]> {
-  const someHash = git(REPO, 'rev-list', '-n1', '--skip=54321', 'HEAD').slice(0, 10);
+  // 取中段的一筆 commit 當 hash 前綴（repo 大小不同也能取到）
+  const total = Number(git(REPO, 'rev-list', '--count', 'HEAD'));
+  const someHash = git(REPO, 'rev-list', '-n1', `--skip=${Math.floor(total / 2)}`, 'HEAD').slice(0, 10);
+  if (!someHash) throw new Error('取不到 commit：repo 是空的？');
   const feature = git(REPO, 'for-each-ref', '--format=%(refname)', '--count=1', 'refs/heads/feature/');
   return [
     ['無篩選', { ...EMPTY }],

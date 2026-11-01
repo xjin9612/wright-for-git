@@ -140,7 +140,7 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
     assert.match(await page.locator('.details-info').innerText(), /Bob Lin/);
   });
   await page.locator('.details-info .issue-link', { hasText: 'PROJ-42' }).click();
-  await h.until(() => JSON.stringify([app.calls.opened, app.calls.executed]).includes('PROJ-42'));
+  await h.until(() => app.calls.opened?.includes('https://tracker.example.com/browse/PROJ-42'));
 });
 
 test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', async () => {
@@ -152,9 +152,10 @@ test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', asy
     assert.match(files, /auth\.md/);
   });
   await (await row('docs: describe key rotation')).click({ button: 'right' });
-  const items = await h.texts(page.locator('.context-menu .menu-item'));
-  assert.ok(items.some((x) => /2/.test(x) && /Copy/.test(x)), items.join(' / '));
-  await page.keyboard.press('Escape');
+  app.calls.clipboard = undefined;
+  await h.menu(page, 'Copy 2 Revision Numbers');
+  const expected = h.git(`${pg}/api-server`, 'log', '--format=%H', '-2', 'main').split('\n').join('\n');
+  await h.until(() => app.calls.clipboard === expected);
 });
 
 test('右鍵選單包含 IntelliJ 的 commit 操作', async () => {
@@ -237,22 +238,28 @@ test('變更檔案列尾顯示狀態字母', async () => {
 test('鍵盤：↑↓／PageDown／Home／End 移動、Ctrl+C 複製 hash、Ctrl+F 聚焦搜尋、Esc 清除', async () => {
   const selected = () => page.evaluate(() => [...document.querySelectorAll('.log-row.selected')].find((r) => r.style.display !== 'none')?.querySelector('.cell-subject-text')?.textContent ?? '');
   await (await row('feat(auth): add API keys')).click();
+  // 畫面上的列依位置排序（列節點會重複使用，DOM 順序不等於畫面順序）
+  const ordered = () => page.evaluate(() => [...document.querySelectorAll('.log-row')].filter((r) => r.style.display !== 'none').sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index)).map((r) => r.querySelector('.cell-subject-text')?.textContent ?? ''));
+  const list = await ordered();
+  const at = list.indexOf('feat(auth): add API keys');
   await page.keyboard.press('ArrowDown');
-  await h.until(async () => (await selected()) === 'feat: add formatter' || (await selected()) !== 'feat(auth): add API keys');
-  const afterDown = await selected();
+  await h.until(async () => (await selected()) === list[at + 1]);
   await page.keyboard.press('ArrowUp');
-  await h.until(async () => (await selected()).includes('add API keys'));
-  await page.keyboard.press('End');
-  await h.until(async () => (await selected()) !== afterDown && !(await selected()).includes('add API keys'));
+  await h.until(async () => (await selected()) === list[at]);
   await page.keyboard.press('Home');
-  await h.until(async () => (await selected()) === (await subjects())[0]);
+  await h.until(async () => (await selected()) === (await ordered())[0]);
   await page.keyboard.press('PageDown');
-  await h.until(async () => (await selected()) !== (await subjects())[0]);
+  await h.until(async () => (await selected()) !== (await ordered())[0]);
+  await page.keyboard.press('End');
+  // 最後一筆：捲到底後畫面上最後一列
+  await h.until(async () => (await selected()) === (await ordered()).at(-1));
   await page.keyboard.press('Home');
+  await h.until(async () => (await selected()) === (await ordered())[0]);
+  // Ctrl+C：複製選取 commit（最上面一筆）的 hash；先清掉前面測試留下的剪貼簿內容
+  app.calls.clipboard = undefined;
   await page.keyboard.press('Control+C');
-  const top = h.git(`${pg}/web-app`, 'rev-parse', 'origin/main');
-  await h.until(() => typeof app.calls.clipboard === 'string' && app.calls.clipboard.length === 40);
-  void top;
+  const topHash = await page.evaluate(() => [...document.querySelectorAll('.log-row.selected')].find((r) => r.style.display !== 'none')?.querySelector('.cell-hash')?.textContent ?? '');
+  await h.until(() => typeof app.calls.clipboard === 'string' && app.calls.clipboard.length === 40 && app.calls.clipboard.startsWith(topHash));
   await page.keyboard.press('Control+F');
   assert.equal(await page.evaluate(() => document.activeElement?.closest('.log-search') !== null), true);
   await page.keyboard.type('pagination');
@@ -263,7 +270,7 @@ test('鍵盤：↑↓／PageDown／Home／End 移動、Ctrl+C 複製 hash、Ctrl
   assert.equal(await page.locator('.log-search input').inputValue(), '');
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
   assert.deepEqual(app.calls.errors, []);
 });

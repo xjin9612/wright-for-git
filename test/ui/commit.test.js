@@ -178,7 +178,9 @@ test('儲藏分頁：列出 stash、檔案依分組顯示、未追蹤另列；�
   await cv.waitForSelector('.confirm-dialog');
   await cv.locator('.confirm-dialog .button.danger').click();
   await h.until(async () => (await cv.locator('.stash-list .tree-row').count()) === stashes.length - 1);
-  assert.equal(h.git(web, 'stash', 'list').split('\n').length, 1);
+  const left = h.git(web, 'stash', 'list').split('\n').filter(Boolean);
+  assert.equal(left.length, 1);
+  assert.match(left[0], /draft: new page/);
 });
 
 test('儲藏變更：從工具列儲藏 web-app 的修改', async () => {
@@ -211,6 +213,6 @@ test('鍵盤：空白鍵切換勾選；提交訊息中 Ctrl+Enter 提交', async
   await h.until(() => h.git(web, 'log', '-1', '--format=%s') === 'style: keyboard commit');
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

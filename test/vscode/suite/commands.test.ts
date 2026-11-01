@@ -1,4 +1,4 @@
-// 指令：顯示 Git 歷史、切換 Git Blame、顯示 Git 主控台（對應手動清單第 2 節的右鍵選單與主控台）
+// 指令：顯示 Git 歷史、切換 Git Blame、顯示 Git 主控台
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';

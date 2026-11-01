@@ -1,4 +1,4 @@
-// 合併衝突：VS Code 內建合併編輯器、採用一邊、繼續合併（對應手動清單第 5 節）
+// 合併衝突：VS Code 內建合併編輯器、採用一邊、繼續合併
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';

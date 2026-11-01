@@ -20,18 +20,22 @@ test('t()／plural() 的字串都在 bundle.l10n.zh-tw.json', () => {
   const bundle = JSON.parse(readFileSync(path.join(ROOT, 'l10n', 'bundle.l10n.zh-tw.json'), 'utf8')) as Record<string, string>;
   const missing = new Set<string>();
   let found = 0;
-  const str = String.raw`'((?:[^'\\]|\\.)*)'`;
+  // 單引號或雙引號的字串字面值；樣板字串（`…`）不能翻譯，另外檢查
+  const str = String.raw`(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")`;
   const tCall = new RegExp(String.raw`\bt\(\s*${str}`, 'g');
   const pluralCall = new RegExp(String.raw`\bplural\([^,]+,\s*${str}\s*,\s*${str}`, 'g');
+  const templateCall = /\b(?:t|plural)\(\s*(?:[^,()]+,\s*)?`/g;
   for (const file of sources(path.join(ROOT, 'src'))) {
     const text = readFileSync(file, 'utf8');
     for (const m of text.matchAll(tCall)) {
       found++;
-      if (!(unquote(m[1]) in bundle)) missing.add(`${path.relative(ROOT, file)}: ${m[1]}`);
+      const key = m[1] ?? m[2];
+      if (!(unquote(key) in bundle)) missing.add(`${path.relative(ROOT, file)}: ${key}`);
     }
     for (const m of text.matchAll(pluralCall)) {
-      for (const k of [m[1], m[2]]) if (!(unquote(k) in bundle)) missing.add(`${path.relative(ROOT, file)}: ${k}`);
+      for (const k of [m[1] ?? m[2], m[3] ?? m[4]]) if (!(unquote(k) in bundle)) missing.add(`${path.relative(ROOT, file)}: ${k}`);
     }
+    for (const m of text.matchAll(templateCall)) missing.add(`${path.relative(ROOT, file)}: 樣板字串無法翻譯：${m[0]}`);
   }
   assert.ok(found > 300, `只找到 ${found} 個 t() 呼叫，比對規則可能失效`);
   assert.deepEqual([...missing], []);

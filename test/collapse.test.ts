@@ -20,16 +20,10 @@ const EXAMPLE = [
 ];
 const heads = new Map([[0, 'M']]);
 
-test('分支中間連續的 commit 被收；上端、分支第一筆保留；主線不收', () => {
+test('分支中間連續的 commit 被收；上端（合併的第二個 parent）、分支第一筆保留；主線不收', () => {
   const runs = findLinearRuns(EXAMPLE, heads, new Set());
   assert.equal(runs.length, 1);
   assert.deepEqual(runs[0], { key: '0:f5', repo: 0, tip: 'f6', hidden: ['f5', 'f4', 'f3', 'f2'], last: 'f1' });
-});
-
-test('分支被合併後沒有標籤：最新一筆（合併的第二個 parent）仍保留', () => {
-  // f6 是 M 的第二個 parent，M 在主線上；f6 本身也可收，但作為上端保留
-  const runs = findLinearRuns(EXAMPLE, heads, new Set());
-  assert.equal(runs[0].tip, 'f6');
 });
 
 test('有標籤的 commit 不收，把段落切開；切開後少於 3 筆的不收', () => {

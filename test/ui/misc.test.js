@@ -131,12 +131,12 @@ test('切換 Git Blame：改變內建的 git.blame.editorDecoration.enabled', as
   assert.equal(app.calls.config['git.blame.editorDecoration.enabled'], false);
 });
 
-test('Fetch／Pull 指令：多 repo 一次執行並彙整', async () => {
+test('Fetch 指令：多 repo 一次執行並彙整結果', async () => {
   const before = app.calls.status.length + app.calls.infos.length + app.calls.warnings.length;
   await app.run('gitWorkbench.fetch');
   await h.until(() => app.calls.status.length + app.calls.infos.length + app.calls.warnings.length > before, 15000);
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

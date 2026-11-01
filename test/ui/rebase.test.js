@@ -130,6 +130,6 @@ test('detached HEAD 時拒絕', async () => {
   h.git(api, 'checkout', '-q', 'main');
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

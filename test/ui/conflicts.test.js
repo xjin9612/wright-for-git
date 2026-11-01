@@ -203,7 +203,6 @@ test('cherry-pick 衝突：提交視窗右鍵「標記為已解決」（仍有�
   await h.until(() => h.git(web, 'log', '-1', '--format=%s') === 'feat(ui): default to dark theme', 30000);
 });
 
-test('沒有 webview 錯誤', () => {
-  assert.deepEqual(h.pageErrors(app.log), []);
-  assert.deepEqual(h.pageErrors(cvView.log), []);
+test('沒有 webview 錯誤（Log、提交視窗、對話框分頁）', () => {
+  assert.deepEqual(app.pageErrors(), []);
 });

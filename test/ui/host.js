@@ -27,6 +27,8 @@ function resetCalls() {
     commands: {},
     executed: [],
     errors: [],
+    /** showErrorMessage 依序回答的按鈕（沒有時視同關閉通知） */
+    errorAnswers: [],
     warnings: [],
     infos: [],
     status: [],
@@ -154,7 +156,7 @@ const vscode = {
     },
     showErrorMessage: async (m, o) => {
       calls.errors.push(m + (o && o.detail ? ` | ${o.detail}` : ''));
-      return undefined;
+      return calls.errorAnswers.shift();
     },
     showInformationMessage: async (m, o, ok) => {
       calls.infos.push(m);
@@ -430,6 +432,8 @@ async function launch(workspace, opts = {}) {
   const page = log.page;
   await page.waitForFunction(() => document.querySelectorAll('.log-row').length > 0 && !document.querySelector('.progress.active'), null, { timeout: 30000 });
   const extraPages = [];
+  /** 所有 webview 頁面的 console 記錄（Log、提交視窗、對話框分頁），檢查 webview 錯誤用 */
+  const pageLogs = [['Log', log.log]];
   current = {
     repos: () => findRepos(workspace),
     pages: () => [['Log', page], ...extraPages.filter(([, p]) => !p.isClosed())],
@@ -446,10 +450,15 @@ async function launch(workspace, opts = {}) {
     ctx,
     /** 擴充功能啟用時回傳的測試用介面（src/testApi.ts） */
     api: testApi,
+    /** 所有開過的 webview 頁面中的錯誤（console.error、未捕捉例外），附上頁面名稱 */
+    pageErrors() {
+      return pageLogs.flatMap(([name, l]) => pageErrors(l).map((e) => `${name}: ${e}`));
+    },
     /** 開啟提交視窗 */
     async commitView(viewport = { width: 420, height: 760 }) {
       const v = await attachWebviewView(browser, calls.providers['gitWorkbench.commit'], 'commit.js', viewport);
       extraPages.push(['提交視窗', v.page]);
+      pageLogs.push(['提交視窗', v.log]);
       await v.page.waitForSelector('.commit-tree .tree-row, .commit-tree .empty-text');
       return v;
     },
@@ -460,6 +469,7 @@ async function launch(workspace, opts = {}) {
       const p = await browser.newPage({ viewport });
       const plog = watchPage(p);
       extraPages.push(['對話框分頁', p]);
+      pageLogs.push([`對話框分頁 ${panel.title}`, plog]);
       await p.exposeFunction('__host', (m) => panel._onMsg(m));
       panel._post = async (m) => {
         await p.evaluate((msg) => window.postMessage(msg, '*'), m).catch(() => undefined);
@@ -584,7 +594,8 @@ const texts = async (locator) => (await locator.allInnerTexts()).map((t) => t.re
 async function logRow(page, text) {
   const find = () => page.locator('.log-row:visible', { hasText: text }).first();
   await find().scrollIntoViewIfNeeded();
-  await page.waitForTimeout(150);
+  // 虛擬清單在捲動後的下一個 frame 重畫：等兩個 frame 再取
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return find();
 }
 

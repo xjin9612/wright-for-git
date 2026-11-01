@@ -1,4 +1,4 @@
-// 啟用、指令註冊、視圖、repo 偵測（對應手動清單「入口」）
+// 啟用、指令註冊、視圖、repo 偵測
 import * as assert from 'node:assert/strict';
 import * as vscode from 'vscode';
 import { api, test, until } from './harness';
@@ -19,8 +19,12 @@ test('快捷鍵：Alt+9、Alt+0 對應的指令可以執行，並打開記錄與
   const keys: { command: string; key: string }[] = ext.packageJSON.contributes.keybindings;
   assert.equal(keys.find((k) => k.key === 'alt+9')?.command, 'gitWorkbench.show');
   assert.equal(keys.find((k) => k.key === 'alt+0')?.command, 'gitWorkbench.showCommit');
+  const a = await api();
   await vscode.commands.executeCommand('gitWorkbench.show');
+  // 記錄面板打開後 webview 會請求載入記錄
+  await until(() => a.logStats()?.doneMs !== undefined, '記錄載入完成');
   await vscode.commands.executeCommand('gitWorkbench.showCommit');
+  await until(() => a.commitState(), '提交視窗載入變更');
   await vscode.commands.executeCommand('gitWorkbench.repositories.focus');
 });
 
