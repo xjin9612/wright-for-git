@@ -290,12 +290,12 @@
         {
           "command": "gitWorkbench.diff.previousFile",
           "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
-          "group": "navigation@-99"
+          "group": "navigation@11.1"
         },
         {
           "command": "gitWorkbench.diff.nextFile",
           "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
-          "group": "navigation@-98"
+          "group": "navigation@11.2"
         }
       ],
       "gitWorkbench.explorer": [
