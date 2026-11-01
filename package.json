@@ -451,6 +451,7 @@
     "test": "node esbuild.mjs --tests && node --test \"out/test/*.test.js\"",
     "test:ui": "node esbuild.mjs && node --test --test-concurrency=1 \"test/ui/*.test.js\"",
     "test:vscode": "node esbuild.mjs && node esbuild.mjs --vscode-tests && node out/vscode/run.js",
+    "bench:vscode": "node esbuild.mjs --production && node esbuild.mjs --vscode-tests && node -e \"process.env.GWB_MODE='bench';require('./out/vscode/run.js')\"",
     "vscode:prepublish": "node esbuild.mjs --production",
     "package": "vsce package --no-dependencies"
   },

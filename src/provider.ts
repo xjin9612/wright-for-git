@@ -27,6 +27,16 @@ interface RepoEntry {
   stateJson?: string;
 }
 
+/** 一次載入 Log 的耗時：從收到 webview 請求起算，到送出第一批與全部送完 */
+export interface LogStats {
+  requestId: number;
+  filter: LogFilter;
+  startedAt: number;
+  firstBatchMs?: number;
+  doneMs?: number;
+  count: number;
+}
+
 export interface RepositorySummary {
   root: string;
   name: string;
@@ -505,6 +515,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     this.logAbort?.abort();
     const abort = new AbortController();
     this.logAbort = abort;
+    const stats: LogStats = { requestId, filter, startedAt: Date.now(), count: 0 };
+    this.lastLogStats = stats;
     const max = vscode.workspace.getConfiguration('gitWorkbench').get<number>('maxCommits', 50000);
     const graph = isGraphFilter(filter);
     const entries = this.entries;
@@ -541,6 +553,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       // 多個 repo 合計也不超過 maxCommits（避免虛擬捲動高度超出瀏覽器上限）
       const batch = pending.slice(0, max - flushed);
       if (!abort.signal.aborted) this.post({ type: 'logBatch', requestId, commits: batch, done: false, graph });
+      stats.firstBatchMs ??= Date.now() - stats.startedAt;
+      stats.count += batch.length;
       flushed += batch.length;
       pending = [];
       lastFlush = Date.now();
@@ -581,6 +595,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       return;
     }
     this.post({ type: 'logBatch', requestId, commits: [], done: true, graph, warnings: errors.length > 0 ? errors : undefined });
+    stats.doneMs = Date.now() - stats.startedAt;
     if (!graph && flushed > 0 && flushed < max && !abort.signal.aborted) await this.sendSimplifiedGraph(requestId, targets, matched, max, abort.signal);
   }
 
@@ -892,6 +907,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     if (this.diffNav) this.diffNav.right = right;
     this.updateDiffNavContext();
   }
+
+  /** 最近一次載入 Log 的耗時（效能量測用） */
+  lastLogStats: LogStats | undefined;
 
   /** 目前 Log 使用中的篩選（webview 套用後回報） */
   get logFilter(): LogFilter {

@@ -18,6 +18,7 @@ const vscodeTests = [
   // 真實 VS Code 自動化測試：啟動程式（Node）與在 VS Code 裡面執行的測試
   { ...common, entryPoints: ['test/vscode/run.ts'], outfile: 'out/vscode/run.js', platform: 'node', format: 'cjs', target: 'node20', external: ['@vscode/test-electron'], sourcemap: true, minify: false },
   { ...common, entryPoints: ['test/vscode/suite/index.ts'], outfile: 'out/vscode/suite/index.js', platform: 'node', format: 'cjs', target: 'node20', external: ['vscode'], sourcemap: true, minify: false },
+  { ...common, entryPoints: ['test/vscode/bench/index.ts'], outfile: 'out/vscode/bench/index.js', platform: 'node', format: 'cjs', target: 'node20', external: ['vscode'], sourcemap: true, minify: false },
 ];
 
 const targets = args.has('--vscode-tests')

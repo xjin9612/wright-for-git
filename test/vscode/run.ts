@@ -2,6 +2,7 @@
 // 用法：npm run test:vscode
 //   VSCODE_VERSION=1.90.0  指定 VS Code 版本（預設 stable）
 //   GWB_GREP=diff          只跑名稱含這段文字的測試
+//   GWB_MODE=bench         改跑大型 repo 效能量測（npm run bench:vscode）；GWB_BENCH_COMMITS 指定 commit 數（預設 100000）
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,9 +12,15 @@ import { runTests } from '@vscode/test-electron';
 const ROOT = path.resolve(__dirname, '..', '..');
 
 async function main(): Promise<void> {
+  const bench = process.env.GWB_MODE === 'bench';
   const tmp = mkdtempSync(path.join(tmpdir(), 'gwb-vscode-'));
-  const playground = path.join(tmp, 'playground');
-  execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-playground.mjs'), playground], { stdio: 'ignore' });
+  const playground = path.join(tmp, bench ? 'large-repo' : 'playground');
+  if (bench) {
+    // 效能量測：產生大型 repo（約 15 秒）
+    execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-large-repo.mjs'), playground, process.env.GWB_BENCH_COMMITS || '100000'], { stdio: 'inherit' });
+  } else {
+    execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-playground.mjs'), playground], { stdio: 'ignore' });
+  }
 
   // 乾淨的使用者設定：不受本機設定、其他擴充功能影響
   const userData = path.join(tmp, 'user-data');
@@ -42,9 +49,9 @@ async function main(): Promise<void> {
     await runTests({
       version: process.env.VSCODE_VERSION || 'stable',
       extensionDevelopmentPath: ROOT,
-      extensionTestsPath: path.join(__dirname, 'suite', 'index.js'),
+      extensionTestsPath: path.join(__dirname, bench ? 'bench' : 'suite', 'index.js'),
       launchArgs: [playground, '--user-data-dir', userData, '--extensions-dir', path.join(tmp, 'extensions'), '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--disable-gpu'],
-      extensionTestsEnv: { GWB_PLAYGROUND: playground, GWB_GREP: process.env.GWB_GREP ?? '' },
+      extensionTestsEnv: { GWB_PLAYGROUND: playground, GWB_GREP: process.env.GWB_GREP ?? '', GWB_ROOT: ROOT },
     });
   } catch (e) {
     failed = true;

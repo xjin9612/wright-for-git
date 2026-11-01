@@ -2,7 +2,7 @@
 // 一般使用不會用到；只回傳既有物件的方法，不新增任何行為。
 import type { CommitViewProvider } from './commitView';
 import { recentGitLog } from './gitConsole';
-import type { RepositorySummary, WorkbenchViewProvider } from './provider';
+import type { LogStats, RepositorySummary, WorkbenchViewProvider } from './provider';
 import type { CommitState, ConflictFile, LogFilter, WorkingChange } from './shared/protocol';
 
 export interface TestApi {
@@ -22,6 +22,10 @@ export interface TestApi {
   resolveConflicts(items: { root: string; path: string }[], action: 'ours' | 'theirs' | 'resolved'): Promise<void>;
   openInMergeEditor(root: string, path: string): Promise<void>;
   runOperation(root: string, action: 'continue' | 'skip' | 'abort'): Promise<void>;
+  /** 最近一次載入 Log 的耗時（效能量測） */
+  logStats(): LogStats | undefined;
+  /** 等同在 Log 上方改篩選（經過 webview，與使用者操作相同） */
+  applyLogFilter(filter: Partial<LogFilter>): Promise<void>;
   /** 最近的寫入 git 指令與失敗（測試失敗時的診斷） */
   recentGitLog(): readonly string[];
 }
@@ -54,6 +58,8 @@ export function createTestApi(provider: WorkbenchViewProvider, commitView: () =>
     resolveConflicts: (items, action) => provider.dialogs.conflicts.act(items, action),
     openInMergeEditor: (root, filePath) => provider.dialogs.conflicts.openInMergeEditor(root, filePath),
     runOperation: (root, action) => provider.runOperation(root, action),
+    logStats: () => provider.lastLogStats,
+    applyLogFilter: (filter) => provider.applyFilter(filter, false),
     recentGitLog,
   };
 }
