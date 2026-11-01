@@ -1,6 +1,7 @@
 // 大型 repo 效能量測（npm run bench:vscode）：在真實 VS Code 裡開啟 scripts/make-large-repo.mjs 產生的 repo，
 // 量測 Log 各種篩選的載入時間；先量沒有 commit-graph 的情況，再寫入 commit-graph 後重量一次。
 // 時間從 extension 收到 webview 的載入請求起算：第一批送出（首屏）、全部送完。
+import { execFile } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -76,7 +77,10 @@ test('大型 repo：各種篩選的載入時間（沒有 commit-graph，再寫�
   const graphFile = path.join(REPO, '.git', 'objects', 'info', 'commit-graph');
   if (existsSync(graphFile)) rmSync(graphFile);
   await round(false);
-  git(REPO, 'commit-graph', 'write', '--reachable', '--changed-paths', '--no-progress');
+  // 用非同步執行：測試跑在 extension host 裡，同步執行好幾秒會讓 VS Code 回報 extension host 沒有回應
+  await new Promise<void>((resolve, reject) =>
+    execFile('git', ['commit-graph', 'write', '--reachable', '--changed-paths', '--no-progress'], { cwd: REPO }, (e) => (e ? reject(e) : resolve())),
+  );
   await sleep(500);
   await round(true);
 
