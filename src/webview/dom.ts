@@ -95,8 +95,10 @@ export type MenuItem =
       star?: { on: boolean; toggle: () => boolean };
       /** 點選後不關閉選單；action 回傳 boolean 時更新勾選狀態 */
       keepOpen?: boolean;
-      /** 子選單（滑鼠移過去時展開） */
+      /** 子選單（滑鼠移過去或按 → 時展開） */
       submenu?: MenuItem[];
+      /** 右側的快捷鍵提示（如 Ctrl+C） */
+      keybinding?: string;
       action?: (e: MouseEvent) => void | boolean;
     }
   | '-';
@@ -107,31 +109,140 @@ export function closeMenus(): void {
 }
 
 let menuCleanup: (() => void) | undefined;
+let keyboardOpen = false;
 
-/** 彈出選單（右鍵選單、下拉選單共用）；支援子選單、星號與不關閉的勾選項；點外面或 Esc 關閉 */
+/** 以鍵盤（選單鍵、Shift+F10）開啟選單：第一個項目直接取得焦點 */
+export function openMenuByKeyboard(open: () => void): void {
+  keyboardOpen = true;
+  try {
+    open();
+  } finally {
+    keyboardOpen = false;
+  }
+}
+
+/** 是否為開啟右鍵選單的按鍵（選單鍵或 Shift+F10） */
+export function isContextMenuKey(e: KeyboardEvent): boolean {
+  return e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey);
+}
+
+/** 鍵盤開啟某列的右鍵選單：在該列左下方送出 contextmenu 事件 */
+export function openContextMenuFor(row: Element | null): void {
+  if (!row) return;
+  const r = row.getBoundingClientRect();
+  openMenuByKeyboard(() => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 24, clientY: r.bottom })));
+}
+
+const levelMenu = (level: number) => document.querySelector<HTMLElement>(`.context-menu[data-level="${level}"]`);
+const enabledItems = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLElement>(':scope > .menu-item:not(.disabled)')];
+
+/** 標記選單中目前的項目（滑鼠移入或方向鍵） */
+function setActive(menu: HTMLElement, item: HTMLElement | undefined): void {
+  menu.querySelectorAll('.menu-item.active').forEach((n) => n.classList.remove('active'));
+  if (!item) return;
+  item.classList.add('active');
+  item.scrollIntoView({ block: 'nearest' });
+}
+
+/** 最深一層有作用中項目的選單 */
+function currentLevel(): number {
+  let level = 0;
+  document.querySelectorAll<HTMLElement>('.context-menu').forEach((m) => {
+    if (m.querySelector('.menu-item.active')) level = Math.max(level, Number(m.dataset.level));
+  });
+  return level;
+}
+
+/**
+ * 彈出選單（右鍵選單、下拉選單共用）；支援子選單、星號與不關閉的勾選項。
+ * 鍵盤：↑↓ Home End 移動、→ 開子選單、← 回上層、Enter／空白鍵執行、Esc 關閉；點外面關閉。
+ */
 export function showMenu(x: number, y: number, items: MenuItem[]): void {
   menuCleanup?.();
   closeMenus();
+  const previousFocus = document.activeElement as HTMLElement | null;
   const root = openLevel(x, y, items, 0);
   if (!root) return;
-  const close = (e: Event) => {
-    if (e instanceof KeyboardEvent) {
-      if (e.key !== 'Escape') return;
-    } else if ((e.target as Element | null)?.closest?.('.context-menu')) {
-      return;
+  if (keyboardOpen) setActive(root, enabledItems(root)[0]);
+  const press = (item: HTMLElement) => item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const onMouse = (e: Event) => {
+    if (!(e.target as Element | null)?.closest?.('.context-menu')) cleanup();
+  };
+  const onKey = (e: KeyboardEvent) => {
+    const level = currentLevel();
+    const menu = levelMenu(level);
+    if (!menu) return;
+    const list = enabledItems(menu);
+    const active = menu.querySelector<HTMLElement>('.menu-item.active') ?? undefined;
+    const idx = active ? list.indexOf(active) : -1;
+    const openSub = (item: HTMLElement) => {
+      press(item);
+      const sub = levelMenu(level + 1);
+      if (sub) setActive(sub, enabledItems(sub)[0]);
+    };
+    switch (e.key) {
+      case 'ArrowDown':
+        setActive(menu, list[(idx + 1) % list.length]);
+        break;
+      case 'ArrowUp':
+        setActive(menu, list[idx <= 0 ? list.length - 1 : idx - 1]);
+        break;
+      case 'Home':
+        setActive(menu, list[0]);
+        break;
+      case 'End':
+        setActive(menu, list[list.length - 1]);
+        break;
+      case 'ArrowRight':
+        if (active?.classList.contains('has-submenu')) openSub(active);
+        break;
+      case 'ArrowLeft':
+        if (level > 0) {
+          menu.remove();
+          const parent = levelMenu(level - 1);
+          const opener = parent?.querySelector<HTMLElement>('.menu-item.open');
+          if (parent && opener) {
+            opener.classList.remove('open');
+            setActive(parent, opener);
+          }
+        }
+        break;
+      case 'Enter':
+      case ' ':
+        if (!active) break;
+        if (active.classList.contains('has-submenu')) openSub(active);
+        else press(active);
+        break;
+      case 'Escape':
+        if (level > 0) {
+          menu.remove();
+          const parent = levelMenu(level - 1);
+          parent?.querySelector('.menu-item.open')?.classList.remove('open');
+        } else {
+          cleanup();
+          previousFocus?.focus?.();
+        }
+        break;
+      case 'Tab':
+        cleanup();
+        return;
+      default:
+        return;
     }
-    cleanup();
+    e.preventDefault();
+    e.stopPropagation();
   };
   const cleanup = () => {
     closeMenus();
-    document.removeEventListener('mousedown', close, true);
-    document.removeEventListener('keydown', close, true);
+    document.removeEventListener('mousedown', onMouse, true);
+    document.removeEventListener('keydown', onKey, true);
     menuCleanup = undefined;
   };
   menuCleanup = cleanup;
+  // 按鍵立即接手（避免選單剛開時按鍵落到底下的清單）；滑鼠延後，以免開啟選單的那一下就把它關掉
+  document.addEventListener('keydown', onKey, true);
   setTimeout(() => {
-    document.addEventListener('mousedown', close, true);
-    document.addEventListener('keydown', close, true);
+    if (menuCleanup === cleanup) document.addEventListener('mousedown', onMouse, true);
   });
 }
 
@@ -175,6 +286,7 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
       check,
       el('span', { className: 'menu-label', text: it.label }),
       it.detail ? el('span', { className: 'menu-detail', text: it.detail }) : null,
+      it.keybinding ? el('span', { className: 'menu-key', text: it.keybinding }) : null,
       it.submenu ? icon('chevron-right', 'menu-arrow') : null,
     );
     if (it.submenu) {
@@ -186,7 +298,10 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
         menu.querySelectorAll('.menu-item.open').forEach((n) => n.classList.remove('open'));
         row.classList.add('open');
       };
-      row.addEventListener('mouseenter', open);
+      row.addEventListener('mouseenter', () => {
+        setActive(menu, it.disabled ? undefined : row);
+        open();
+      });
       row.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -194,6 +309,7 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
       });
     } else {
       row.addEventListener('mouseenter', () => {
+        setActive(menu, it.disabled ? undefined : row);
         // 移到沒有子選單的項目時，收起更深層的子選單
         document.querySelectorAll<HTMLElement>('.context-menu').forEach((m) => {
           if (Number(m.dataset.level) > level) m.remove();

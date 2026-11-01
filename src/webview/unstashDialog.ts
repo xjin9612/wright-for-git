@@ -1,7 +1,7 @@
 // 取消儲藏對話框（對應 IntelliJ 的 Unstash Changes）：選儲藏、看檔案，套用／套用並刪除／建立成分支
 import type { ChangedFile, StashInfo, ToWebview } from '../shared/protocol';
 import { clear, el, formatDate } from './dom';
-import { fileIcon } from './fileIcons';
+import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { t } from './l10n';
 import { post } from './vscodeApi';
 
@@ -158,8 +158,9 @@ class UnstashDialog {
         'div',
         { className: 'tree-row', title: `${f.path}\n${t('Double-click to show the diff')}` },
         fileIcon(f.path),
-        el('span', { className: `tree-label status-${f.status}`, text: name }),
-        el('span', { className: 'tree-count', text: [dir, f.untracked ? t('untracked') : ''].filter(Boolean).join(' · ') }),
+        el('span', { className: `tree-label ${statusClass(f.untracked ? 'untracked' : f.status)}`, text: name }),
+        el('span', { className: 'tree-count', text: dir }),
+        statusLetter(f.untracked ? 'untracked' : f.status),
       );
       row.addEventListener('dblclick', () => {
         if (this.root && this.selected) post({ type: 'openStashDiff', root: this.root, hash: this.selected, file: f });

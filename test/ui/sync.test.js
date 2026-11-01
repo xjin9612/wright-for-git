@@ -65,9 +65,9 @@ test('Push：web-app 被拒（遠端較新），api-server 推送成功', async 
   const before = remoteHead('api-server');
   const d = await openPush();
   await d.page.locator('.push-main').click();
-  await h.until(() => remoteHead('api-server') !== before, 15000);
+  await h.until(() => remoteHead('api-server') !== before, 40000);
   assert.equal(remoteHead('api-server'), h.git(api, 'rev-parse', 'main'));
-  await h.until(() => app.calls.errors.length + app.calls.warnings.length > 0, 15000);
+  await h.until(() => app.calls.errors.length + app.calls.warnings.length > 0, 40000);
   assert.match([...app.calls.errors, ...app.calls.warnings].join('\n'), /web-app/);
   await d.page.close();
   await refresh();
@@ -77,7 +77,7 @@ test('Pull：落後的 web-app 拉到最新', async () => {
   app.calls.errors.length = 0;
   h.git(web, 'stash', '-q');
   await page.locator('.toolbar-group [title*="Pull"]').click();
-  await h.until(() => h.git(web, 'rev-parse', 'main') === remoteHead('web-app'), 15000);
+  await h.until(() => h.git(web, 'rev-parse', 'main') === remoteHead('web-app'), 40000);
   h.git(web, 'stash', 'pop', '-q');
   await refresh();
 });
@@ -93,7 +93,7 @@ test('Force Push（with lease）需確認，覆蓋遠端', async () => {
   await d.page.locator('.menu-item', { hasText: 'Force Push' }).dispatchEvent('mousedown');
   await d.page.waitForSelector('.confirm-dialog');
   await d.page.locator('.confirm-dialog .button.danger').click();
-  await h.until(() => h.git(`${remotes()}/api-server.git`, 'log', '-1', '--format=%s', 'main') === 'local only', 15000);
+  await h.until(() => h.git(`${remotes()}/api-server.git`, 'log', '-1', '--format=%s', 'main') === 'local only', 40000);
   await d.page.close();
   await refresh();
 });
@@ -102,20 +102,26 @@ test('新分支：顯示 New 並在推送後設定 upstream；可改遠端分支
   h.git(api, 'stash', '-q', '-u');
   h.git(api, 'checkout', '-q', 'feature/rate-limit');
   await refresh();
-  const d = await openPush();
-  const apiRepo = d.page.locator('.push-repo', { hasText: 'rate-limit' }).first();
-  assert.match(await apiRepo.innerText(), /New/);
-  const input = apiRepo.locator('.push-branch');
-  await input.fill('feature/rate-limit-v2');
-  await input.press('Enter');
-  await d.page.waitForTimeout(800);
-  await d.page.locator('.push-main').click();
-  await h.until(() => h.git(`${remotes()}/api-server.git`, 'branch', '--list', 'feature/rate-limit-v2') !== '', 15000);
-  await h.until(() => h.git(api, 'rev-parse', '--abbrev-ref', 'feature/rate-limit@{upstream}') === 'origin/feature/rate-limit-v2');
-  await d.page.close();
-  h.git(api, 'checkout', '-q', 'main');
-  h.git(api, 'stash', 'pop', '-q');
-  await refresh();
+  try {
+    const d = await openPush();
+    const apiRepo = d.page.locator('.push-repo', { hasText: 'rate-limit' }).first();
+    assert.match(await apiRepo.innerText(), /New/);
+    const input = apiRepo.locator('.push-branch');
+    await input.fill('feature/rate-limit-v2');
+    await input.press('Enter');
+    // 新的預覽回來前 Push 停用
+    await d.page.waitForFunction(() => !document.querySelector('.push-main').disabled);
+    assert.equal(await d.page.locator('.push-branch').first().inputValue(), 'feature/rate-limit-v2');
+    await d.page.locator('.push-main').click();
+    await h.until(() => h.git(`${remotes()}/api-server.git`, 'branch', '--list', 'feature/rate-limit-v2') !== '', 40000);
+    await h.until(() => h.git(api, 'rev-parse', '--abbrev-ref', 'feature/rate-limit@{upstream}') === 'origin/feature/rate-limit-v2');
+    await d.page.close();
+  } finally {
+    // 失敗時也還原，避免影響後面的測試
+    h.git(api, 'checkout', '-q', 'main');
+    h.git(api, 'stash', 'pop', '-q');
+    await refresh();
+  }
 });
 
 test('Push 到這裡為止：只推到選取的 commit', async () => {
@@ -124,7 +130,7 @@ test('Push 到這裡為止：只推到選取的 commit', async () => {
   await refresh();
   const target = h.git(api, 'rev-parse', 'HEAD~1');
   for (const p of app.calls.panels) if (!p.disposed) p.dispose();
-  await page.locator('.log-row:visible', { hasText: 'second local' }).first().click({ button: 'right' });
+  await (await h.logRow(page, 'second local')).click({ button: 'right' });
   const n = app.calls.panels.length;
   await h.menu(page, 'Push All up to Here');
   await h.until(() => app.calls.panels.length > n);
@@ -133,7 +139,7 @@ test('Push 到這裡為止：只推到選取的 commit', async () => {
   await d.page.waitForTimeout(400);
   assert.deepEqual(await h.texts(d.page.locator('.push-commit-subject')), ['second local']);
   await d.page.locator('.push-main').click();
-  await h.until(() => remoteHead('api-server') === target, 15000);
+  await h.until(() => remoteHead('api-server') === target, 40000);
   await d.page.close();
 });
 
@@ -141,7 +147,7 @@ test('Fetch：取得遠端新 commit', async () => {
   h.remotePush(pg, 'web-app');
   const remote = remoteHead('web-app');
   await page.locator('.vertical-toolbar [title="Fetch all remotes"]').click();
-  await h.until(() => h.git(web, 'rev-parse', 'origin/main') === remote, 15000);
+  await h.until(() => h.git(web, 'rev-parse', 'origin/main') === remote, 40000);
 });
 
 test('沒有 webview 錯誤', () => {

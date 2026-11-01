@@ -2,7 +2,7 @@
 import type { ChangedFile } from '../shared/protocol';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, icon, iconButton, showMenu } from './dom';
-import { fileIcon } from './fileIcons';
+import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { plural, t } from './l10n';
 
 /** 變更檔案的分組方式 */
@@ -238,12 +238,13 @@ export class FileTree {
         { className: `tree-row${r.key === this.selected ? ' selected' : ''}`, title, attrs: { role: 'treeitem' } },
         twisty,
         f ? fileIcon(f.path) : r.icon === 'section' ? null : icon(r.icon ?? 'folder'),
-        el('span', { className: `tree-label${f ? ` status-${f.status}` : ''}${r.icon === 'section' ? ' commit-section' : ''}`, text: r.label }),
+        el('span', { className: `tree-label${f ? ` ${statusClass(f.untracked ? 'untracked' : f.status)}` : ''}${r.icon === 'section' ? ' commit-section' : ''}`, text: r.label }),
         r.count !== undefined ? el('span', { className: 'tree-count', text: plural(r.count, '{0} file', '{0} files') }) : null,
         f && !this.grouping.directory && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
         r.detail ? el('span', { className: 'tree-count', text: r.detail }) : null,
         f?.oldPath ? el('span', { className: 'tree-count', text: `← ${f.oldPath}` }) : null,
         extra ? el('span', { className: 'tree-count', text: extra }) : null,
+        f ? statusLetter(f.untracked ? 'untracked' : f.status) : null,
       );
       row.style.paddingLeft = `${4 + r.depth * 14}px`;
       row.addEventListener('click', () => {

@@ -23,7 +23,7 @@ async function settle() {
 }
 const visibleRows = () => page.locator('.log-row:visible');
 const subjects = () => h.texts(page.locator('.log-row:visible .cell-subject-text'));
-const row = (text) => page.locator('.log-row:visible', { hasText: text }).first();
+const row = (text) => h.logRow(page, text);
 const chip = (name) => page.locator('.chip', { hasText: name });
 const clearChip = async (name) => {
   await chip(name).locator('.chip-clear').click();
@@ -134,7 +134,7 @@ test('Paths：Ctrl+點選只看一個 repo；點色條顯示 repo 名稱欄', as
 });
 
 test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', async () => {
-  await row('feat(auth): add API keys').click();
+  await (await row('feat(auth): add API keys')).click();
   await page.waitForTimeout(600);
   assert.deepEqual(await h.texts(page.locator('.file-tree .tree-row .tree-label')), ['api-server', 'src/auth', 'keys.ts']);
   assert.match(await page.locator('.details-info').innerText(), /Bob Lin/);
@@ -143,21 +143,21 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
 });
 
 test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', async () => {
-  await row('feat(auth): rotate API keys').click();
-  await row('docs: describe key rotation').click({ modifiers: ['Shift'] });
+  await (await row('feat(auth): rotate API keys')).click();
+  await (await row('docs: describe key rotation')).click({ modifiers: ['Shift'] });
   await page.waitForTimeout(800);
   const files = (await h.texts(page.locator('.file-tree .tree-row .tree-label'))).join(' ');
   assert.match(files, /rotate\.ts/);
   assert.match(files, /auth\.md/);
-  await row('docs: describe key rotation').click({ button: 'right' });
+  await (await row('docs: describe key rotation')).click({ button: 'right' });
   const items = await h.texts(page.locator('.context-menu .menu-item'));
   assert.ok(items.some((x) => /2/.test(x) && /Copy/.test(x)), items.join(' / '));
   await page.keyboard.press('Escape');
 });
 
 test('右鍵選單包含 IntelliJ 的 commit 操作', async () => {
-  await row('feat(cache): try in-memory cache').click();
-  await row('feat(cache): try in-memory cache').click({ button: 'right' });
+  await (await row('feat(cache): try in-memory cache')).click();
+  await (await row('feat(cache): try in-memory cache')).click({ button: 'right' });
   const items = (await h.texts(page.locator('.context-menu[data-level="0"] .menu-item'))).join(' / ');
   for (const s of ['Cherry-Pick', 'Revert Commit', 'Reset Current Branch to Here', 'New Branch', 'New Tag', 'Interactively Rebase from Here', 'Push All up to Here']) assert.ok(items.includes(s), `${s} 不在：${items}`);
   await page.keyboard.press('Escape');
@@ -195,6 +195,34 @@ test('欄位：拖曳 Author 欄左緣調整寬度；👁 隱藏 Hash 欄', asyn
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
   assert.ok(await page.locator('.hide-hash').count());
+});
+
+test('鍵盤：Shift+F10 開右鍵選單，方向鍵移動、Enter 執行、Esc 關閉', async () => {
+  const subject = 'feat(auth): add API keys';
+  await (await row(subject)).click();
+  await page.waitForFunction((t) => [...document.querySelectorAll('.log-row.selected')].some((r) => r.style.display !== 'none' && r.textContent.includes(t)), subject);
+  await page.keyboard.press('Shift+F10');
+  await page.waitForSelector('.context-menu .menu-item.active');
+  assert.match(await page.locator('.context-menu .menu-item.active').innerText(), /^Copy/);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.context-menu').count(), 0);
+  await page.keyboard.press('Shift+F10');
+  await page.keyboard.press('End');
+  assert.notEqual(await page.locator('.context-menu .menu-item.active').innerText(), 'Copy Revision Number');
+  await page.keyboard.press('Home');
+  assert.equal(await page.locator('.context-menu .menu-item.active').innerText(), 'Copy Revision Number');
+  await page.keyboard.press('Enter');
+  const hash = h.git(`${pg}/api-server`, 'log', '-1', '--format=%H', '--grep=add API keys');
+  await h.until(() => app.calls.clipboard === hash);
+  assert.equal(await page.locator('.context-menu').count(), 0);
+});
+
+test('變更檔案列尾顯示狀態字母', async () => {
+  await (await row('docs: rename orders guide')).click();
+  await page.waitForTimeout(500);
+  const letters = await h.texts(page.locator('.file-tree .status-letter'));
+  assert.deepEqual(letters, ['R']);
+  assert.equal(await page.locator('.file-tree .status-letter').first().getAttribute('aria-label'), 'Renamed');
 });
 
 test('沒有 webview 錯誤', () => {

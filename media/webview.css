@@ -16,11 +16,13 @@
   --col-date: 136px;
   --col-hash: 74px;
 
-  /* 變更狀態（IntelliJ 慣例：新增綠、修改藍、刪除灰） */
-  --st-added: #73bd79;
-  --st-modified: #70aeff;
-  --st-deleted: #868a91;
-  --st-conflict: #e06c75;
+  /* 變更狀態：沿用 VS Code 主題的 git 顏色（與檔案總管、原始檔控制一致；高對比主題也適用） */
+  --st-added: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+  --st-modified: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+  --st-deleted: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+  --st-conflict: var(--vscode-gitDecoration-conflictingResourceForeground, #e4676b);
+  --st-untracked: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+  --st-ignored: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
 
   /* Conventional Commits 類型色 */
   --cc-feat: #73bd79;
@@ -34,10 +36,6 @@
   --cc-revert: #f07178;
 }
 body.vscode-light, body.vscode-high-contrast-light {
-  --st-added: #1d7d2a;
-  --st-modified: #1e5fc2;
-  --st-deleted: #8c8f96;
-  --st-conflict: #c62828;
   --cc-feat: #1d7d2a;
   --cc-fix: #b25400;
   --cc-docs: #1e5fc2;
@@ -132,6 +130,10 @@ button { font: inherit; color: inherit; }
 .tree-row:hover { background: var(--hover); }
 .tree-row.selected { background: var(--sel-bg); color: var(--sel-fg); }
 .tree:focus .tree-row.selected { background: var(--sel-focus-bg); color: var(--sel-focus-fg); }
+/* 鍵盤焦點所在的列（與 Log 相同的焦點框） */
+.tree:focus-visible .tree-row.selected, .push-list:focus-visible .push-commit.selected, .rebase-list:focus-visible .rebase-row.selected {
+  outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px;
+}
 .tree-row .twisty { width: 16px; color: var(--muted); }
 .tree-row > .icon { color: var(--vscode-icon-foreground, var(--muted)); }
 .tree-label { overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
@@ -181,7 +183,7 @@ button { font: inherit; color: inherit; }
 @keyframes progress { to { left: 100%; } }
 
 .log-warning {
-  flex: none; padding: 3px 8px; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 0.92em; white-space: nowrap; overflow: hidden;
   color: var(--vscode-editorWarning-foreground, #cca700);
   background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12));
   border-bottom: 1px solid var(--border);
@@ -263,7 +265,11 @@ button { font: inherit; color: inherit; }
 .status-M, .status-T, .status-R { color: var(--st-modified); }
 .status-D { color: var(--st-deleted); }
 .status-U { color: var(--st-conflict); }
-.tree-row.selected .tree-label { color: inherit; }
+.status-untracked { color: var(--st-untracked); }
+.status-ignored { color: var(--st-ignored); }
+/* 列尾的狀態字母（與 VS Code 原始檔控制相同），不只靠顏色區分 */
+.status-letter { margin-left: auto; padding-left: 8px; flex: none; width: 20px; text-align: center; font-size: 0.92em; font-variant-numeric: tabular-nums; }
+.tree-row.selected .tree-label, .tree-row.selected .status-letter { color: inherit; }
 
 .details-info { flex: 1; min-height: 40px; overflow: auto; padding: 10px 12px; user-select: text; line-height: 1.5; }
 .details-message { margin-bottom: 10px; }
@@ -303,13 +309,14 @@ button { font: inherit; color: inherit; }
 
 .context-menu { padding: 4px 0; min-width: 200px; }
 .menu-item { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 16px 0 6px; cursor: pointer; white-space: nowrap; }
-.menu-item:hover { background: var(--vscode-menu-selectionBackground, var(--sel-focus-bg)); color: var(--vscode-menu-selectionForeground, inherit); }
+.menu-item:hover, .menu-item.active { background: var(--vscode-menu-selectionBackground, var(--sel-focus-bg)); color: var(--vscode-menu-selectionForeground, inherit); }
 .menu-check { width: 16px; display: inline-flex; }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--vscode-menu-separatorBackground, var(--border)); }
 
 /* ---------- 選單停用項目 ---------- */
 .menu-item.disabled { opacity: 0.45; cursor: default; }
 .menu-item.disabled:hover { background: transparent; color: inherit; }
+.menu-key { color: var(--muted); margin-left: 24px; font-size: 0.92em; }
 
 /* ---------- 一般按鈕 ---------- */
 .button {
@@ -365,7 +372,8 @@ select.push-remote {
 .push-branch:focus { outline: none; border-color: var(--vscode-focusBorder); background: var(--vscode-input-background); color: var(--vscode-input-foreground); }
 .push-badge { font-size: 0.85em; padding: 0 5px; border-radius: 8px; border: 1px solid var(--vscode-badge-background); color: var(--muted); }
 .push-badge.new { background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-.push-warning { padding: 2px 10px 4px 34px; color: var(--vscode-editorWarning-foreground, #cca700); white-space: normal; }
+.push-warning { display: flex; align-items: flex-start; gap: 6px; padding: 2px 10px 4px 34px; color: var(--vscode-editorWarning-foreground, #cca700); white-space: normal; }
+.warning-text { overflow: hidden; text-overflow: ellipsis; }
 .push-commit { display: flex; align-items: center; gap: 12px; height: 22px; padding: 0 10px 0 34px; cursor: default; }
 .push-commit:hover { background: var(--vscode-list-hoverBackground, var(--hover)); }
 .push-commit.selected { background: var(--vscode-list-activeSelectionBackground, var(--sel-focus-bg)); color: var(--vscode-list-activeSelectionForeground, inherit); }
@@ -414,9 +422,6 @@ select.push-remote {
 .log-tab .tab-close { width: 18px; height: 18px; visibility: hidden; }
 .log-tab:hover .tab-close, .log-tab.active .tab-close { visibility: visible; }
 
-/* ---------- 檔案類型圖示 ---------- */
-.icon.ftype { display: inline-flex; align-items: center; justify-content: center; width: 16px; font-size: 9px; font-weight: 700; letter-spacing: -0.3px; line-height: 1; font-family: var(--vscode-editor-font-family, monospace); }
-.icon.ftype.small { font-size: 7px; }
 .pane-toolbar .icon-button.on { background: var(--vscode-inputOption-activeBackground, rgba(0, 122, 204, 0.2)); }
 
 /* ---------- 面板內確認框 ---------- */
@@ -530,3 +535,21 @@ body.dialog-page { overflow: hidden; }
 .rebase-message-pane { padding: 4px 12px; display: flex; flex-direction: column; gap: 4px; flex: none; }
 .rebase-message { min-height: 70px; }
 .rebase-warning { flex: none; padding-left: 12px; }
+
+/* ---------- 高對比主題：以邊框取代底色區分狀態 ---------- */
+:is(.vscode-high-contrast, .vscode-high-contrast-light) :is(.tree-row, .log-row, .push-commit, .rebase-row, .picker-item, .menu-item, .chip, .log-tab, .icon-button):hover,
+:is(.vscode-high-contrast, .vscode-high-contrast-light) :is(.menu-item.active, .menu-item.open, .picker-item.active) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder); outline-offset: -1px;
+}
+:is(.vscode-high-contrast, .vscode-high-contrast-light) :is(.tree-row.selected, .log-row.selected, .push-commit.selected, .rebase-row.selected, .toggle-button.on, .commit-tab.active, .icon-button.on) {
+  outline: 1px solid var(--vscode-contrastActiveBorder); outline-offset: -1px;
+}
+:is(.vscode-high-contrast, .vscode-high-contrast-light) :is(.context-menu, .picker, .push-dialog, .confirm-dialog, .hunk, .button, .chip.active, .search-box) {
+  border: 1px solid var(--vscode-contrastBorder);
+}
+:is(.vscode-high-contrast, .vscode-high-contrast-light) .modal-overlay.embedded > .push-dialog { border: none; }
+
+/* ---------- 減少動態效果 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .progress.active::after { animation: none; left: 0; width: 100%; opacity: 0.5; }
+}

@@ -224,7 +224,8 @@ const warningBar = el('div', { className: 'log-warning hidden' });
 
 /** 部分 repo 讀取失敗時，在表格上方顯示提示（其餘 repo 照常顯示） */
 function setWarnings(list: string[] | undefined): void {
-  warningBar.textContent = list && list.length > 0 ? `⚠ ${list.join('  ·  ')}` : '';
+  clear(warningBar);
+  if (list && list.length > 0) warningBar.append(icon('warning'), el('span', { className: 'warning-text', text: list.join('  ·  ') }));
   warningBar.title = list?.join('\n') ?? '';
   warningBar.classList.toggle('hidden', !list || list.length === 0);
 }

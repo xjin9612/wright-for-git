@@ -43,6 +43,11 @@ test('列出兩個 repo 的變更、未追蹤檔案；預設勾選變更、不�
   assert.ok(await box('config.ts').isChecked());
   assert.ok(!(await box('todo.ts').isChecked()));
   assert.equal(await cv.locator('.commit-actions .button.primary').isDisabled(), true, '沒有訊息時提交停用');
+  // 狀態字母：修改 M、刪除 D、未追蹤 U
+  const letter = async (name) => fileRow(name).locator('.status-letter').innerText();
+  assert.equal(await letter('config.ts'), 'M');
+  assert.equal(await letter('db.yml'), 'D');
+  assert.equal(await letter('todo.ts'), 'U');
 });
 
 test('分組方式：模組讓 packages/sdk 成為獨立一組；平鋪', async () => {

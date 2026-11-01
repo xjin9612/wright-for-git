@@ -1,8 +1,8 @@
 // 提交視窗（側邊欄）：「提交｜儲藏」兩個分頁，對應 IntelliJ 的 Commit 工具視窗
 import type { CommitState, StashInfo, ToWebview, WorkingChange } from '../shared/protocol';
 import { showConfirm } from './confirmDialog';
-import { clear, el, formatDate, icon, iconButton, showMenu, type MenuItem } from './dom';
-import { fileIcon } from './fileIcons';
+import { clear, el, formatDate, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, type MenuItem } from './dom';
+import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
 import { loadState, post, saveState } from './vscodeApi';
@@ -465,7 +465,8 @@ function renderRow(r: Row): HTMLElement {
   else iconEl = icon(r.icon === 'module' ? 'module' : r.icon === 'repo' ? 'repo' : 'folder');
 
   const isActive = r.kind === 'section' && r.listId !== undefined && r.listId === state?.activeList && (state?.changelists.length ?? 0) > 1;
-  const label = el('span', { className: `tree-label${r.change ? ` status-${r.change.status}` : ''}${r.kind === 'section' ? ' commit-section' : ''}${isActive ? ' active-list' : ''}`, text: r.label });
+  const kindStatus = r.change ? (r.change.kind === 'changed' ? r.change.status : r.change.kind) : '';
+  const label = el('span', { className: `tree-label${r.change ? ` ${statusClass(kindStatus)}` : ''}${r.kind === 'section' ? ' commit-section' : ''}${isActive ? ' active-list' : ''}`, text: r.label });
   const partial = r.kind === 'file' ? state?.partial[r.key] : undefined;
   const count = r.kind !== 'file' ? el('span', { className: 'tree-count', text: plural(r.files.length, '{0} file', '{0} files') }) : null;
   const div = el(
@@ -478,6 +479,7 @@ function renderRow(r: Row): HTMLElement {
     r.detail ? el('span', { className: 'tree-count', text: r.detail }) : null,
     partial ? el('span', { className: 'commit-partial', text: t('{0}/{1} changes', partial.selected, partial.total) }) : null,
     count,
+    r.change ? statusLetter(kindStatus) : null,
   );
   div.style.paddingLeft = `${4 + r.depth * 14}px`;
   if (r.change) div.title = `${r.change.path}${r.change.oldPath ? `\n← ${r.change.oldPath}` : ''}`;
@@ -624,6 +626,11 @@ function showRowMenu(r: Row, x: number, y: number): void {
 }
 
 tree.addEventListener('keydown', (e) => {
+  if (isContextMenuKey(e)) {
+    e.preventDefault();
+    openContextMenuFor(tree.querySelector('.tree-row.focused') ?? tree.querySelector('.tree-row.selected'));
+    return;
+  }
   const idx = rows.findIndex((r) => r.key === focusKey);
   const row = rows[idx];
   const move = (i: number) => {

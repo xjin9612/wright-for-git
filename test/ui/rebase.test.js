@@ -25,11 +25,17 @@ async function refresh() {
 }
 const subjects = (n) => h.git(api, 'log', '--format=%s', `-${n}`).split('\n');
 
+/** 等 rebase 執行完（分頁關閉、沒有進行中的 rebase）；Windows 上 git 較慢，不能只看 log */
+async function finished(d) {
+  await h.until(() => d.panel.disposed, 60000);
+  await h.until(() => !fs.existsSync(`${api}/.git/rebase-merge`) && !fs.existsSync(`${api}/.git/rebase-apply`), 60000);
+}
+
 /** 從指定 commit 開啟互動式 rebase 分頁 */
 async function openRebase(subject) {
   for (const p of app.calls.panels) if (!p.disposed) p.dispose();
   const n = app.calls.panels.length;
-  await page.locator('.log-row:visible', { hasText: subject }).first().click({ button: 'right' });
+  await (await h.logRow(page, subject)).click({ button: 'right' });
   await h.menu(page, 'Interactively Rebase from Here');
   await h.until(() => app.calls.panels.length > n);
   const d = await app.lastPanel();
@@ -49,7 +55,7 @@ test('reword、squash（未提交的變更自動儲藏並還原）', async () =>
   await d.page.locator('.rebase-row').nth(1).click();
   await d.page.keyboard.press('s');
   await d.page.locator('.button.primary').click();
-  await h.until(() => subjects(1)[0] === 'docs: key rotation (rewritten)', 15000);
+  await finished(d);
   assert.deepEqual(subjects(3), ['docs: key rotation (rewritten)', 'feat(sdk): add client package', 'feat(auth): add API keys']);
   assert.match(h.git(api, 'log', '-1', '--format=%B'), /#123 keep this line/);
   assert.equal(h.git(api, 'status', '--porcelain'), dirty, '未提交的變更還在');
@@ -64,7 +70,7 @@ test('調整順序（Alt+↑）與 drop', async () => {
   await d.page.locator('.rebase-row', { hasText: 'add API keys' }).click();
   await d.page.keyboard.press('d');
   await d.page.locator('.button.primary').click();
-  await h.until(() => !h.git(api, 'log', '--format=%s', '-5').includes('feat(auth): add API keys'), 15000);
+  await finished(d);
   assert.deepEqual(subjects(2), ['feat(sdk): add client package', 'docs: key rotation (rewritten)']);
   await refresh();
 });
@@ -74,12 +80,12 @@ test('edit 停下：Log 上方出現進行中列，按「繼續」完成', async
   await d.page.locator('.rebase-row', { hasText: 'key rotation' }).click();
   await d.page.keyboard.press('e');
   await d.page.locator('.button.primary').click();
-  await h.until(() => h.git(api, 'status').includes('rebase'), 15000);
+  await h.until(() => h.git(api, 'status').includes('rebase'), 40000);
   await refresh();
   await page.waitForSelector('.log-ops:not(.hidden)');
   assert.match(await page.locator('.log-ops').innerText(), /api-server.*Rebase/);
   await page.locator('.log-ops .link', { hasText: 'Continue' }).click();
-  await h.until(() => !h.git(api, 'status').includes('rebase'), 15000);
+  await h.until(() => !h.git(api, 'status').includes('rebase'), 40000);
   await refresh();
   assert.ok(await page.locator('.log-ops.hidden').count());
   assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('gitworkbench-')), [], '沒有殘留的暫存檔');
@@ -97,7 +103,7 @@ test('detached HEAD 時拒絕', async () => {
   h.git(api, 'checkout', '-q', '--detach');
   await refresh();
   const n = app.calls.panels.length;
-  await page.locator('.log-row:visible', { hasText: 'feat(sdk): add client package' }).first().click({ button: 'right' });
+  await (await h.logRow(page, 'feat(sdk): add client package')).click({ button: 'right' });
   await h.menu(page, 'Interactively Rebase from Here');
   await h.until(() => app.calls.warnings.some((w) => /detached/.test(w)));
   assert.equal(app.calls.panels.length, n);

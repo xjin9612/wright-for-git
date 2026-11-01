@@ -94,6 +94,8 @@ export interface ChangedFile {
   /** 多選合併變更時，diff 左右兩側的 revision（'' 表示不存在）；單一 commit 時不填 */
   left?: string;
   right?: string;
+  /** 儲藏中的未追蹤檔案 */
+  untracked?: boolean;
 }
 
 export interface CommitDetails {

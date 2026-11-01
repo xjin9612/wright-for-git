@@ -277,9 +277,22 @@ require.cache.vscode = { id: 'vscode', filename: 'vscode', loaded: true, exports
 
 // ---------- playground 與 git ----------
 
+/** 這次執行建立的暫存資料夾；測試結束時刪除 */
+const tempDirs = [];
+process.on('exit', () => {
+  for (const d of tempDirs) {
+    try {
+      fs.rmSync(d, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // Windows 上偶爾有檔案仍被 git 佔用：留給系統清理暫存資料夾
+    }
+  }
+});
+
 /** 在暫存資料夾建立 playground（docs/TESTING.md 描述的內容），回傳其路徑 */
 function makePlayground() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gwb-ui-'));
+  tempDirs.push(dir);
   const root = path.join(dir, 'playground');
   execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-playground.mjs'), root], { stdio: 'ignore' });
   return root;
@@ -439,10 +452,15 @@ async function launch(workspace, opts = {}) {
 const pageErrors = (log) => log.filter((l) => /^\[(error|pageerror)\]/.test(l));
 
 /** 等條件成立（輪詢） */
-async function until(fn, timeout = 8000, interval = 100) {
+async function until(fn, timeout = 20000, interval = 100) {
   const end = Date.now() + timeout;
   for (;;) {
-    const v = await fn();
+    let v;
+    try {
+      v = await fn();
+    } catch {
+      v = undefined; // 條件中的 git 指令暫時失敗（例如 upstream 尚未設定）視為還沒成立
+    }
     if (v) return v;
     if (Date.now() > end) throw new Error('等待逾時');
     await new Promise((r) => setTimeout(r, interval));
@@ -452,10 +470,21 @@ async function until(fn, timeout = 8000, interval = 100) {
 /** 列的文字（換行改空白） */
 const texts = async (locator) => (await locator.allInnerTexts()).map((t) => t.replace(/\s*\n\s*/g, ' ').trim());
 
+/**
+ * Log 中標題含 text 的列。列是重複使用的節點，捲動後同一個節點可能換成別的 commit，
+ * 所以先捲到可見、等重繪後再重新定位。
+ */
+async function logRow(page, text) {
+  const find = () => page.locator('.log-row:visible', { hasText: text }).first();
+  await find().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150);
+  return find();
+}
+
 /** 點選單項目（選單在 mousedown 時觸發） */
 async function menu(page, label, level) {
   const scope = level === undefined ? page.locator('.context-menu') : page.locator(`.context-menu[data-level="${level}"]`);
   await scope.locator('.menu-item', { hasText: label }).first().dispatchEvent('mousedown');
 }
 
-module.exports = { launch, makePlayground, git, remotePush, pageErrors, until, texts, menu, ROOT };
+module.exports = { launch, makePlayground, git, remotePush, pageErrors, until, texts, menu, logRow, ROOT };

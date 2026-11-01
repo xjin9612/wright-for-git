@@ -1,6 +1,6 @@
 // 互動式 rebase 對話框（對應 IntelliJ 的 Interactively Rebase from Here）
 import type { RebaseAction, RebaseCommit } from '../shared/protocol';
-import { clear, el, formatDate } from './dom';
+import { clear, el, formatDate, icon } from './dom';
 import { t } from './l10n';
 import { post } from './vscodeApi';
 
@@ -122,7 +122,8 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
     msgPane.classList.toggle('hidden', !it);
     if (it && msgBox.value !== it.message) msgBox.value = it.message;
     const problem = validate();
-    warn.textContent = problem ? `⚠ ${problem}` : '';
+    clear(warn);
+    if (problem) warn.append(icon('warning'), el('span', { text: problem }));
     warn.classList.toggle('hidden', !problem);
     start.disabled = !!problem;
     up.disabled = current <= 0;

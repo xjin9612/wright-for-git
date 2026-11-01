@@ -2,7 +2,7 @@
 import type { CommitInfo, HeadInfo, RefInfo, RepoState } from '../shared/protocol';
 import { MultiGraph, type FrameLayout, type GraphModel } from '../shared/multiGraph';
 import { buildLabels, type RefLabel } from '../shared/refs';
-import { el, formatDate, icon } from './dom';
+import { el, formatDate, icon, isContextMenuKey, openContextMenuFor } from './dom';
 import { t } from './l10n';
 
 export const ROW_HEIGHT = 22;
@@ -399,6 +399,13 @@ export class LogTable {
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (isContextMenuKey(e)) {
+      e.preventDefault();
+      // 列是重複使用的節點：只看目前顯示中的列
+      const shown = [...this.rowsLayer.querySelectorAll<HTMLElement>('.log-row')].filter((r) => r.style.display !== 'none');
+      openContextMenuFor(shown.find((r) => r.classList.contains('focused')) ?? shown.find((r) => r.classList.contains('selected')) ?? null);
+      return;
+    }
     const page = Math.max(1, Math.floor(this.viewport.clientHeight / ROW_HEIGHT) - 1);
     let next: number | undefined;
     switch (e.key) {

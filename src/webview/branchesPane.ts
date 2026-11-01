@@ -2,7 +2,7 @@
 import type { RepoState } from '../shared/protocol';
 import { mergeRefs, naturalCompare, type MergedRef } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, icon, iconButton, showMenu, type IconName } from './dom';
+import { clear, el, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, type IconName } from './dom';
 import { plural, t } from './l10n';
 
 interface Row {
@@ -469,6 +469,11 @@ export class BranchesPane {
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (isContextMenuKey(e)) {
+      e.preventDefault();
+      openContextMenuFor(this.list.querySelector('.tree-row.selected'));
+      return;
+    }
     const row = this.rows.find((r) => r.key === this.selectedKey);
     switch (e.key) {
       case 'ArrowDown':

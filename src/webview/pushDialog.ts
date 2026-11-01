@@ -3,7 +3,7 @@
 // Push 按鈕的下拉選單提供 Force Push。推送前一定經過這個對話框，避免誤觸。
 import type { ChangedFile, PushCommit, PushPlan, PushTarget, ToWebview } from '../shared/protocol';
 import { clear, el, formatDate, icon, showMenu } from './dom';
-import { fileIcon } from './fileIcons';
+import { fileIcon, statusLetter } from './fileIcons';
 import { post } from './vscodeApi';
 import { plural, t } from './l10n';
 
@@ -77,6 +77,8 @@ class PushDialog {
   private confirmRequest = 0;
   private selected: { root: string; commit: PushCommit } | undefined;
   private busy = false;
+  /** 改了目標（remote／分支）後，等新的預覽回來前不能推送，避免推到舊的目標 */
+  private pending = false;
   private loaded = false;
   private readonly onKey = (e: KeyboardEvent) => this.handleKey(e);
 
@@ -130,6 +132,7 @@ class PushDialog {
 
   onMessage(m: DialogMessage): void {
     if (m.type === 'pushPreview' && m.requestId === this.previewRequest) {
+      this.pending = false;
       const first = !this.loaded;
       this.loaded = true;
       this.plans = m.plans;
@@ -143,6 +146,7 @@ class PushDialog {
         this.select(p ? { root: p.root, commit: p.commits[0] } : undefined);
       }
       this.render();
+      this.updateButtons();
     } else if (m.type === 'pushCommitFiles' && m.requestId === this.filesRequest) {
       this.renderFiles(m.files);
     } else if (m.type === 'pushStatus' && m.requestId === this.confirmRequest) {
@@ -156,6 +160,8 @@ class PushDialog {
 
   private requestPreview(): void {
     this.previewRequest = nextRequest++;
+    this.pending = true;
+    if (this.pushButton) this.updateButtons();
     post({ type: 'pushPreview', requestId: this.previewRequest, roots: this.opts.roots, branch: this.opts.branch, upTo: this.opts.upTo, overrides: [...this.overrides.values()] });
   }
 
@@ -178,7 +184,7 @@ class PushDialog {
   }
 
   private canPush(): boolean {
-    return !this.busy && this.plans.some((p) => pushable(p) && this.checked.has(p.root));
+    return !this.busy && !this.pending && this.plans.some((p) => pushable(p) && this.checked.has(p.root));
   }
 
   private updateButtons(): void {
@@ -300,7 +306,8 @@ class PushDialog {
           el(
             'div',
             { className: 'push-warning' },
-            `⚠ ${t("The remote branch has {0} commit(s) you don't have. Push will be rejected — pull first, or use Force Push to overwrite.", p.behind)}`,
+            icon('warning'),
+            el('span', { text: t("The remote branch has {0} commit(s) you don't have. Push will be rejected — pull first, or use Force Push to overwrite.", p.behind) }),
           ),
         );
       }
@@ -346,6 +353,7 @@ class PushDialog {
         fileIcon(f.path),
         el('span', { className: `tree-label status-${f.status}`, text: name }),
         dir ? el('span', { className: 'tree-count', text: dir }) : null,
+        statusLetter(f.status),
       );
       row.addEventListener('click', () => {
         this.files.querySelector('.tree-row.selected')?.classList.remove('selected');

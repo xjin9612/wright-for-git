@@ -407,5 +407,7 @@
   "The branch changed since this dialog was opened. The list has been reloaded; review it and start again.": "開啟此對話框後分支已有變動，清單已重新載入，請確認後再開始。",
   "{0}: committed, but the staging area could not be updated. Run \"git reset\" on the committed files before committing elsewhere.": "{0}：已提交，但無法更新暫存區。在其他地方提交前，請先對已提交的檔案執行「git reset」。",
   "{0} changed while committing. Try again.": "{0} 在提交時被修改，請再試一次。",
-  "Untracked files": "未追蹤的檔案"
+  "Untracked files": "未追蹤的檔案",
+  "Untracked": "未追蹤",
+  "Ignored": "已忽略"
 }
