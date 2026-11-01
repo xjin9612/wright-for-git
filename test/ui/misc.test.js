@@ -106,7 +106,10 @@ test('取消儲藏分頁：選 stash 看檔案；以新分支取消儲藏', asyn
   h.git(web, 'stash', '-q');
   await d.page.locator('.unstash-branch').fill('from-stash');
   await d.page.locator('.button.primary').click();
-  await h.until(() => h.git(web, 'rev-parse', '--abbrev-ref', 'HEAD') === 'from-stash');
+  // `git stash branch` 先切換分支、再套用儲藏：HEAD 變了不代表已經做完（Windows 上兩步之間間隔明顯），
+  // 要等指令結束（分頁關閉）才檢查檔案
+  await h.until(() => d.panel.disposed, 30000);
+  assert.equal(h.git(web, 'rev-parse', '--abbrev-ref', 'HEAD'), 'from-stash');
   // 直接看檔案：使用者的 git 可能設定 status.showUntrackedFiles=no，status 不會列出未追蹤檔案
   assert.ok(require('node:fs').existsSync(path.join(web, 'src/Draft.tsx')), '儲藏中的未追蹤檔案已還原');
   assert.match(h.git(web, 'status', '--porcelain'), /App\.css/);
