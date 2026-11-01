@@ -57,6 +57,12 @@ test('Push 對話框：列出各 repo 的目標與待推 commit；點 commit 列
   });
   await d.page.locator('.push-commit', { hasText: 'docs: describe key rotation' }).click();
   await h.eventually(async () => assert.match((await h.texts(d.page.locator('.push-files .tree-row'))).join(' '), /auth\.md/));
+  // 檔案依目錄分組（與記錄右欄相同）；取消分組後變平鋪，並記住設定（下次開啟沿用）
+  assert.ok((await h.texts(d.page.locator('.push-files .tree-row'))).some((r) => /^docs\b/.test(r)), '有 docs 資料夾列');
+  await d.page.locator('.push-files-toolbar [title="Group By"]').click();
+  await h.menu(d.page, 'Directory');
+  await h.eventually(async () => assert.ok((await h.texts(d.page.locator('.push-files .tree-row'))).every((r) => !/^docs\b/.test(r))));
+  await h.until(() => app.ctx.globalState.get('gitWorkbench.dialogPrefs')?.['fileGrouping.push']?.directory === false);
   await d.page.locator('.button.secondary', { hasText: 'Cancel' }).click();
   await h.until(() => d.panel.disposed);
   await d.page.close();

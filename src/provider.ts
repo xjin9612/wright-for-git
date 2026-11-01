@@ -876,8 +876,17 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     await this.refresh(true);
   }
 
+  /** 對話框分頁的偏好（變更檔案的分組方式等） */
+  get dialogPrefs(): Record<string, unknown> {
+    return this.context.globalState.get<Record<string, unknown>>('gitWorkbench.dialogPrefs') ?? {};
+  }
+
+  async setDialogPref(key: string, value: unknown): Promise<void> {
+    await this.context.globalState.update('gitWorkbench.dialogPrefs', { ...this.dialogPrefs, [key]: value });
+  }
+
   dialogHtml(webview: vscode.Webview, config: unknown): string {
-    return this.renderHtml(webview, { script: 'dialog.js', config });
+    return this.renderHtml(webview, { script: 'dialog.js', config: { ...(config as object), prefs: this.dialogPrefs } });
   }
 
   /** 其他 webview（提交視窗）的 HTML：同一份樣式、翻譯與 CSP */

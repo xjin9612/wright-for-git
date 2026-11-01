@@ -334,7 +334,7 @@ button { font: inherit; color: inherit; }
 .push-files-pane { display: flex; flex-direction: column; min-height: 0; }
 .push-files-title { padding: 6px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
 .push-files { overflow: auto; flex: 1; }
-.push-files .tree-row { padding-left: 10px; }
+.push-files-toolbar .push-files-title { flex: 1; min-width: 0; padding: 0 4px; }
 .push-repo { display: flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 10px; white-space: nowrap; }
 .push-repo input[type="checkbox"] { margin: 0 2px 0 0; }
 .push-repo-name { font-weight: 600; margin-right: 4px; }

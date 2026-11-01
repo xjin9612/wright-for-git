@@ -251,6 +251,8 @@ export interface SettingsValues {
 
 export type ToExtension =
   | { type: 'getSettings' }
+  /** 編輯器分頁對話框的偏好（例如變更檔案的分組方式），存在 globalState，下次開啟沿用 */
+  | { type: 'dialogPref'; key: string; value: unknown }
   /** 衝突：整個檔案採用我的／他們的版本，或標記為已解決 */
   | { type: 'conflictAction'; items: { root: string; path: string }[]; action: 'ours' | 'theirs' | 'resolved' }
   /** 開啟三方合併分頁 */

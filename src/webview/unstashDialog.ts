@@ -1,7 +1,8 @@
 // 取消儲藏對話框（對應 IntelliJ 的 Unstash Changes）：選儲藏、看檔案，套用／套用並刪除／建立成分支
 import type { ChangedFile, StashInfo, ToWebview } from '../shared/protocol';
 import { clear, el, formatDate } from './dom';
-import { fileIcon, statusClass, statusLetter } from './fileIcons';
+import { dialogFilesPane, type DialogFiles } from './dialogFiles';
+import type { FileGroup } from './fileTree';
 import { t } from './l10n';
 import { post } from './vscodeApi';
 
@@ -35,8 +36,12 @@ class UnstashDialog {
   private filesRequest = 0;
   private readonly repoSelect = el('select', { className: 'push-remote', attrs: { 'aria-label': t('Repository') } });
   private readonly list = el('div', { className: 'push-list', attrs: { tabindex: '0' } });
-  private readonly files = el('div', { className: 'tree push-files' });
-  private readonly filesTitle = el('div', { className: 'push-files-title muted', text: t('Changed files') });
+  private readonly files: DialogFiles = dialogFilesPane('unstash', {
+    repoName: (root) => this.repos.find((r) => r.root === root)?.name ?? '',
+    onOpen: (_g, file) => {
+      if (this.root && this.selected) post({ type: 'openStashDiff', root: this.root, hash: this.selected, file });
+    },
+  });
   private readonly pop = el('input', { attrs: { type: 'checkbox', id: 'unstash-pop' } });
   private readonly index = el('input', { attrs: { type: 'checkbox', id: 'unstash-index' } });
   private readonly branch = el('input', { className: 'text-input unstash-branch', attrs: { type: 'text', spellcheck: 'false', placeholder: t('As new branch (optional)') } });
@@ -71,7 +76,7 @@ class UnstashDialog {
       'div',
       { className: 'push-dialog', attrs: { role: 'dialog', 'aria-label': t('Unstash Changes') } },
       el('div', { className: 'push-header unstash-header' }, el('span', { text: t('Unstash Changes') }), el('span', { className: 'toolbar-spacer' }), this.repoSelect),
-      el('div', { className: 'push-body' }, this.list, el('div', { className: 'push-files-pane' }, this.filesTitle, this.files)),
+      el('div', { className: 'push-body' }, this.list, this.files.pane),
       el(
         'div',
         { className: 'push-footer' },
@@ -139,34 +144,30 @@ class UnstashDialog {
   }
 
   private requestFiles(): void {
-    clear(this.files);
     const s = this.current?.stashes.find((x) => x.hash === this.selected);
-    this.filesTitle.textContent = s ? `${s.ref} ${stashLabel(s.message)}` : t('Changed files');
-    if (!s || !this.root) return;
-    this.files.append(el('div', { className: 'empty-text', text: t('Loading…') }));
+    this.files.setTitle(s ? `${s.ref} ${stashLabel(s.message)}` : t('Changed files'));
+    if (!s || !this.root) {
+      this.files.tree.setEmpty('');
+      return;
+    }
+    this.files.tree.setLoading();
     this.filesRequest = seq++;
     post({ type: 'unstashFiles', requestId: this.filesRequest, root: this.root, hash: s.hash });
   }
 
   private renderFiles(files: (ChangedFile & { untracked?: boolean })[]): void {
-    clear(this.files);
-    if (files.length === 0) this.files.append(el('div', { className: 'empty-text', text: t('No changes') }));
-    for (const f of files) {
-      const name = f.path.slice(f.path.lastIndexOf('/') + 1);
-      const dir = f.path.slice(0, Math.max(0, f.path.lastIndexOf('/')));
-      const row = el(
-        'div',
-        { className: 'tree-row', title: `${f.path}\n${t('Double-click to show the diff')}` },
-        fileIcon(f.path),
-        el('span', { className: `tree-label ${statusClass(f.untracked ? 'untracked' : f.status)}`, text: name }),
-        el('span', { className: 'tree-count', text: dir }),
-        statusLetter(f.untracked ? 'untracked' : f.status),
-      );
-      row.addEventListener('dblclick', () => {
-        if (this.root && this.selected) post({ type: 'openStashDiff', root: this.root, hash: this.selected, file: f });
-      });
-      this.files.append(row);
+    if (!this.root) return;
+    if (files.length === 0) {
+      this.files.tree.setEmpty(t('No changes'));
+      return;
     }
+    // 未追蹤的檔案另成一組（與提交視窗的儲藏分頁相同）
+    const tracked = files.filter((f) => !f.untracked);
+    const untracked = files.filter((f) => f.untracked);
+    const groups: FileGroup[] = [];
+    if (tracked.length > 0) groups.push({ root: this.root, files: tracked });
+    if (untracked.length > 0) groups.push({ root: this.root, files: untracked, section: t('Untracked files') });
+    this.files.tree.setGroups(groups);
   }
 
   private syncButtons(): void {

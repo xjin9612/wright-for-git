@@ -2,6 +2,7 @@
 import type { DiffHunk, MergeArgs, RebaseCommit, ToWebview } from '../shared/protocol';
 import { handleConflictsMessage, openConflictsDialog } from './conflictsDialog';
 import { openMergeDialog } from './mergeDialog';
+import { setDialogPrefs } from './dialogFiles';
 import { openRebaseDialog } from './rebaseDialog';
 import { openHunksDialog } from './hunksDialog';
 import { showConfirm } from './confirmDialog';
@@ -18,7 +19,8 @@ type DialogConfig =
   | { kind: 'merge'; args: MergeArgs };
 
 const node = document.getElementById('dialog-config');
-const config = node?.textContent ? (JSON.parse(node.textContent) as DialogConfig | null) : null;
+const config = node?.textContent ? (JSON.parse(node.textContent) as (DialogConfig & { prefs?: Record<string, unknown> }) | null) : null;
+setDialogPrefs(config?.prefs);
 document.body.classList.add('dialog-page');
 
 if (config?.kind === 'unstash') openUnstashDialog(config.args.root);

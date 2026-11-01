@@ -13,7 +13,7 @@
 
 ### Sync
 - Fetch in the Branches toolbar; Pull and Push in the log toolbar. Pull follows your `pull.rebase` setting
-- Push opens a Push Commits dialog in an editor tab (drag it to another group or a new window): each repository's target (`branch → remote : branch`, editable), the commits to push and their changed files (double-click for the diff), and a Push tags option (`--follow-tags`)
+- Push opens a Push Commits dialog in an editor tab (drag it to another group or a new window): each repository's target (`branch → remote : branch`, editable), the commits to push and their changed files as a tree grouped by directory, repository or module like the log (double-click for the diff; the grouping is remembered), and a Push tags option (`--follow-tags`)
 - Force Push (with lease) lives in the dialog's Push drop-down and asks for confirmation; the lease is bound to the remote state shown in the dialog, and it never uses a plain `--force`
 - A branch that is not on the remote yet is marked New and gets its upstream set on the first push; a remote branch with commits you don't have is flagged before you push
 - Push All up to Here… in the commit context menu pushes only up to the selected commit
@@ -67,7 +67,7 @@
 
 ### Explorer and editor
 - Explorer context menu → Git Workbench: Show History, Compare with Branch or Tag…, Stash Changes…, Unstash Changes…
-- Unstash Changes opens a dialog in an editor tab: pick a stash, see its files, Apply / Pop / Drop / Clear, or unstash as a branch
+- Unstash Changes opens a dialog in an editor tab: pick a stash, see its files (grouped like the log, untracked files listed separately), Apply / Pop / Drop / Clear, or unstash as a branch
 - Editor context menu: Toggle Git Blame, which switches VS Code's built-in blame annotations
 
 ### Accessibility and look

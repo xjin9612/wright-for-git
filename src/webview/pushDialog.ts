@@ -3,7 +3,7 @@
 // Push 按鈕的下拉選單提供 Force Push。推送前一定經過這個對話框，避免誤觸。
 import type { ChangedFile, PushCommit, PushPlan, PushTarget, ToWebview } from '../shared/protocol';
 import { clear, el, formatDate, icon, showMenu } from './dom';
-import { fileIcon, statusLetter } from './fileIcons';
+import { dialogFilesPane, type DialogFiles } from './dialogFiles';
 import { post } from './vscodeApi';
 import { plural, t } from './l10n';
 
@@ -20,7 +20,6 @@ export interface PushDialogOptions {
 
 type DialogMessage = Extract<ToWebview, { type: 'pushPreview' | 'pushCommitFiles' | 'pushStatus' }>;
 
-const STATUS_TEXT: Record<string, string> = { A: t('Added'), M: t('Modified'), D: t('Deleted'), R: t('Renamed'), C: t('Copied'), T: t('Type changed'), U: t('Unmerged') };
 
 let current: PushDialog | undefined;
 let nextRequest = 1;
@@ -62,8 +61,7 @@ function problemText(p: PushPlan): string {
 class PushDialog {
   private readonly overlay: HTMLElement;
   private readonly list: HTMLElement;
-  private readonly files: HTMLElement;
-  private readonly filesTitle: HTMLElement;
+  private readonly files: DialogFiles;
   private readonly pushButton: HTMLButtonElement;
   private readonly caretButton: HTMLButtonElement;
   private readonly tagsBox: HTMLInputElement;
@@ -84,8 +82,13 @@ class PushDialog {
 
   constructor(private readonly opts: PushDialogOptions) {
     this.list = el('div', { className: 'push-list', attrs: { tabindex: '0' } });
-    this.filesTitle = el('div', { className: 'push-files-title muted', text: t('Changed files') });
-    this.files = el('div', { className: 'tree push-files' });
+    this.files = dialogFilesPane('push', {
+      repoName: (root) => this.plans.find((p) => p.root === root)?.name ?? '',
+      onOpen: (_g, file) => {
+        const sel = this.selected;
+        if (sel) this.opts.onOpenDiff(sel.root, sel.commit.hash, sel.commit.parents[0], file);
+      },
+    });
     this.tagsBox = el('input', { attrs: { type: 'checkbox', id: 'push-tags' } });
 
     this.pushButton = el('button', { className: 'button primary push-main', text: t('Push'), attrs: { type: 'button' } });
@@ -103,7 +106,7 @@ class PushDialog {
       'div',
       { className: 'push-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': title } },
       el('div', { className: 'push-header', text: title }),
-      el('div', { className: 'push-body' }, this.list, el('div', { className: 'push-files-pane' }, this.filesTitle, this.files)),
+      el('div', { className: 'push-body' }, this.list, this.files.pane),
       el(
         'div',
         { className: 'push-footer' },
@@ -171,14 +174,13 @@ class PushDialog {
 
   private select(sel: { root: string; commit: PushCommit } | undefined): void {
     this.selected = sel;
-    clear(this.files);
     if (!sel) {
-      this.filesTitle.textContent = t('Changed files');
+      this.files.setTitle(t('Changed files'));
+      this.files.tree.setEmpty('');
       return;
     }
-    this.filesTitle.textContent = `${sel.commit.hash.slice(0, 8)} ${sel.commit.subject}`;
-    this.filesTitle.title = this.filesTitle.textContent;
-    this.files.append(el('div', { className: 'empty-text', text: t('Loading…') }));
+    this.files.setTitle(`${sel.commit.hash.slice(0, 8)} ${sel.commit.subject}`);
+    this.files.tree.setLoading();
     this.filesRequest = nextRequest++;
     post({ type: 'pushCommitFiles', requestId: this.filesRequest, root: sel.root, hash: sel.commit.hash });
   }
@@ -337,30 +339,9 @@ class PushDialog {
   }
 
   private renderFiles(files: ChangedFile[]): void {
-    clear(this.files);
     const sel = this.selected;
     if (!sel) return;
-    if (files.length === 0) {
-      this.files.append(el('div', { className: 'empty-text', text: t('No changes') }));
-      return;
-    }
-    for (const f of files) {
-      const name = f.path.split('/').pop() ?? f.path;
-      const dir = f.path.slice(0, f.path.length - name.length).replace(/\/$/, '');
-      const row = el(
-        'div',
-        { className: 'tree-row', title: `${STATUS_TEXT[f.status] ?? f.status}: ${f.oldPath ? `${f.oldPath} → ` : ''}${f.path}\n${t('Double-click to show the diff')}` },
-        fileIcon(f.path),
-        el('span', { className: `tree-label status-${f.status}`, text: name }),
-        dir ? el('span', { className: 'tree-count', text: dir }) : null,
-        statusLetter(f.status),
-      );
-      row.addEventListener('click', () => {
-        this.files.querySelector('.tree-row.selected')?.classList.remove('selected');
-        row.classList.add('selected');
-      });
-      row.addEventListener('dblclick', () => this.opts.onOpenDiff(sel.root, sel.commit.hash, sel.commit.parents[0], f));
-      this.files.append(row);
-    }
+    if (files.length === 0) this.files.tree.setEmpty(t('No changes'));
+    else this.files.tree.setGroups([{ root: sel.root, files }]);
   }
 }
