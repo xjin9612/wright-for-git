@@ -25,7 +25,7 @@
   - 提交訊息中的 issue 編號轉連結（`gitWorkbench.issueLinks`）；選取 commit 時淡化不在其路徑上的列
 - **Commit 視窗**（`Alt+0`）：勾選要提交的檔案或只提交部分 hunk；Changelist；未追蹤與已忽略檔案；依目錄／repo／模組分組；Amend、Sign-off、略過 hooks、提交並推送；捨棄變更、加入 `.gitignore`。透過暫時 index 提交，不影響內建原始檔控制的暫存區。另有「儲藏」分頁列出所有 repo 的 stash
 - **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框（編輯器分頁），列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後
-- **變更檔案**：樹狀或平鋪清單，可依目錄／repo／模組分組，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列可切換上一個／下一個檔案
+- **變更檔案**：樹狀或平鋪清單，可依目錄／repo／模組分組，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列的 ← → 可切換上一個／下一個檔案
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
 - 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」

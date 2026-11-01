@@ -360,7 +360,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'openDiff':
           this.diffNav = m.files && m.files.length > 1 ? { root: m.root, hash: m.hash, parent: m.parent, files: m.files, index: m.files.findIndex((f) => f.path === m.file.path) } : undefined;
           {
-            const right = await this.openDiff(m.root, m.hash, m.parent, m.file);
+            const nav = this.diffNav;
+            const right = await this.openDiff(m.root, m.hash, m.parent, m.file, undefined, nav && nav.index >= 0 ? `${nav.index + 1}/${nav.files.length}` : undefined);
             if (this.diffNav) this.diffNav.right = right;
             this.updateDiffNavContext();
           }
@@ -692,7 +693,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
     nav.index = next;
     const file = nav.files[next];
-    nav.right = await this.openDiff(nav.root, file.right ?? nav.hash, file.left ?? nav.parent, file);
+    nav.right = await this.openDiff(nav.root, file.right ?? nav.hash, file.left ?? nav.parent, file, undefined, `${next + 1}/${nav.files.length}`);
     this.updateDiffNavContext();
     vscode.window.setStatusBarMessage(`${next + 1}/${nav.files.length} ${file.path}`, 2500);
   }
@@ -727,7 +728,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   /** @returns 右側（修改後）的 URI 字串，用來辨識這個 diff 分頁 */
-  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile, viewColumn?: vscode.ViewColumn): Promise<string | undefined> {
+  /** @param position 在變更檔案中的位置（如 1/5），顯示在分頁標題，對應 IntelliJ 的「1/5 files」 */
+  private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile, viewColumn?: vscode.ViewColumn, position?: string): Promise<string | undefined> {
     const e = this.find(root);
     if (!e) return undefined;
     // 多選合併的變更自帶左右兩側的 revision
@@ -736,7 +738,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const left = revisionUri(e.repo.root, leftRef, file.oldPath ?? file.path);
     const right = revisionUri(e.repo.root, rightRef, file.path);
     const short = (h: string) => (h ? h.slice(0, 8) : '∅');
-    const title = `${path.basename(file.path)} (${short(leftRef)} ↔ ${short(rightRef)})`;
+    const title = `${path.basename(file.path)} (${short(leftRef)} ↔ ${short(rightRef)})${position ? ` · ${position}` : ''}`;
     await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true, viewColumn });
     return right.toString();
   }

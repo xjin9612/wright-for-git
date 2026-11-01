@@ -140,13 +140,13 @@
         "command": "gitWorkbench.diff.previousFile",
         "title": "%command.diff.previousFile%",
         "category": "Git Workbench",
-        "icon": "$(arrow-up)"
+        "icon": "$(arrow-left)"
       },
       {
         "command": "gitWorkbench.diff.nextFile",
         "title": "%command.diff.nextFile%",
         "category": "Git Workbench",
-        "icon": "$(arrow-down)"
+        "icon": "$(arrow-right)"
       },
       {
         "command": "gitWorkbench.compareWithRef",

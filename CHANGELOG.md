@@ -48,7 +48,7 @@
 
 ### Changed files
 - Group by directory, repository or module from the 👁 menu; switch between tree and flat list; file-type icons
-- In a diff opened from the log, step to the previous / next changed file from the editor title bar or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`
+- In a diff opened from the log, step to the previous / next changed file with the ← → buttons in the editor title bar (separate from VS Code's own ↑↓ for changes) or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`; the tab title shows the position, like `1/5`
 
 ### Git console
 - Every git command Git Workbench runs is written to the Output panel's **Git Workbench** channel, like IntelliJ's Git Console: the repository, the full command line, how long it took, and git's own output (for example `To origin … main -> main`)

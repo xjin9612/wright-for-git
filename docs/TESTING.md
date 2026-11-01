@@ -63,7 +63,7 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] 切換淺色、深色、高對比主題：文字與選取都看得清楚；對話框按鈕在 Windows 上為「主要按鈕在左、取消在右」
 
 ## 2. VS Code 原生功能的整合
-- [ ] 記錄右欄雙擊檔案開啟 diff（新增的左側為空、刪除的右側為空、`docs/中文說明.md` 檔名正常）；diff 標題列的 ↑↓ 與 `Ctrl+Alt+PageUp／PageDown` 切換檔案
+- [ ] 記錄右欄雙擊檔案開啟 diff（新增的左側為空、刪除的右側為空、`docs/中文說明.md` 檔名正常）；diff 標題列的 ← → 與 `Ctrl+Alt+PageUp／PageDown` 切換檔案（與 VS Code 本身切換變更段落的 ↑↓ 不同），分頁標題顯示「1/5」
 - [ ] 提交視窗雙擊 `src/config.ts`：開啟「HEAD ↔ 工作區」diff，可在右側直接編輯
 - [ ] 檔案總管右鍵 → Git Workbench 子選單四個項目都在；編輯器右鍵有「顯示 Git 歷史」「切換 Git Blame 標註」，切換後行尾出現／消失 blame
 - [ ] Push… 等編輯器分頁可拖到其他編輯器群組或「移到新視窗」
