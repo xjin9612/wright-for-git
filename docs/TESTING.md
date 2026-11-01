@@ -20,7 +20,7 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-每個測試檔會在系統暫存資料夾建立一份新的 playground，不會動到專案旁邊的 `playground`。失敗時訊息會指出哪一個步驟、預期與實際的內容；等待逾時還會附上診斷：各 repo 的 `git status`、錯誤與警告通知、Git 主控台最後幾行、當下開著的選單與確認框。回報失敗時請連同這段一起貼上。
+每個測試檔會在系統暫存資料夾建立一份新的 playground，不會動到手動測試用的範例 repo。失敗時訊息會指出哪一個步驟、預期與實際的內容；等待逾時還會附上診斷：各 repo 的 `git status`、錯誤與警告通知、Git 主控台最後幾行、當下開著的選單與確認框。回報失敗時請連同這段一起貼上。
 
 ### UI 測試涵蓋的項目（不需手動再測）
 
@@ -43,7 +43,7 @@ npm run test:vscode
 
 - 第一次會下載 VS Code（約 100～200 MB，存在專案的 `.vscode-test/`，之後沿用）。
 - 測試期間會開出一個 VS Code 視窗，跑完自動關閉；請不要操作它。
-- 使用全新的使用者設定與暫存的 playground，不會動到你自己的 VS Code 設定與專案旁邊的 `playground`。
+- 使用全新的使用者設定與暫存的 playground，不會動到你自己的 VS Code 設定與手動測試用的範例 repo。
 - `VSCODE_VERSION=1.90.0` 指定版本（預設 stable）；`GWB_GREP=diff` 只跑名稱含這段文字的測試。PowerShell 寫法：`$env:GWB_GREP="diff"; npm run test:vscode`。
 - 等待逾時會附上診斷：各 repo 的 `git status`、使用中的分頁、記錄的篩選、最近的 git 指令。
 
@@ -66,13 +66,13 @@ webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴
 npm run bench:vscode
 ```
 
-- 先用 `scripts/make-large-repo.mjs` 產生 10 萬筆 commit 的 repo（約 15 秒；固定亂數種子，每次內容相同，作者與訊息都是虛構的），再開真實 VS Code 量測。`GWB_BENCH_COMMITS=200000` 可改 commit 數。
+- 先在系統暫存資料夾用 `scripts/make-large-repo.mjs` 產生 10 萬筆 commit 的 repo（約 15 秒；固定亂數種子，每次內容相同，作者與訊息都是虛構的），再開真實 VS Code 量測。`GWB_BENCH_COMMITS=200000` 可改 commit 數。
 - 量測 Log 各種篩選的載入時間：無篩選、文字、作者、單一檔案、資料夾、hash、單一分支。時間從 extension 收到 webview 的載入請求起算，「首屏」是第一批送出、「全部載入」是全部送完；每項 3 次取中位數。
 - 先量沒有 commit-graph 的情況，再執行 `git commit-graph write --reachable --changed-paths` 後重量一次，比較差異。
 - 結果印在終端機，並寫入 `out/bench/results.md` 與 `results.json`。
 - 數字會隨電腦而不同，不放進 CI；改動 Log 載入相關的程式時，前後各跑一次比較。
 
-產生大型 repo 也可以單獨用：`node scripts/make-large-repo.mjs <資料夾> [commit 數]`。
+產生大型 repo 也可以單獨用，見下方「範例 repo」。
 
 ---
 
@@ -80,15 +80,30 @@ npm run bench:vscode
 
 安裝或更新 `.vsix` 後先執行「開發人員: 重新載入視窗」。寫入類操作請用 playground，不要在正式的 repo 上測。
 
-## 測試用 playground
+## 範例 repo
 
-在專案資料夾執行（會在專案的上一層建立 `playground` 與 `playground-remotes`）：
+手動測試用的範例 repo 都放在專案旁邊的 `vscode-git-workbench-test` 資料夾（與專案資料夾同一層），不會散在上一層：
 
 ```
-node scripts/make-playground.mjs            # 第一次建立
-node scripts/make-playground.mjs --force    # 測完想重來：刪除後重建
+<上一層>/
+  vscode-git-workbench/          ← 專案
+  vscode-git-workbench-test/
+    playground/                  ← 手動測試清單用，用 VS Code 開這個
+    playground-remotes/          ← playground 的遠端與模擬的另一台電腦，不要用 VS Code 開
+    large-repo/                  ← 大型 repo（效能、長線性分支折疊）
+```
+
+在專案資料夾執行：
+
+```
+node scripts/make-playground.mjs                       # 建立 playground
+node scripts/make-playground.mjs --force               # 測完想重來：刪除後重建
 node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一筆新 commit
+node scripts/make-large-repo.mjs 3000                  # 3000 筆 commit 的 large-repo（看長線性分支折疊；約 1 秒）
+node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 repo 的效能；約 15 秒）
 ```
+
+`large-repo` 的 main 每 100 筆會合併一條 5 筆的 feature 分支：👁 →「Collapse Linear Branches」後往下捲約 90 列，可以看到第一個「⋯ 3 commits」。10 萬筆時可以試「Git Workbench: 最佳化儲存庫」前後，以單一檔案（例如 `src/mod07/file03.ts`）路徑篩選的速度差異。
 
 用 VS Code 開啟 `playground` 資料夾（不是 `playground-remotes`）。內容：
 - `api-server`：main 領先遠端 2 筆；`feature/rate-limit` 尚未推送；`experiment/cache` 未合併；tag `v1.0.0`、`v1.1.0`；有 rename、刪除、中文檔名（`docs/中文說明.md`）
