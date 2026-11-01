@@ -442,6 +442,7 @@ select.push-remote {
 .paths-search { margin: 8px 12px 4px; }
 .paths-tree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; }
 .paths-tree input[type="checkbox"] { margin: 0 4px 0 0; }
+.paths-tree:focus .tree-row.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
 
 /* ---------- 編輯器分頁中的對話框：填滿整頁 ---------- */
 body.dialog-page { overflow: hidden; }

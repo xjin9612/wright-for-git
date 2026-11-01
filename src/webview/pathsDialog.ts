@@ -1,6 +1,6 @@
 // Paths → Select…：跨 repo 勾選要篩選的資料夾（對應 IntelliJ 的 Select Folders 對話框）
 import type { RepoState } from '../shared/protocol';
-import { clear, el, icon } from './dom';
+import { clear, el, icon, treeItemAttrs } from './dom';
 import { t } from './l10n';
 
 export interface PathsSelection {
@@ -64,7 +64,11 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
   }
   const expanded = new Set<string>(opts.initial.roots.map((r) => `${r}\0`));
   const filterInput = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: t('Filter folders'), spellcheck: 'false' } });
-  const list = el('div', { className: 'tree paths-tree', attrs: { tabindex: '0' } });
+  const list = el('div', { className: 'tree paths-tree', attrs: { tabindex: '0', role: 'tree', 'aria-label': t('Select Folders') } });
+  /** 目前畫出的列（鍵盤移動用），依顯示順序 */
+  let items: { key: string; parent?: string; expandable: boolean; open: boolean; box: HTMLInputElement; row: HTMLElement }[] = [];
+  /** 鍵盤焦點所在的列 */
+  let caret: string | undefined;
   const ok = el('button', { className: 'button primary', text: t('OK'), attrs: { type: 'button' } });
   const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
   const clearBtn = el('button', { className: 'button secondary', text: t('Clear'), attrs: { type: 'button' } });
@@ -79,6 +83,7 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
 
   const render = () => {
     clear(list);
+    items = [];
     const q = filterInput.value.trim().toLowerCase();
     for (const repo of opts.repos) {
       const repoKey = `${repo.root}\0`;
@@ -99,6 +104,9 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
       }
       walk(repo.root, dirTree([...visible]), 1, q !== '');
     }
+    // 焦點列不在畫面上（被收合或篩掉）時改到第一列
+    if (!items.some((i) => i.key === caret)) caret = items[0]?.key;
+    for (const i of items) i.row.classList.toggle('focused', i.key === caret);
   };
 
   const walk = (root: string, nodes: DirNode[], depth: number, forceOpen: boolean) => {
@@ -115,7 +123,8 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
   const row = (root: string, path: string, label: string, depth: number, expandable: boolean, open: boolean, kind: 'repo' | 'folder') => {
     const key = `${root}\0${path}`;
     const covered = path !== '' && coveredBy(root, path);
-    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': label } });
+    // 勾選框不進 Tab 順序：在清單上以空白鍵勾選
+    const box = el('input', { attrs: { type: 'checkbox', 'aria-label': label, tabindex: '-1' } });
     box.checked = checked.has(key) || covered;
     box.disabled = covered && !checked.has(key);
     box.addEventListener('change', () => {
@@ -126,11 +135,20 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
       } else {
         checked.delete(key);
       }
+      // 滑鼠點勾選框時焦點在勾選框上，重畫後回到清單，接著可用鍵盤
+      const refocus = list.contains(document.activeElement);
       render();
+      if (refocus) list.focus();
     });
     const twisty = expandable ? icon(open ? 'chevron-down' : 'chevron-right', 'twisty') : el('span', { className: 'twisty' });
-    const r = el('div', { className: 'tree-row' }, twisty, box, icon(kind), el('span', { className: 'tree-label', text: label }));
+    const r = el('div', { className: 'tree-row', attrs: treeItemAttrs(depth, expandable, open, checked.has(key) || covered) }, twisty, box, icon(kind), el('span', { className: 'tree-label', text: label }));
     r.style.paddingLeft = `${4 + depth * 16}px`;
+    const parent = path === '' ? undefined : `${root}\0${path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''}`;
+    items.push({ key, parent, expandable, open, box, row: r });
+    r.addEventListener('mousedown', () => {
+      caret = key;
+      for (const i of items) i.row.classList.toggle('focused', i.key === caret);
+    });
     twisty.addEventListener('click', () => {
       if (!expandable) return;
       if (expanded.has(key)) expanded.delete(key);
@@ -155,6 +173,61 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
     }
     opts.onApply({ roots, pathsByRoot });
   };
+  /** 移到某一列並捲到看得見 */
+  const moveTo = (key: string | undefined) => {
+    if (!key) return;
+    caret = key;
+    for (const i of items) i.row.classList.toggle('focused', i.key === caret);
+    items.find((i) => i.key === key)?.row.scrollIntoView({ block: 'nearest' });
+  };
+  const setExpanded = (key: string, open: boolean) => {
+    if (open) expanded.add(key);
+    else expanded.delete(key);
+    render();
+  };
+  // 清單的鍵盤操作，與其他樹相同：↑↓ 移動、→ 展開／進入第一個子項、← 收合／回上層、空白鍵勾選
+  list.addEventListener('keydown', (e) => {
+    const idx = items.findIndex((i) => i.key === caret);
+    const cur = items[idx];
+    if (!cur) return;
+    switch (e.key) {
+      case 'ArrowDown':
+        moveTo(items[Math.min(items.length - 1, idx + 1)].key);
+        break;
+      case 'ArrowUp':
+        moveTo(items[Math.max(0, idx - 1)].key);
+        break;
+      case 'Home':
+        moveTo(items[0].key);
+        break;
+      case 'End':
+        moveTo(items[items.length - 1].key);
+        break;
+      case 'ArrowRight':
+        if (!cur.expandable) break;
+        if (!cur.open) setExpanded(cur.key, true);
+        else moveTo(items[idx + 1]?.key);
+        break;
+      case 'ArrowLeft':
+        // 篩選時資料夾強制展開，收合沒有作用：直接回上層
+        if (cur.expandable && cur.open && expanded.has(cur.key)) setExpanded(cur.key, false);
+        else moveTo(cur.parent);
+        break;
+      case ' ':
+        if (!cur.box.disabled) cur.box.click();
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  });
+  // 篩選框按 ↓ 進入清單
+  filterInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' || items.length === 0) return;
+    e.preventDefault();
+    list.focus();
+  });
+
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();

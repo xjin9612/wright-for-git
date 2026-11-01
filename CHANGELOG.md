@@ -12,6 +12,7 @@
 - `npm run bench:vscode` measures log loading in a generated 100,000-commit repository inside a real VS Code, with and without a commit-graph
 - Tests that run inside a real VS Code (`npm run test:vscode`): native diffs, commands, file watching and the built-in Git integration, in CI on Windows and Linux and on the minimum supported version 1.90.0
 - Annotate with Git Blame (toggle) on VS Code older than 1.96 (which has no built-in blame) now says so instead of failing with a settings error
+- Paths → Select… can be used with the keyboard: `↑` `↓` move, `→` expands or enters a folder, `←` collapses or goes up, `Space` checks; `↓` in the filter box moves into the list
 - Accepting a side of a conflict no longer waits for the "all conflicts are resolved" notification to be dismissed
 
 ## 1.1.0

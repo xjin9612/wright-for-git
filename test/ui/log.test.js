@@ -112,6 +112,41 @@ test('Date 篩選：最近 7 天', async () => {
   await clearChip('Date');
 });
 
+test('Paths → Select…：以鍵盤展開資料夾、勾選並套用', async () => {
+  await chip('Paths').click();
+  await h.menu(page, 'Select…');
+  const dialog = page.locator('.paths-dialog');
+  await dialog.waitFor();
+  await dialog.locator('button', { hasText: 'Clear' }).click();
+  const focused = () => dialog.locator('.tree-row.focused');
+  const api = dialog.locator('.tree-row', { hasText: 'api-server' }).first();
+  // 篩選框按 ↓ 進入清單，焦點在第一列
+  await dialog.locator('.paths-search input').focus();
+  await page.keyboard.press('ArrowDown');
+  assert.ok(await dialog.locator('.paths-tree').evaluate((e) => e === document.activeElement), '焦點在清單');
+  assert.equal((await focused().innerText()).trim(), 'api-server');
+  // ← 收合、→ 展開、再 → 進入第一個子資料夾
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await api.getAttribute('aria-expanded'), 'false');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await api.getAttribute('aria-expanded'), 'true');
+  await h.until(async () => (await dialog.locator('.tree-row').count()) > 3);
+  await page.keyboard.press('ArrowRight');
+  const folder = (await focused().innerText()).trim();
+  assert.notEqual(folder, 'api-server');
+  // 空白鍵勾選；← 回上層
+  await page.keyboard.press(' ');
+  assert.ok(await focused().locator('input').isChecked(), `${folder} 已勾選`);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal((await focused().innerText()).trim(), 'api-server');
+  // Ctrl+Enter 套用：Paths 篩選只剩這個資料夾
+  await page.keyboard.press('Control+Enter');
+  await dialog.waitFor({ state: 'detached' });
+  await settle();
+  assert.match(await chip('Paths').innerText(), new RegExp(`api-server/${folder}`));
+  await clearChip('Paths');
+});
+
 test('Paths：Ctrl+點選只看一個 repo；點色條顯示 repo 名稱欄', async () => {
   await chip('Paths').click();
   await page.locator('.context-menu .menu-item', { hasText: 'web-app' }).first().dispatchEvent('mousedown', { ctrlKey: true });
