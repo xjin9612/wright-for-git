@@ -57,42 +57,149 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - `notes`：一般資料夾，不是 repo
 - 作者 Alice／Bob／Carol／Dave；「我」是 Alice
 
+## 怎麼看這份清單
+
+每一項都寫成「**做**：操作步驟 → **應該看到**：結果」。照做，結果相符就打勾；不相符就截圖回報，並註明是哪一節、哪一項。
+
+- 名稱以畫面上的文字為準。面板內的文字依 `gitWorkbench.language` 設定，可能是英文或中文，下面兩種都會寫出來。
+- VS Code 自己的選單（右鍵、指令面板）跟著 VS Code 的顯示語言，下面以中文為準。
+- 「Git 記錄面板」指底部面板的 Git 分頁，左邊是 Branches 樹、中間是 commit 清單、右邊是檔案與詳情。
+- 「提交視窗」指左側 Git Workbench 側邊欄裡的「提交」。
+
 ## 1. 開啟、版面與主題
-- [ ] 點活動列的 Git Workbench 圖示：側邊欄出現「提交」與「儲存庫」，底部開啟 Git 記錄；狀態列「Git Log」、`Alt+9`、`Alt+0` 也能開啟
-- [ ] 分隔線拖曳、左右欄收合後重新載入視窗：寬度、收合、欄寬、分組選項、我的最愛都保留
-- [ ] Git 記錄、提交視窗標題列的齒輪打開面板右上角的設定框（面板內沒有其他重複的設定按鈕）；切換語言：面板立即以新語言重新載入，設定框自動再打開；語言設為「跟隨 VS Code」時跟隨 VS Code 的顯示語言
-- [ ] 切換淺色、深色、高對比主題：文字與選取都看得清楚；對話框按鈕在 Windows 上為「主要按鈕在左、取消在右」
+
+- [ ] **入口**
+  - **做**：點左側活動列的 Git Workbench 圖示；再分別點狀態列左下的「Git Log」、按 `Alt+9`、按 `Alt+0`。
+  - **應該看到**：
+    - 活動列圖示：左側出現「提交」與「儲存庫」，底部面板切到 Git 記錄。
+    - 「Git Log」與 `Alt+9`：打開 Git 記錄面板。
+    - `Alt+0`：游標移到提交視窗。
+- [ ] **版面會被記住**
+  - **做**：
+    1. 拖曳 Git 記錄面板裡三欄之間的分隔線，改變寬度。
+    2. 按 Branches 樹左上的「‹」收合左欄。
+    3. 拖曳 Author、Date 欄位標題的左緣，改變欄寬。
+    4. 在 Branches 樹把 `feature/rate-limit` 加上星號。
+    5. 執行「開發人員: 重新載入視窗」。
+  - **應該看到**：重新載入後，寬度、收合、欄寬、星號都和重新載入前一樣。
+- [ ] **設定框與語言**
+  - **做**：
+    1. 點 Git 記錄面板標題列（面板右上角那排圖示）的齒輪。
+    2. 把語言改成另一種。
+    3. 再點提交視窗標題列的齒輪。
+  - **應該看到**：
+    - 面板右上角彈出設定框。
+    - 改語言後面板立刻換成新語言，設定框自動再打開。
+    - 提交視窗的齒輪也會打開同一個設定框。
+    - 面板內部沒有其他齒輪按鈕。
+- [ ] **主題**
+  - **做**：按 `Ctrl+K` `Ctrl+T`，依序切換到淺色、深色、高對比主題。每換一次，在 Branches 樹的 `experiment/cache` 上按右鍵 → Delete（刪除），出現確認框後按取消。
+  - **應該看到**：
+    - 每種主題下，文字、選取列、標籤都看得清楚。
+    - 確認框裡，紅色的刪除按鈕在左、取消在右（Windows 的順序）。
 
 ## 2. VS Code 原生功能的整合
-- [ ] 記錄右欄雙擊檔案開啟 diff（新增的左側為空、刪除的右側為空、`docs/中文說明.md` 檔名正常）；diff 標題列的 ← → 與 `Ctrl+Alt+PageUp／PageDown` 切換檔案（與 VS Code 本身切換變更段落的 ↑↓ 不同），分頁標題顯示「1/5」
-- [ ] 提交視窗雙擊 `src/config.ts`：開啟「HEAD ↔ 工作區」diff，可在右側直接編輯
-- [ ] 檔案總管右鍵 → Git Workbench 子選單四個項目都在；編輯器右鍵有「顯示 Git 歷史」「切換 Git Blame 標註」，切換後行尾出現／消失 blame
-- [ ] Push… 等編輯器分頁可拖到其他編輯器群組或「移到新視窗」
-- [ ] Log 標題列「顯示 Git 主控台」：開啟「輸出」並切到 Git Workbench 頻道，看得到剛才的 Push／Fetch 指令
+
+- [ ] **從記錄開 diff**
+  - **做**：
+    1. 在 Git 記錄面板點 `docs: API reference for orders`（api-server 的 commit）。
+    2. 在右欄雙擊 `中文說明.md`。
+    3. 再點 `chore: drop legacy script`，雙擊 `legacy.sh`。
+  - **應該看到**：
+    - `中文說明.md`：開啟 diff，左邊空白（新增的檔案），檔名中文正常，分頁標題結尾是「· 1/2」或「· 2/2」。
+    - `legacy.sh`：右邊空白（刪除的檔案）。
+- [ ] **diff 切換檔案**
+  - **做**：開著 `docs: API reference for orders` 的 diff，按標題列的 ← →，再按 `Ctrl+Alt+PageUp`、`Ctrl+Alt+PageDown`。
+  - **應該看到**：
+    - ← → 緊接在 VS Code 自己的 ↑↓ 後面。↑↓ 是在同一個檔案裡跳變更段落，← → 是換到同一個 commit 的另一個檔案。
+    - 換檔案後分頁標題的「1/2」跟著變。
+    - 快捷鍵的效果和按 ← → 相同。
+- [ ] **提交視窗的 diff 可編輯**
+  - **做**：在提交視窗雙擊 `src/config.ts`（api-server）。
+  - **應該看到**：開啟「config.ts (HEAD ↔ Working Tree)」diff，可以直接在右邊打字。
+- [ ] **右鍵選單**
+  - **做**：
+    1. 在檔案總管對 `api-server/src` 按右鍵 → Git Workbench。
+    2. 開啟任一檔案，在編輯器裡按右鍵 →「切換 Git Blame 標註」，再按一次。
+  - **應該看到**：
+    - Git Workbench 子選單有「顯示 Git 歷史」「與分支或標籤比較…」「儲藏變更…」「取消儲藏…」四項。
+    - 第一次切換後，每一行行尾出現作者與時間；再按一次就消失。
+- [ ] **編輯器分頁可移動**
+  - **做**：按 Git 記錄工具列的 Push（↑ 圖示），把開出來的「Push Commits」分頁拖到旁邊的編輯器群組；再對分頁按右鍵 →「移到新視窗」。
+  - **應該看到**：分頁可以拖動，也能變成獨立視窗，內容正常。
+- [ ] **Git 主控台**
+  - **做**：按 Branches 工具列的 Fetch（雲朵圖示），再點 Git 記錄面板標題列的「顯示 Git 主控台」圖示。
+  - **應該看到**：底部切到「輸出」，右上的下拉選單是「Git Workbench」，看得到剛才的 `git fetch` 指令和耗時。
 
 ## 3. 自動重新整理（檔案監看）
-- [ ] 在終端機執行 `git checkout`、`git commit`、`git stash`：記錄面板與儲藏分頁自動更新
-- [ ] 用 VS Code 內建「原始檔控制」提交、或在編輯器修改存檔：記錄面板與提交視窗約 1 秒內更新
+
+- [ ] **終端機操作**
+  - **做**：開終端機，`cd api-server`，依序執行：
+    1. `git checkout -b tmp`
+    2. `git commit --allow-empty -m test`
+    3. `git stash`
+    4. `git checkout main`
+  - **應該看到**：每一步做完 1～2 秒內，Git 記錄面板跟著更新，例如 Branches 出現 `tmp`、清單最上面出現 `test`；提交視窗的 Stash 分頁出現新的儲藏。
+- [ ] **VS Code 內的修改**
+  - **做**：在編輯器修改 `api-server/src/index.ts` 並存檔。
+  - **應該看到**：約 1 秒內，提交視窗出現這個檔案。
 
 ## 4. 側邊欄「儲存庫」
-- [ ] 列出 api-server、api-server/libs/shared、web-app（不含 notes）
-- [ ] 取消勾選某個 repo，記錄面板的 Paths 篩選同步；在 Paths 選單勾回來，側邊欄也同步
+
+- [ ] **列出的 repo**
+  - **做**：看左側 Git Workbench 側邊欄的「儲存庫」。
+  - **應該看到**：列出 api-server、api-server/libs/shared、web-app，沒有 notes。
+- [ ] **與 Paths 篩選同步**
+  - **做**：
+    1. 取消勾選 web-app。
+    2. 點 Git 記錄面板上方的 Paths 篩選。
+    3. 在 Paths 選單裡把 web-app 勾回來。
+  - **應該看到**：
+    - 取消勾選後，記錄裡不再出現 web-app 的 commit，Paths 選單裡的 web-app 也是未勾選。
+    - 在 Paths 選單勾回來後，側邊欄的 web-app 也被勾回來。
 
 ## 5. 合併衝突（實際畫面）
 
 先製造衝突：
-1. Git 記錄面板左側的 Branches 樹：展開 Local → `conflict`，在 `theme` 上按右鍵 →「Merge 'conflict/theme' into Current」（中文介面為「將 'conflict/theme' 合併到目前的分支」）；若要求選 repo，選 web-app
-2. 右下角跳出「web-app：merge 因衝突而暫停」的通知
+
+1. 在 Git 記錄面板左側的 Branches 樹，展開 Local → `conflict`。
+2. 在 `theme` 上按右鍵 →「Merge 'conflict/theme' into Current」（中文介面為「將 'conflict/theme' 合併到目前的分支」）。若要求選 repo，選 web-app。
+3. 右下角跳出「web-app：merge 因衝突而暫停」的通知。
 
 接著檢查：
-- [ ] 通知按「解決衝突…」：開啟「衝突」分頁，列出 `legacy.ts`（我的：修改、他們的：刪除）與 `theme.ts`（修改／修改）
-- [ ] 雙擊 `theme.ts`：開啟三方合併分頁，左中右三欄一起捲動；在淺色、深色、高對比主題下，紅色（衝突）、藍色（不衝突的變更）都看得清楚
-- [ ] 在中間「結果」欄打幾個字，按 `Ctrl+Z` 復原；按 `F7` 跳到下一個變更
-- [ ] 按「在 VS Code 合併編輯器開啟」：開啟 VS Code 內建的合併編輯器（之後關掉它，回到衝突分頁）
-- [ ] 解決兩個檔案（例如 `legacy.ts` 按「採用我的」、`theme.ts` 在三方合併按 ≫ 後「套用」），衝突分頁出現「繼續合併」，按下後 Log 出現一筆 merge commit
 
-測完要重來：`node scripts/make-playground.mjs --force`
+- [ ] **衝突清單**
+  - **做**：在通知上按「Resolve Conflicts…／解決衝突…」。
+  - **應該看到**：開啟衝突分頁，列出 `legacy.ts`（我的：修改、他們的：刪除）與 `theme.ts`（兩邊都是修改）。
+- [ ] **三方合併畫面**
+  - **做**：雙擊 `theme.ts`，捲動畫面，並用 `Ctrl+K` `Ctrl+T` 切換淺色、深色、高對比主題。
+  - **應該看到**：
+    - 開啟三方合併分頁，左中右三欄一起捲動。
+    - 每種主題下，紅色（衝突）與藍色（不衝突的變更）都看得清楚。
+- [ ] **編輯與復原**
+  - **做**：在中間的結果欄打幾個字，按 `Ctrl+Z`，再按 `F7`。
+  - **應該看到**：`Ctrl+Z` 把剛打的字復原；`F7` 跳到下一個變更。
+- [ ] **VS Code 合併編輯器**
+  - **做**：按「Open in VS Code Merge Editor／在 VS Code 合併編輯器開啟」。
+  - **應該看到**：開啟 VS Code 內建的合併編輯器。確認後關掉它，回到衝突分頁。
+- [ ] **完成合併**
+  - **做**：
+    1. 在衝突分頁選 `legacy.ts`，按「Accept Yours／採用我的」。
+    2. 雙擊 `theme.ts`，在三方合併按左邊的 ≫，再按「Apply／套用」。
+    3. 衝突分頁出現「Continue Merge／繼續合併」後，按下去。
+  - **應該看到**：Git 記錄最上面多一筆 `Merge branch 'conflict/theme'`，上方的「合併進行中」提示消失。
+
+測完要重來：`node scripts/make-playground.mjs --force`。
 
 ## 6. 真實環境
-- [ ] 你自己的 GitHub／GitLab repo（SSH 遠端）：Fetch、Pull、Push 各一次；提交訊息中的 `#123` 連到該 repo 的 issue 頁
-- [ ] 數萬筆 commit 的 repo：開啟、捲動、篩選都順暢
+
+- [ ] **自己的 repo**
+  - **做**：用 VS Code 開一個你自己的 GitHub 或 GitLab repo（SSH 遠端），各做一次 Fetch、Pull、Push。在記錄裡找一筆訊息含 `#數字` 的 commit，點那個連結。
+  - **應該看到**：
+    - Fetch、Pull、Push 都成功，「輸出」的 Git Workbench 頻道有對應的指令。
+    - `#數字` 的連結打開該 repo 的 issue 頁。
+- [ ] **大型 repo**
+  - **做**：開一個有數萬筆 commit 的 repo，例如 clone 一個大型開源專案。開啟 Git 記錄，快速捲到底，再用文字篩選搜尋。
+  - **應該看到**：
+    - 開啟到出現第一批 commit 不超過幾秒，捲動不卡頓，篩選結果幾秒內出現。
+    - 請記下大約花了幾秒。
