@@ -24,6 +24,15 @@ jobs:
       # UI 端對端測試（Playwright + Chromium；webview 與 git 都是真的，VS Code API 為模擬）
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
+      # 下載的 VS Code（每個約 350 MB）依作業系統與週次快取，同一週內不重複下載
+      - id: week
+        shell: bash
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ steps.week.outputs.week }}
+          restore-keys: vscode-test-${{ runner.os }}-
       # 真實 VS Code 測試（@vscode/test-electron）；Linux 沒有畫面，用 xvfb 提供虛擬顯示器
       - name: 真實 VS Code 測試
         if: runner.os == 'Linux'
