@@ -25,10 +25,13 @@ async function refresh() {
 }
 const subjects = (n) => h.git(api, 'log', '--format=%s', `-${n}`).split('\n');
 
+/** 是否有進行中的 rebase（看 .git 裡的狀態資料夾，不依賴 git 訊息的語言） */
+const rebasing = () => fs.existsSync(`${api}/.git/rebase-merge`) || fs.existsSync(`${api}/.git/rebase-apply`);
+
 /** 等 rebase 執行完（分頁關閉、沒有進行中的 rebase）；Windows 上 git 較慢，不能只看 log */
 async function finished(d) {
   await h.until(() => d.panel.disposed, 60000);
-  await h.until(() => !fs.existsSync(`${api}/.git/rebase-merge`) && !fs.existsSync(`${api}/.git/rebase-apply`), 60000);
+  await h.until(() => !rebasing(), 60000);
 }
 
 /** 從指定 commit 開啟互動式 rebase 分頁 */
@@ -80,12 +83,12 @@ test('edit 停下：Log 上方出現進行中列，按「繼續」完成', async
   await d.page.locator('.rebase-row', { hasText: 'key rotation' }).click();
   await d.page.keyboard.press('e');
   await d.page.locator('.button.primary').click();
-  await h.until(() => h.git(api, 'status').includes('rebase'), 40000);
+  await h.until(() => rebasing(), 40000);
   await refresh();
   await page.waitForSelector('.log-ops:not(.hidden)');
   assert.match(await page.locator('.log-ops').innerText(), /api-server.*Rebase/);
   await page.locator('.log-ops .link', { hasText: 'Continue' }).click();
-  await h.until(() => !h.git(api, 'status').includes('rebase'), 40000);
+  await h.until(() => !rebasing(), 40000);
   await refresh();
   assert.ok(await page.locator('.log-ops.hidden').count());
   assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('gitworkbench-')), [], '沒有殘留的暫存檔');

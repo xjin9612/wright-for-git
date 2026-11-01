@@ -312,7 +312,8 @@ function makePlayground() {
 
 /** 在 repo 中執行 git，回傳去掉頭尾空白的輸出 */
 function git(cwd, ...args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  // 固定英文輸出：使用者的 git 可能是中文介面（Windows 的 Git 依系統語言翻譯訊息）
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LC_ALL: 'C', LANG: 'C', LANGUAGE: 'C' } }).trim();
 }
 
 /** 模擬另一台電腦推送一筆 commit */
