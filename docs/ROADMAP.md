@@ -91,7 +91,7 @@
 |---|---|---|
 | 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
-| 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬）；◐ `npm run test:vscode`：真實 VS Code（`@vscode/test-electron`）中的 diff、指令、檔案監看、內建 Git 整合，Windows 本機 17 項全數通過，待 CI（Windows、Linux、1.90.0）驗證 |
+| 5.3 | ✅ 整合測試 | `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬）；`npm run test:vscode`：真實 VS Code（`@vscode/test-electron`）中的 diff、指令、檔案監看、內建 Git 整合。CI 在 Windows、Linux 與最低支援版本 1.90.0 全數通過 |
 | 5.4 | ✅ 大型 repo 效能 | `npm run bench:vscode` 在真實 VS Code 量測 10 萬 commit。Windows 實測（VS Code 1.144）：全部載入 5 萬筆約 1 秒；首屏 0.6 秒（有 commit-graph 0.1 秒）；單一檔案路徑篩選 1.2 秒（有 commit-graph 0.2 秒）。不主動提示，提供「最佳化儲存庫」指令寫入 commit-graph，README 說明 |
 | 5.5 | Marketplace 發佈 | publisher 帳號、英文 CHANGELOG |
 
@@ -102,6 +102,6 @@
 | # | 項目 | 說明 |
 |---|---|---|
 | 4.4 | ✅ 長線性分支折疊 | 完成（見上方 4.4） |
-| 5.3 | ◐ 真實 VS Code 測試 | 進行中（見上方 5.3） |
+| 5.3 | ✅ 真實 VS Code 測試 | 完成（見上方 5.3） |
 | 5.4 | ✅ 大型 repo 效能實測 | 完成（見上方 5.4） |
 | 5.5 | Marketplace 發佈 | 建立 publisher 帳號；目前以 GitHub Release 發佈 |
