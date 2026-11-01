@@ -249,6 +249,11 @@ const vscode = {
         const key = section ? `${section}.${k}` : k;
         return key in calls.config ? calls.config[key] : d;
       },
+      // 模擬目前版本的 VS Code：設定都已註冊（預設值 false）
+      inspect: (k) => {
+        const key = section ? `${section}.${k}` : k;
+        return { key, defaultValue: false, globalValue: calls.config[key] };
+      },
       update: async (k, v) => {
         const key = section ? `${section}.${k}` : k;
         calls.config[key] = v;
@@ -419,7 +424,7 @@ async function launch(workspace, opts = {}) {
     workspaceState: memento,
     globalState: { ...memento, setKeysForSync() {} },
   };
-  await ext.activate(ctx);
+  const testApi = await ext.activate(ctx);
   const browser = await chromium.launch();
   const log = await attachWebviewView(browser, calls.providers['gitWorkbench.log'], 'webview.js', { width: opts.width ?? 1400, height: opts.height ?? 520 });
   const page = log.page;
@@ -439,6 +444,8 @@ async function launch(workspace, opts = {}) {
     calls,
     vscode,
     ctx,
+    /** 擴充功能啟用時回傳的測試用介面（src/testApi.ts） */
+    api: testApi,
     /** 開啟提交視窗 */
     async commitView(viewport = { width: 420, height: 760 }) {
       const v = await attachWebviewView(browser, calls.providers['gitWorkbench.commit'], 'commit.js', viewport);

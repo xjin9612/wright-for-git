@@ -474,5 +474,6 @@
   "{0} non-conflicting changes": "{0} 個不衝突的變更",
   "All {0} commits to push": "這次要推的全部 {0} 個 commit",
   "{0} commit selected": "已選取 {0} 個 commit",
-  "Click to show the changes of all commits to push": "點這裡查看所有要推的 commit 合併後的改動"
+  "Click to show the changes of all commits to push": "點這裡查看所有要推的 commit 合併後的改動",
+  "Git blame annotations need VS Code 1.96 or later.": "Git blame 標註需要 VS Code 1.96 以上版本。"
 }

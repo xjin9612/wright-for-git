@@ -98,6 +98,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     // Annotate：VS Code 1.96 起內建 git blame，這裡只切換內建的編輯器標註，不重複實作
     vscode.commands.registerCommand('gitWorkbench.toggleBlame', async () => {
       const cfg = vscode.workspace.getConfiguration('git');
+      // 內建的 blame 標註從 VS Code 1.96 開始才有；舊版沒有這個設定，寫入會失敗
+      if (cfg.inspect('blame.editorDecoration.enabled')?.defaultValue === undefined) {
+        void vscode.window.showInformationMessage(t('Git blame annotations need VS Code 1.96 or later.'));
+        return;
+      }
       const on = cfg.get<boolean>('blame.editorDecoration.enabled', false);
       await cfg.update('blame.editorDecoration.enabled', !on, vscode.ConfigurationTarget.Global);
       vscode.window.setStatusBarMessage(on ? t('Git blame annotations off') : t('Git blame annotations on'), 2500);

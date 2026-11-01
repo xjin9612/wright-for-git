@@ -4,6 +4,7 @@
 
 ### Other
 - Tests that run inside a real VS Code (`npm run test:vscode`): native diffs, commands, file watching and the built-in Git integration, in CI on Windows and Linux and on the minimum supported version 1.90.0
+- Toggle Git Blame on VS Code older than 1.96 (which has no built-in blame) now says so instead of failing with a settings error
 - Accepting a side of a conflict no longer waits for the "all conflicts are resolved" notification to be dismissed
 
 ## 1.1.0
