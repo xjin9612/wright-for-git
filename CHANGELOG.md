@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
 ### Commit window
 - New Commit view in the Git Workbench side bar (`Alt+0`), next to Repositories, modeled on IntelliJ's Commit tool window. It works alongside VS Code's Source Control and never touches your staging area: only the checked files are committed, through a temporary index
