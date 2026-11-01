@@ -79,10 +79,19 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] 取消勾選某個 repo，記錄面板的 Paths 篩選同步；在 Paths 選單勾回來，側邊欄也同步
 
 ## 5. 合併衝突（實際畫面）
-- [ ] web-app：分支右鍵 `conflict/theme` →「合併到目前的分支」→ 衝突提示選「解決衝突…」：開啟衝突清單分頁，`legacy.ts` 顯示「修改／刪除」
-- [ ] 雙擊 `theme.ts` 開啟三方合併分頁：三欄捲動一致、顏色在淺色／深色／高對比主題都看得清楚；在結果欄打字、`Ctrl+Z` 復原；`F7` 跳到下一個變更
-- [ ] 按「在 VS Code 合併編輯器開啟」：開啟內建的合併編輯器
-- [ ] 解決完後在衝突清單按「繼續合併」，或關掉清單、從 Log 上方的「繼續」完成
+
+先製造衝突：
+1. Git 記錄面板左側的 Branches 樹：展開 Local → `conflict`，在 `theme` 上按右鍵 →「Merge 'conflict/theme' into Current」（中文介面為「將 'conflict/theme' 合併到目前的分支」）；若要求選 repo，選 web-app
+2. 右下角跳出「web-app：merge 因衝突而暫停」的通知
+
+接著檢查：
+- [ ] 通知按「解決衝突…」：開啟「衝突」分頁，列出 `legacy.ts`（我的：修改、他們的：刪除）與 `theme.ts`（修改／修改）
+- [ ] 雙擊 `theme.ts`：開啟三方合併分頁，左中右三欄一起捲動；在淺色、深色、高對比主題下，紅色（衝突）、藍色（不衝突的變更）都看得清楚
+- [ ] 在中間「結果」欄打幾個字，按 `Ctrl+Z` 復原；按 `F7` 跳到下一個變更
+- [ ] 按「在 VS Code 合併編輯器開啟」：開啟 VS Code 內建的合併編輯器（之後關掉它，回到衝突分頁）
+- [ ] 解決兩個檔案（例如 `legacy.ts` 按「採用我的」、`theme.ts` 在三方合併按 ≫ 後「套用」），衝突分頁出現「繼續合併」，按下後 Log 出現一筆 merge commit
+
+測完要重來：`node scripts/make-playground.mjs --force`
 
 ## 6. 真實環境
 - [ ] 你自己的 GitHub／GitLab repo（SSH 遠端）：Fetch、Pull、Push 各一次；提交訊息中的 `#123` 連到該 repo 的 issue 頁
