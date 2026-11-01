@@ -135,9 +135,10 @@ test('Paths：Ctrl+點選只看一個 repo；點色條顯示 repo 名稱欄', as
 
 test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', async () => {
   await (await row('feat(auth): add API keys')).click();
-  await page.waitForTimeout(600);
-  assert.deepEqual(await h.texts(page.locator('.file-tree .tree-row .tree-label')), ['api-server', 'src/auth', 'keys.ts']);
-  assert.match(await page.locator('.details-info').innerText(), /Bob Lin/);
+  await h.eventually(async () => {
+    assert.deepEqual(await h.texts(page.locator('.file-tree .tree-row .tree-label')), ['api-server', 'src/auth', 'keys.ts']);
+    assert.match(await page.locator('.details-info').innerText(), /Bob Lin/);
+  });
   await page.locator('.details-info .issue-link', { hasText: 'PROJ-42' }).click();
   await h.until(() => JSON.stringify([app.calls.opened, app.calls.executed]).includes('PROJ-42'));
 });
@@ -145,10 +146,11 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
 test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', async () => {
   await (await row('feat(auth): rotate API keys')).click();
   await (await row('docs: describe key rotation')).click({ modifiers: ['Shift'] });
-  await page.waitForTimeout(800);
-  const files = (await h.texts(page.locator('.file-tree .tree-row .tree-label'))).join(' ');
-  assert.match(files, /rotate\.ts/);
-  assert.match(files, /auth\.md/);
+  await h.eventually(async () => {
+    const files = (await h.texts(page.locator('.file-tree .tree-row .tree-label'))).join(' ');
+    assert.match(files, /rotate\.ts/);
+    assert.match(files, /auth\.md/);
+  });
   await (await row('docs: describe key rotation')).click({ button: 'right' });
   const items = await h.texts(page.locator('.context-menu .menu-item'));
   assert.ok(items.some((x) => /2/.test(x) && /Copy/.test(x)), items.join(' / '));
@@ -166,8 +168,7 @@ test('右鍵選單包含 IntelliJ 的 commit 操作', async () => {
 test('Log 分頁：新增分頁各自保留篩選', async () => {
   await page.locator('[title="View options"]').click();
   await h.menu(page, 'New Log Tab');
-  await page.waitForTimeout(500);
-  assert.equal(await page.locator('.log-tab').count(), 2);
+  await h.eventually(async () => assert.equal(await page.locator('.log-tab').count(), 2));
   await search('pagination');
   await page.locator('.log-tab').first().click();
   await settle();
@@ -229,9 +230,7 @@ test('沒有符合的 commit：提示並可一鍵清除篩選', async () => {
 
 test('變更檔案列尾顯示狀態字母', async () => {
   await (await row('docs: rename orders guide')).click();
-  await page.waitForTimeout(500);
-  const letters = await h.texts(page.locator('.file-tree .status-letter'));
-  assert.deepEqual(letters, ['R']);
+  await h.eventually(async () => assert.deepEqual(await h.texts(page.locator('.file-tree .status-letter')), ['R']));
   assert.equal(await page.locator('.file-tree .status-letter').first().getAttribute('aria-label'), 'Renamed');
 });
 

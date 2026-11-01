@@ -9,6 +9,7 @@ const h = require('./host');
 let pg;
 let app;
 let cv;
+let cvView;
 let api;
 let web;
 
@@ -17,23 +18,28 @@ before(async () => {
   api = `${pg}/api-server`;
   web = `${pg}/web-app`;
   app = await h.launch(pg);
-  cv = (await app.commitView()).page;
-  await cv.waitForTimeout(800);
+  cvView = await app.commitView();
+  cv = cvView.page;
+  await h.until(() => (cvView.posted.commitState ?? 0) > 0);
+  await cv.waitForTimeout(300);
 });
 after(async () => app && (await app.close()));
 
 const rows = () => h.texts(cv.locator('.commit-tree .tree-row'));
 const fileRow = (name) => cv.locator('.commit-tree .tree-row', { hasText: new RegExp(`^\\s*\\S*\\s*${name.replace(/\./g, '\\.')}`) }).first();
 const box = (name) => fileRow(name).locator('input.commit-check');
+/** 按重新整理並等 extension 送回新的狀態（Windows 上 git 較慢，不用固定等待時間） */
 async function reload() {
+  const n = cvView.posted.commitState ?? 0;
   await cv.locator('.commit-pane:not(.stash-pane) .commit-toolbar [title="Refresh"]').click();
-  await cv.waitForTimeout(900);
+  await h.until(() => (cvView.posted.commitState ?? 0) > n, 30000);
+  await cv.waitForTimeout(200);
 }
 async function commit(message) {
   await cv.locator('.commit-message').fill(message);
   await cv.locator('.commit-actions .button.primary').click();
-  await h.until(async () => (await cv.locator('.commit-message').inputValue()) === '', 15000);
-  await cv.waitForTimeout(600);
+  await h.until(async () => (await cv.locator('.commit-message').inputValue()) === '', 40000);
+  await reload();
 }
 const headFiles = (repo) => h.git(repo, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean);
 

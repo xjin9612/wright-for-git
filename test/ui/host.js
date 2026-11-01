@@ -347,6 +347,8 @@ async function attachWebviewView(browser, provider, script, viewport) {
   const log = watchPage(page);
   let onMsg = () => undefined;
   const visibility = [];
+  /** extension 送到這個 webview 的訊息類型計數（測試用來等「重新整理完成」） */
+  const posted = {};
   const view = {
     visible: true,
     description: '',
@@ -357,6 +359,7 @@ async function attachWebviewView(browser, provider, script, viewport) {
       asWebviewUri: (u) => u,
       postMessage: async (m) => {
         await page.evaluate((msg) => window.postMessage(msg, '*'), m).catch(() => undefined);
+        posted[m.type] = (posted[m.type] ?? 0) + 1;
         return true;
       },
       onDidReceiveMessage: (h) => {
@@ -375,7 +378,7 @@ async function attachWebviewView(browser, provider, script, viewport) {
   await page.exposeFunction('__host', (m) => onMsg(m));
   const l10n = jsonTag(view.webview.html, 'l10n-bundle') ?? '{}';
   await page.setContent(pageHtml(script, `<script type="application/json" id="l10n-bundle">${l10n}</script>`));
-  return { page, log, view };
+  return { page, log, view, posted };
 }
 
 /**
@@ -495,6 +498,19 @@ async function until(fn, timeout = 20000, interval = 100) {
   }
 }
 
+/** 反覆執行 fn（含 assert）直到不再丟出錯誤；逾時時丟出最後一次的錯誤。用於非同步載入的畫面 */
+async function eventually(fn, timeout = 30000, interval = 200) {
+  const end = Date.now() + timeout;
+  for (;;) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (Date.now() > end) throw e;
+      await new Promise((r) => setTimeout(r, interval));
+    }
+  }
+}
+
 /** 列的文字（換行改空白） */
 const texts = async (locator) => (await locator.allInnerTexts()).map((t) => t.replace(/\s*\n\s*/g, ' ').trim());
 
@@ -515,4 +531,4 @@ async function menu(page, label, level) {
   await scope.locator('.menu-item', { hasText: label }).first().dispatchEvent('mousedown');
 }
 
-module.exports = { launch, makePlayground, git, remotePush, pageErrors, until, texts, menu, logRow, ROOT };
+module.exports = { launch, makePlayground, git, remotePush, pageErrors, until, eventually, texts, menu, logRow, ROOT };

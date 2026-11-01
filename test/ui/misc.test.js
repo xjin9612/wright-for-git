@@ -32,9 +32,10 @@ test('介面語言 zh-tw：面板、選單、提交視窗都是中文', async ()
   assert.doesNotMatch(items, /Cherry-Pick|Revert|Reset/);
   await page.keyboard.press('Escape');
   const cv = await app.commitView();
-  await cv.page.waitForTimeout(600);
-  assert.deepEqual(await h.texts(cv.page.locator('.commit-tab')), ['提交', '儲藏']);
-  assert.ok((await h.texts(cv.page.locator('.commit-tree .tree-row'))).some((r) => r.startsWith('變更')));
+  await h.eventually(async () => {
+    assert.deepEqual(await h.texts(cv.page.locator('.commit-tab')), ['提交', '儲藏']);
+    assert.ok((await h.texts(cv.page.locator('.commit-tree .tree-row'))).some((r) => r.startsWith('變更')));
+  });
   await cv.page.close();
 });
 
@@ -99,12 +100,9 @@ test('與分支或標籤比較：單一檔案直接開 diff；資料夾列出不
 test('取消儲藏分頁：選 stash 看檔案；以新分支取消儲藏', async () => {
   await app.run('gitWorkbench.unstash', fileUri(path.join(web, 'src')));
   const d = await app.lastPanel();
-  await d.page.waitForSelector('.push-list .push-commit, .push-list .tree-row, .push-list > *');
-  await d.page.waitForTimeout(600);
-  const list = await h.texts(d.page.locator('.push-list > *'));
-  assert.ok(list.some((s) => /draft: new page/.test(s)), list.join(' / '));
-  await d.page.waitForTimeout(400);
-  assert.ok((await h.texts(d.page.locator('.push-files .tree-row, .push-files > *'))).join(' ').includes('App.css'));
+  // 清單與檔案都是非同步載入（Windows 上較慢）：等到內容出現，不用固定的等待時間
+  await h.until(async () => (await h.texts(d.page.locator('.push-list > *'))).some((x) => /draft: new page/.test(x)), 30000);
+  await h.until(async () => (await h.texts(d.page.locator('.push-files > *'))).join(' ').includes('App.css'), 30000);
   h.git(web, 'stash', '-q');
   await d.page.locator('.unstash-branch').fill('from-stash');
   await d.page.locator('.button.primary').click();

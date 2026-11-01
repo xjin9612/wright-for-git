@@ -40,22 +40,23 @@ async function openPush() {
   await h.until(() => app.calls.panels.length > n);
   const d = await app.lastPanel();
   await d.page.waitForSelector('.push-repo');
-  await d.page.waitForTimeout(400);
+  await d.page.waitForFunction(() => !document.querySelector('.push-main')?.disabled || document.querySelector('.push-warning'));
   return d;
 }
 
 test('Push 對話框：列出各 repo 的目標與待推 commit；點 commit 列出檔案', async () => {
   const d = await openPush();
-  const repos = await h.texts(d.page.locator('.push-repo'));
-  const apiRow = repos.find((r) => r.includes('api-server') && !r.includes('shared'));
-  assert.match(apiRow, /main → origin/);
-  const subjects = await h.texts(d.page.locator('.push-commit-subject'));
-  assert.ok(subjects.includes('feat(auth): rotate API keys') && subjects.includes('docs: describe key rotation'), subjects.join(' / '));
+  await h.eventually(async () => {
+    const repos = await h.texts(d.page.locator('.push-repo'));
+    const apiRow = repos.find((r) => r.includes('api-server') && !r.includes('shared'));
+    assert.match(apiRow ?? '', /main → origin/);
+    const subjects = await h.texts(d.page.locator('.push-commit-subject'));
+    assert.ok(subjects.includes('feat(auth): rotate API keys') && subjects.includes('docs: describe key rotation'), subjects.join(' / '));
+    // web-app 落後遠端：有警告
+    assert.ok(await d.page.locator('.push-warning').count(), '遠端有本機沒有的 commit 時顯示警告');
+  });
   await d.page.locator('.push-commit', { hasText: 'docs: describe key rotation' }).click();
-  await d.page.waitForTimeout(400);
-  assert.match((await h.texts(d.page.locator('.push-files .tree-row'))).join(' '), /auth\.md/);
-  // web-app 落後遠端：有警告
-  assert.ok(await d.page.locator('.push-warning').count(), '遠端有本機沒有的 commit 時顯示警告');
+  await h.eventually(async () => assert.match((await h.texts(d.page.locator('.push-files .tree-row'))).join(' '), /auth\.md/));
   await d.page.locator('.button.secondary', { hasText: 'Cancel' }).click();
   await h.until(() => d.panel.disposed);
   await d.page.close();
@@ -135,9 +136,7 @@ test('Push 到這裡為止：只推到選取的 commit', async () => {
   await h.menu(page, 'Push All up to Here');
   await h.until(() => app.calls.panels.length > n);
   const d = await app.lastPanel();
-  await d.page.waitForSelector('.push-commit');
-  await d.page.waitForTimeout(400);
-  assert.deepEqual(await h.texts(d.page.locator('.push-commit-subject')), ['second local']);
+  await h.eventually(async () => assert.deepEqual(await h.texts(d.page.locator('.push-commit-subject')), ['second local']));
   await d.page.locator('.push-main').click();
   await h.until(() => remoteHead('api-server') === target, 40000);
   await d.page.close();
