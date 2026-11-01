@@ -73,7 +73,10 @@ class PushDialog {
   private previewRequest = 0;
   private filesRequest = 0;
   private confirmRequest = 0;
-  private selected: { root: string; commit: PushCommit } | undefined;
+  /** 選取的 commit（同一個 repo，可多選；點 repo 列選取全部），依清單順序（新到舊） */
+  private selected: { root: string; commits: PushCommit[] } | undefined;
+  /** Shift 範圍選取的起點 */
+  private anchor: string | undefined;
   private busy = false;
   /** 改了目標（remote／分支）後，等新的預覽回來前不能推送，避免推到舊的目標 */
   private pending = false;
@@ -85,8 +88,9 @@ class PushDialog {
     this.files = dialogFilesPane('push', {
       repoName: (root) => this.plans.find((p) => p.root === root)?.name ?? '',
       onOpen: (_g, file) => {
-        const sel = this.selected;
-        if (sel) this.opts.onOpenDiff(sel.root, sel.commit.hash, sel.commit.parents[0], file);
+        // 多筆合併的檔案自帶左右兩側的 revision；單筆時以該 commit 與其 parent 比較
+        const c = this.selected?.commits[0];
+        if (c && this.selected) this.opts.onOpenDiff(this.selected.root, c.hash, c.parents[0], file);
       },
     });
     this.tagsBox = el('input', { attrs: { type: 'checkbox', id: 'push-tags' } });
@@ -144,9 +148,12 @@ class PushDialog {
         if (!pushable(p)) this.checked.delete(p.root);
         else if (first) this.checked.add(p.root);
       }
-      if (first || !this.selected || !this.findCommit(this.selected.root, this.selected.commit.hash)) {
+      const sel = this.selected;
+      const still = sel && sel.commits.every((c) => this.findCommit(sel.root, c.hash));
+      if (first || !still) {
+        // 預設選取第一個 repo 的全部 commit：一次看這次要推的所有改動
         const p = m.plans.find((x) => pushable(x) && x.commits.length > 0);
-        this.select(p ? { root: p.root, commit: p.commits[0] } : undefined);
+        this.select(p ? { root: p.root, commits: [...p.commits] } : undefined);
       }
       this.render();
       this.updateButtons();
@@ -172,17 +179,61 @@ class PushDialog {
     return this.plans.find((p) => p.root === root)?.commits.find((c) => c.hash === hash);
   }
 
-  private select(sel: { root: string; commit: PushCommit } | undefined): void {
-    this.selected = sel;
-    if (!sel) {
+  private select(sel: { root: string; commits: PushCommit[] } | undefined): void {
+    this.selected = sel && sel.commits.length > 0 ? sel : undefined;
+    this.syncSelection();
+    if (!this.selected) {
       this.files.setTitle(t('Changed files'));
       this.files.tree.setEmpty('');
       return;
     }
-    this.files.setTitle(`${sel.commit.hash.slice(0, 8)} ${sel.commit.subject}`);
+    const { root, commits } = this.selected;
+    const plan = this.plans.find((p) => p.root === root);
+    const all = !!plan && commits.length === plan.commits.length && commits.length > 1;
+    this.files.setTitle(
+      commits.length === 1
+        ? `${commits[0].hash.slice(0, 8)} ${commits[0].subject}`
+        : all
+          ? t('All {0} commits to push', commits.length)
+          : plural(commits.length, '{0} commit selected', '{0} commits selected'),
+    );
     this.files.tree.setLoading();
     this.filesRequest = nextRequest++;
-    post({ type: 'pushCommitFiles', requestId: this.filesRequest, root: sel.root, hash: sel.commit.hash });
+    post({ type: 'pushCommitFiles', requestId: this.filesRequest, root, hash: commits[0].hash, hashes: commits.map((c) => c.hash) });
+  }
+
+  /** 點 commit：一般點選單選；Ctrl 加選／取消；Shift 範圍選取（只限同一個 repo） */
+  private clickCommit(p: PushPlan, c: PushCommit, e: MouseEvent): void {
+    const same = this.selected?.root === p.root;
+    let list: PushCommit[];
+    if (e.shiftKey && same && this.anchor) {
+      const a = p.commits.findIndex((x) => x.hash === this.anchor);
+      const b = p.commits.indexOf(c);
+      list = a < 0 ? [c] : p.commits.slice(Math.min(a, b), Math.max(a, b) + 1);
+    } else if ((e.ctrlKey || e.metaKey) && same) {
+      const has = this.selected!.commits.some((x) => x.hash === c.hash);
+      const set = new Set(this.selected!.commits.map((x) => x.hash));
+      if (has) set.delete(c.hash);
+      else set.add(c.hash);
+      list = p.commits.filter((x) => set.has(x.hash));
+      this.anchor = c.hash;
+    } else {
+      list = [c];
+      this.anchor = c.hash;
+    }
+    this.select({ root: p.root, commits: list });
+  }
+
+  /** 只更新選取樣式，不重繪清單（避免輸入框失去焦點） */
+  private syncSelection(): void {
+    const sel = this.selected;
+    for (const row of this.list.querySelectorAll<HTMLElement>('.push-commit')) {
+      row.classList.toggle('selected', !!sel && row.dataset.root === sel.root && sel.commits.some((c) => c.hash === row.dataset.hash));
+    }
+    for (const row of this.list.querySelectorAll<HTMLElement>('.push-repo')) {
+      const plan = this.plans.find((p) => p.root === row.dataset.root);
+      row.classList.toggle('selected', !!sel && !!plan && sel.root === plan.root && sel.commits.length === plan.commits.length && plan.commits.length > 1);
+    }
   }
 
   private canPush(): boolean {
@@ -287,7 +338,7 @@ class PushDialog {
       const source = p.upTo ? el('span', { className: 'push-source hash', text: p.upTo.slice(0, 8), title: t('Only commits up to {0}', p.upTo) }) : el('span', { className: 'push-source', text: p.branch ?? '' });
       const header = el(
         'div',
-        { className: 'push-repo' },
+        { className: 'push-repo', title: t('Click to show the changes of all commits to push'), attrs: { 'data-root': p.root } },
         box,
         multi ? el('span', { className: 'push-repo-name', text: p.name, title: p.root }) : null,
         icon('branch'),
@@ -301,6 +352,12 @@ class PushDialog {
         el('span', { className: 'toolbar-spacer' }),
         el('span', { className: 'tree-count', text: plural(p.total, '{0} commit', '{0} commits') }),
       );
+      // 點 repo 列（不含勾選框、輸入框）：選取這個 repo 的全部 commit，右側顯示合併後的所有改動
+      header.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('input, select')) return;
+        this.anchor = p.commits[0]?.hash;
+        this.select({ root: p.root, commits: [...p.commits] });
+      });
       this.list.append(header);
 
       if (p.behind > 0) {
@@ -314,18 +371,13 @@ class PushDialog {
         );
       }
       for (const c of p.commits) {
-        const sel = this.selected?.root === p.root && this.selected.commit.hash === c.hash;
         const row = el(
           'div',
-          { className: `push-commit${sel ? ' selected' : ''}`, title: `${c.hash}\n${c.author} · ${formatDate(c.authorTime)}` },
+          { className: 'push-commit', title: `${c.hash}\n${c.author} · ${formatDate(c.authorTime)}`, attrs: { 'data-root': p.root, 'data-hash': c.hash } },
           el('span', { className: 'push-commit-subject', text: c.subject }),
           el('span', { className: 'muted push-commit-meta', text: `${c.author} · ${formatDate(c.authorTime)}` }),
         );
-        row.addEventListener('click', () => {
-          this.list.querySelector('.push-commit.selected')?.classList.remove('selected');
-          row.classList.add('selected');
-          this.select({ root: p.root, commit: c });
-        });
+        row.addEventListener('click', (e) => this.clickCommit(p, c, e));
         this.list.append(row);
       }
       if (p.total > p.commits.length) this.list.append(el('div', { className: 'push-more muted', text: t('… and {0} more', p.total - p.commits.length) }));
@@ -335,6 +387,7 @@ class PushDialog {
       const names = idle.map((p) => `${p.name} (${problemText(p)})`);
       this.list.append(el('div', { className: 'push-idle muted', text: plural(idle.length, 'Nothing to push in {0} repository', 'Nothing to push in {0} repositories'), title: names.join('\n') }));
     }
+    this.syncSelection();
     this.updateButtons();
   }
 

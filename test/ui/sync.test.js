@@ -55,6 +55,17 @@ test('Push 對話框：列出各 repo 的目標與待推 commit；點 commit 列
     // web-app 落後遠端：有警告
     assert.ok(await d.page.locator('.push-warning').count(), '遠端有本機沒有的 commit 時顯示警告');
   });
+  // 預設選取 repo 的全部 commit：右側是合併後的所有改動
+  const fileTexts = async () => (await h.texts(d.page.locator('.push-files .tree-row'))).join(' ');
+  await h.eventually(async () => {
+    assert.equal(await d.page.locator('.push-files-title').innerText(), 'All 2 commits to push');
+    assert.match(await fileTexts(), /auth\.md[\s\S]*rotate\.ts|rotate\.ts[\s\S]*auth\.md/);
+  });
+  // Ctrl+點選取消其中一筆 → 只剩另一筆的檔案；點 repo 列又回到全部
+  await d.page.locator('.push-commit', { hasText: 'feat(auth): rotate API keys' }).click({ modifiers: ['Control'] });
+  await h.eventually(async () => assert.doesNotMatch(await fileTexts(), /rotate\.ts/));
+  await d.page.locator('.push-repo', { hasText: 'api-server' }).first().click({ position: { x: 300, y: 8 } });
+  await h.eventually(async () => assert.match(await fileTexts(), /rotate\.ts/));
   await d.page.locator('.push-commit', { hasText: 'docs: describe key rotation' }).click();
   await h.eventually(async () => assert.match((await h.texts(d.page.locator('.push-files .tree-row'))).join(' '), /auth\.md/));
   // 檔案依目錄分組（與記錄右欄相同）；取消分組後變平鋪，並記住設定（下次開啟沿用）

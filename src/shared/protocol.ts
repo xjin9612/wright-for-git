@@ -290,7 +290,8 @@ export type ToExtension =
   /** Push 對話框：取得各 repo 要推的內容；upTo 為「Push All up to Here」的 commit */
   | { type: 'pushPreview'; requestId: number; roots: string[]; branch?: string; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
   /** Push 對話框中點選 commit：取得變更檔案 */
-  | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string }
+  /** hashes 有多筆時回傳這些 commit 合併後的淨變更（新到舊排列） */
+  | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string; hashes?: string[] }
   /** 在編輯器分頁開啟 Push 對話框 */
   | { type: 'openPushPanel'; roots: string[]; branch?: string; upTo?: { root: string; hash: string } }
   /** 取消儲藏對話框 */

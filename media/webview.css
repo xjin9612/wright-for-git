@@ -625,3 +625,6 @@ body.dialog-page { overflow: hidden; }
 .merge-btn:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
 .merge-binary { flex: 1; padding: 16px; }
 @media (prefers-reduced-motion: reduce) { .merge-cell.flash { outline-style: dashed; } }
+.push-repo { cursor: default; border-radius: 2px; }
+.push-repo:hover { background: var(--hover); }
+.push-repo.selected { background: var(--sel-bg); color: var(--sel-fg); }

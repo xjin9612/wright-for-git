@@ -814,8 +814,23 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     } else if (m.type === 'pushCommitFiles') {
       const e = this.find(m.root);
       if (!e || !isHash(m.hash)) return;
-      const parents = (await e.repo.exec(['rev-list', '--parents', '-n1', m.hash])).trim().split(' ').slice(1);
-      reply({ type: 'pushCommitFiles', requestId: m.requestId, root: m.root, hash: m.hash, files: await e.repo.getChangedFiles(m.hash, parents) });
+      const hashes = (m.hashes?.length ? m.hashes : [m.hash]).filter(isHash);
+      const parentsOf = async (h: string) => (await e.repo.exec(['rev-list', '--parents', '-n1', h])).trim().split(' ').slice(1);
+      const modules = new ModuleResolver(e.repo.root);
+      let files: ChangedFile[];
+      if (hashes.length <= 1) {
+        files = await e.repo.getChangedFiles(m.hash, await parentsOf(m.hash));
+      } else {
+        // 多筆：由舊到新合併成淨變更（與 Log 多選相同），每個檔案帶左右兩側的 revision
+        const ordered = [...hashes].reverse();
+        const changes = await mapLimit(ordered, 4, async (h) => {
+          const parents = await parentsOf(h);
+          return { hash: h, parent: parents[0], files: await e.repo.getChangedFiles(h, parents.slice(0, 1)) };
+        });
+        files = combineChanges(changes);
+      }
+      files = files.map((f) => ({ ...f, module: modules.moduleOf(f.path) }));
+      reply({ type: 'pushCommitFiles', requestId: m.requestId, root: m.root, hash: m.hash, files });
     } else {
       const targets = await this.freshTargets(m.targets.map((x) => x.root));
       const entries = m.targets.flatMap((push) => {
@@ -842,7 +857,6 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return this.visibleEntries().map((e) => e.repo.root);
   }
 
-  /** 開在編輯器分頁的對話框用的 HTML（同一份樣式與翻譯） */
   /** 進行中操作的繼續／略過／中止（Log 上方的操作列、衝突清單分頁） */
   async runOperation(root: string, action: 'continue' | 'skip' | 'abort', expected?: 'cherry-pick' | 'revert' | 'merge' | 'rebase'): Promise<void> {
     const e = this.find(root);
@@ -885,6 +899,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     await this.context.globalState.update('gitWorkbench.dialogPrefs', { ...this.dialogPrefs, [key]: value });
   }
 
+  /** 開在編輯器分頁的對話框用的 HTML（同一份樣式與翻譯） */
   dialogHtml(webview: vscode.Webview, config: unknown): string {
     return this.renderHtml(webview, { script: 'dialog.js', config: { ...(config as object), prefs: this.dialogPrefs } });
   }

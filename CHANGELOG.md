@@ -14,6 +14,7 @@
 ### Sync
 - Fetch in the Branches toolbar; Pull and Push in the log toolbar. Pull follows your `pull.rebase` setting
 - Push opens a Push Commits dialog in an editor tab (drag it to another group or a new window): each repository's target (`branch → remote : branch`, editable), the commits to push and their changed files as a tree grouped by directory, repository or module like the log (double-click for the diff; the grouping is remembered), and a Push tags option (`--follow-tags`)
+- The dialog opens with all commits of the first repository selected, so the file tree shows everything you are about to push combined into net changes; click a repository row to see all of its commits again, a commit to see just that one, or `Ctrl` / `Shift`-click to combine several
 - Force Push (with lease) lives in the dialog's Push drop-down and asks for confirmation; the lease is bound to the remote state shown in the dialog, and it never uses a plain `--force`
 - A branch that is not on the remote yet is marked New and gets its upstream set on the first push; a remote branch with commits you don't have is flagged before you push
 - Push All up to Here… in the commit context menu pushes only up to the selected commit
