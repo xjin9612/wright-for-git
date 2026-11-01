@@ -18,6 +18,7 @@ import { showGitError } from './gitConsole';
 import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { DialogPanels } from './dialogPanel';
+import { opName } from './conflicts';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -114,12 +115,12 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return this.entries.find((e) => e.key === k);
   }
 
-  /** 依 root 取得 repository（供 diff 內容提供者使用） */
   /** 目前所有 repository */
   repositoryList(): GitRepository[] {
     return this.entries.map((e) => e.repo);
   }
 
+  /** 依 root 取得 repository（diff 內容提供者、提交視窗、對話框分頁使用） */
   getRepository(root: string): GitRepository | undefined {
     return this.find(root)?.repo;
   }
@@ -130,7 +131,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return this.entries.map((e) => ({
       root: e.repo.root,
       name: e.name,
-      branch: e.state?.head.branch ?? (e.state?.head.hash ? `detached ${e.state.head.hash.slice(0, 8)}` : undefined),
+      branch: e.state?.head.branch ?? (e.state?.head.hash ? t('detached {0}', e.state.head.hash.slice(0, 8)) : undefined),
       visible: roots.size === 0 || roots.has(e.key),
     }));
   }
@@ -151,14 +152,17 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       return this.discovering;
     }
     this.discovering = (async () => {
+      // 重新整理期間又有呼叫（rediscoverAgain）時再掃描一次，不遺漏
       do {
-        this.rediscoverAgain = false;
-        await this.discover();
+        do {
+          this.rediscoverAgain = false;
+          await this.discover();
+        } while (this.rediscoverAgain);
+        this.discovered = true;
+        const shouldNotify = this.rediscoverNotify;
+        this.rediscoverNotify = false;
+        if (shouldNotify) await this.refresh(true);
       } while (this.rediscoverAgain);
-      this.discovered = true;
-      const shouldNotify = this.rediscoverNotify;
-      this.rediscoverNotify = false;
-      if (shouldNotify) await this.refresh(true);
       this.changeEmitter.fire();
     })().finally(() => (this.discovering = undefined));
     return this.discovering;
@@ -179,7 +183,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
     const old = new Map(this.entries.map((e) => [e.key, e]));
     this.entries = [...repos.entries()]
-      .map(([key, repo]) => old.get(key) ?? { repo, key, name: displayName(repo.root, folders) })
+      // 已有的 repo 沿用（保留讀到的狀態），名稱依目前的工作區資料夾重新計算
+      .map(([key, repo]) => ({ ...(old.get(key) ?? { repo, key }), name: displayName(repo.root, folders) }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     this.generation++;
     this.watchRepositories();
@@ -278,7 +283,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const visible = this.visibleEntries();
     if (visible.length === 1) {
       const s = visible[0].state;
-      this.view.description = `${visible[0].name} · ${s?.head.branch ?? `detached ${s?.head.hash?.slice(0, 8) ?? ''}`}`;
+      this.view.description = `${visible[0].name} · ${s?.head.branch ?? t('detached {0}', s?.head.hash?.slice(0, 8) ?? '')}`;
     } else {
       this.view.description = t('{0} repositories', visible.length);
     }
@@ -386,9 +391,6 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           await vscode.env.clipboard.writeText(m.text);
           vscode.window.setStatusBarMessage(t('Copied: {0}', m.text), 2000);
           break;
-        case 'selectRepository':
-          await this.selectRepository();
-          break;
         case 'sync':
           await this.sync(m.action, m.roots);
           break;
@@ -448,9 +450,6 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     await this.applyFilter({ roots: all ? [] : roots, paths: [] }, focus);
   }
 
-  /**
-   * 顯示某個檔案或資料夾的歷史：Paths 篩選到它所屬的 repository 與相對路徑。
-   */
   /** 找出檔案或資料夾所屬的 repository（巢狀時為最內層）與相對路徑；不在 repo 內時提示並回傳 undefined */
   async locateUri(uri: vscode.Uri): Promise<{ repo: GitRepository; rel: string; isDir: boolean } | undefined> {
     await this.ensureDiscovered();
@@ -475,6 +474,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     return { repo: entry.repo, rel, isDir };
   }
 
+  /** 顯示某個檔案或資料夾的歷史：Paths 篩選到它所屬的 repository 與相對路徑 */
   async showHistory(uri: vscode.Uri | undefined): Promise<void> {
     const target = uri ?? vscode.window.activeTextEditor?.document.uri;
     if (!target || target.scheme !== 'file') return;
@@ -710,8 +710,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     }
   }
 
-  /** @returns 右側（修改後）的 URI 字串，用來辨識這個 diff 分頁 */
-  /** @param position 在變更檔案中的位置（如 1/5），顯示在分頁標題，對應 IntelliJ 的「1/5 files」 */
+  /**
+   * 開啟 VS Code 原生 diff。
+   * @param position 在變更檔案中的位置（如 1/5），顯示在分頁標題，對應 IntelliJ 的「1/5 files」
+   * @returns 右側（修改後）的 URI 字串，用來辨識這個 diff 分頁
+   */
   private async openDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile, viewColumn?: vscode.ViewColumn, position?: string): Promise<string | undefined> {
     const e = this.find(root);
     if (!e) return undefined;
@@ -743,7 +746,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     await this.refresh(true);
   }
 
-  /** 開啟 Push 對話框（webview 尚未建立時，等 ready 後再開） */
+  /** 開啟 Push 對話框（編輯器分頁）：目前 Paths 篩選下可見的 repo */
   async openPush(): Promise<void> {
     await this.ensureDiscovered();
     this.dialogs.openPush({ roots: this.visibleRoots() });
@@ -787,7 +790,8 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   private async checkoutRevision(root: string, hash: string): Promise<void> {
     const entry = this.find(root);
-    if (!entry) return;
+    // 值來自 webview：只接受 commit hash（不是 hash 的字串可能被 git 當成路徑，捨棄該檔的修改）
+    if (!entry || !isHash(hash)) return;
     const ok = t('Checkout');
     const yes = await confirm(t('Checkout revision {0}? This will put the repository in detached HEAD state.', hash.slice(0, 8)), { detail: entry.name, ok, kind: 'warning' });
     if (yes) await this.runCheckouts([{ entry, target: hash, track: false }], hash.slice(0, 8));
@@ -876,8 +880,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       return;
     }
     if (action === 'abort') {
-      const names = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
-      const ok = await confirm(t('Abort the {0} in {1}?', names[op], e.name), { detail: t('The repository returns to the state before the {0} started. Conflicts you have already resolved are lost.', names[op]), ok: t('Abort'), kind: 'danger' });
+      const ok = await confirm(t('Abort the {0} in {1}?', opName(op), e.name), { detail: t('The repository returns to the state before the {0} started. Conflicts you have already resolved are lost.', opName(op)), ok: t('Abort'), kind: 'danger' });
       if (!ok) return;
     }
     try {
@@ -889,7 +892,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       // 仍在進行中：多半是還有衝突沒解決
       if (next) {
         const resolve = t('Resolve Conflicts…');
-        void vscode.window.showWarningMessage(t('{0}: {1} is still in progress. Resolve the remaining conflicts, then continue.', e.name, next), { detail: errorMessage(err) }, resolve).then((a) => {
+        void vscode.window.showWarningMessage(t('{0}: {1} is still in progress. Resolve the remaining conflicts, then continue.', e.name, opName(next)), { detail: errorMessage(err) }, resolve).then((a) => {
           if (a === resolve) this.dialogs.conflicts.openList(root);
         });
       } else {
@@ -997,13 +1000,13 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 }
 
-/** repo 顯示名稱：相對所屬工作區資料夾的路徑；多個工作區資料夾時加上資料夾名稱 */
 /** 工作區資料夾路徑（解析成實際路徑，與 git 回傳的 repo 根目錄一致） */
 async function workspaceFolderPaths(): Promise<string[]> {
   const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
   return Promise.all(folders.map((f) => fsp.realpath(f).catch(() => f)));
 }
 
+/** repo 顯示名稱：相對所屬工作區資料夾的路徑；多個工作區資料夾時加上資料夾名稱 */
 function displayName(root: string, folders: readonly string[]): string {
   const owner = folders.filter((f) => isInside(f, root)).sort((a, b) => b.length - a.length)[0];
   if (!owner) return path.basename(root);

@@ -1,6 +1,6 @@
 // 面板內的確認框（取代 VS Code 的 modal 對話框，外觀與 Push 對話框一致）
 import type { ToWebview } from '../shared/protocol';
-import { el } from './dom';
+import { closeMenus, el } from './dom';
 import { post } from './vscodeApi';
 
 type ConfirmMessage = Extract<ToWebview, { type: 'confirm' }>;
@@ -26,8 +26,8 @@ function next(): void {
     return;
   }
   showing = true;
-  // 其他浮動選單先關閉
-  document.querySelector('.context-menu')?.remove();
+  // 其他浮動選單（含子選單）先關閉
+  closeMenus();
 
   const iconBox = el('span', { className: `confirm-icon ${m.kind}` });
   iconBox.innerHTML = `<svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${ICONS[m.kind]}</svg>`;

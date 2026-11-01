@@ -29,13 +29,9 @@ export function openPushDialog(opts: PushDialogOptions): void {
   current = new PushDialog(opts);
 }
 
-/** 由 main.ts 轉送 extension 的回應 */
+/** dialogMain.ts 轉送的 extension 回應 */
 export function handlePushMessage(m: DialogMessage): void {
   current?.onMessage(m);
-}
-
-export function isPushDialogOpen(): boolean {
-  return current !== undefined;
 }
 
 /** 可以推送：沒有問題，且有 commit 要推、是新 branch，或遠端有本機沒有的 commit（force 時有意義） */
@@ -77,6 +73,8 @@ class PushDialog {
   private selected: { root: string; commits: PushCommit[] } | undefined;
   /** Shift 範圍選取的起點 */
   private anchor: string | undefined;
+  /** 鍵盤移動的位置（Shift+↑↓ 從 anchor 延伸到這裡） */
+  private caret: string | undefined;
   private busy = false;
   /** 改了目標（remote／分支）後，等新的預覽回來前不能推送，避免推到舊的目標 */
   private pending = false;
@@ -85,6 +83,20 @@ class PushDialog {
 
   constructor(private readonly opts: PushDialogOptions) {
     this.list = el('div', { className: 'push-list', attrs: { tabindex: '0' } });
+    // 鍵盤：↑↓ 換 commit（Shift 延伸選取，限同一個 repo）
+    this.list.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') return;
+      const flat = this.plans.filter(pushable).flatMap((p) => p.commits.map((c) => ({ p, c })));
+      const caret = this.caret ?? this.selected?.commits[0]?.hash;
+      const i = flat.findIndex((x) => x.c.hash === caret && x.p.root === this.selected?.root);
+      const next = flat[Math.max(0, Math.min(flat.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (!next) return;
+      e.preventDefault();
+      this.clickCommit(next.p, next.c, { shiftKey: e.shiftKey && next.p.root === this.selected?.root, ctrlKey: false, metaKey: false });
+      this.caret = next.c.hash;
+      this.list.querySelector(`.push-commit[data-hash="${next.c.hash}"]`)?.scrollIntoView({ block: 'nearest' });
+    });
     this.files = dialogFilesPane('push', {
       repoName: (root) => this.plans.find((p) => p.root === root)?.name ?? '',
       onOpen: (_g, file) => {
@@ -203,7 +215,8 @@ class PushDialog {
   }
 
   /** 點 commit：一般點選單選；Ctrl 加選／取消；Shift 範圍選取（只限同一個 repo） */
-  private clickCommit(p: PushPlan, c: PushCommit, e: MouseEvent): void {
+  private clickCommit(p: PushPlan, c: PushCommit, e: Pick<MouseEvent, 'shiftKey' | 'ctrlKey' | 'metaKey'>): void {
+    this.caret = c.hash;
     const same = this.selected?.root === p.root;
     let list: PushCommit[];
     if (e.shiftKey && same && this.anchor) {
@@ -366,7 +379,7 @@ class PushDialog {
             'div',
             { className: 'push-warning' },
             icon('warning'),
-            el('span', { text: t("The remote branch has {0} commit(s) you don't have. Push will be rejected — pull first, or use Force Push to overwrite.", p.behind) }),
+            el('span', { text: plural(p.behind, 'The remote branch has {0} commit you don\'t have. Push will be rejected — pull first, or use Force Push to overwrite.', 'The remote branch has {0} commits you don\'t have. Push will be rejected — pull first, or use Force Push to overwrite.') }),
           ),
         );
       }

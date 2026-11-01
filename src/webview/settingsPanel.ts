@@ -81,7 +81,12 @@ function link(text: string, onClick: () => void): HTMLAnchorElement {
 
 function render(): void {
   if (!popover) return;
+  // 重繪會換掉所有控制項：記下焦點所在的控制項，重繪後還原（鍵盤操作下拉選單時焦點才不會跳走）
+  const focusedId = popover.contains(document.activeElement) ? (document.activeElement as HTMLElement).id : '';
   popover.replaceChildren();
+  queueMicrotask(() => {
+    if (focusedId) document.getElementById(focusedId)?.focus();
+  });
   popover.append(el('div', { className: 'settings-title', text: t('Git Workbench Settings') }));
   if (!values) {
     popover.append(el('div', { className: 'empty-text', text: t('Loading…') }));
@@ -96,7 +101,7 @@ function render(): void {
   ], (x) => set('language', x));
   const maxOptions = MAX_COMMITS.includes(v.maxCommits) ? MAX_COMMITS : [...MAX_COMMITS, v.maxCommits].sort((a, b) => a - b);
   const max = select('gwb-max', v.maxCommits, maxOptions.map((n) => ({ value: n, label: n.toLocaleString() })), (x) => set('maxCommits', x));
-  const depth = select('gwb-depth', v.scanDepth, Array.from({ length: 7 }, (_, i) => ({ value: i, label: String(i) })), (x) => set('scanDepth', x));
+  const depth = select('gwb-depth', v.scanDepth, Array.from({ length: 11 }, (_, i) => ({ value: i, label: String(i) })), (x) => set('scanDepth', x));
   const auto = el('input', { attrs: { type: 'checkbox', id: 'gwb-auto' } });
   auto.checked = v.autoRefresh;
   auto.addEventListener('change', () => set('autoRefresh', auto.checked));

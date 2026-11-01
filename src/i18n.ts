@@ -60,3 +60,8 @@ export function t(message: string, ...args: (string | number | boolean)[]): stri
   const s = bundle?.[message] ?? message;
   return args.length === 0 ? s : s.replace(/\{(\d+)\}/g, (m, i: string) => (args[Number(i)] !== undefined ? String(args[Number(i)]) : m));
 }
+
+/** 依數量選單複數：plural(n, '{0} file', '{0} files')（與 webview 的 plural 相同） */
+export function plural(count: number, one: string, other: string): string {
+  return t(count === 1 ? one : other, count);
+}

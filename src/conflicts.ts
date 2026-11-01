@@ -6,7 +6,7 @@ import type { DialogPanels, Reply } from './dialogPanel';
 import { merge3, splitText } from './git/merge3';
 import type { GitRepository } from './git/repository';
 import { showGitError } from './gitConsole';
-import { t } from './i18n';
+import { plural, t } from './i18n';
 import type { WorkbenchViewProvider } from './provider';
 import { isContentConflict, type ConflictFile, type MergeArgs, type RepoState, type ToExtension } from './shared/protocol';
 
@@ -30,7 +30,7 @@ function decodeText(buf: Buffer | undefined): string | undefined {
   }
 }
 
-/** 仍有衝突標記的行（<<<<<<<、=======、>>>>>>>） */
+/** 仍有衝突標記的行（<<<<<<< 與 >>>>>>>；======= 在一般文字中也常見，不列入） */
 const MARKERS = /^(<{7}|>{7})( |$)/m;
 
 export function opName(op: Operation): string {
@@ -122,7 +122,7 @@ export class ConflictResolver {
             if (MARKERS.test(text)) marked.push(p);
           }
           if (marked.length > 0) {
-            const ok = await confirm(t('{0} still contain conflict markers. Mark as resolved anyway?', marked.join(', ')), { ok: t('Mark as Resolved'), kind: 'warning' }, host);
+            const ok = await confirm(plural(marked.length, '{0} file still contains conflict markers. Mark it as resolved anyway?', '{0} files still contain conflict markers. Mark them as resolved anyway?'), { detail: marked.join('\n'), ok: t('Mark as Resolved'), kind: 'warning' }, host);
             if (!ok) continue;
           }
           await repo.markConflictResolved(list);
@@ -192,7 +192,7 @@ export class ConflictResolver {
         case 'mergeApply': {
           if (m.root !== root || m.path !== filePath) return;
           if (m.unresolved > 0 && !(await confirm(t('{0} changes are not resolved yet. Save the result and mark the file as resolved anyway?', m.unresolved), { ok: t('Apply'), kind: 'warning' }, host))) return;
-          if (MARKERS.test(m.text) && !(await confirm(t('{0} still contain conflict markers. Mark as resolved anyway?', filePath), { ok: t('Apply'), kind: 'warning' }, host))) return;
+          if (MARKERS.test(m.text) && !(await confirm(plural(1, '{0} file still contains conflict markers. Mark it as resolved anyway?', '{0} files still contain conflict markers. Mark them as resolved anyway?'), { detail: filePath, ok: t('Mark as Resolved'), kind: 'warning' }, host))) return;
           try {
             await repo.saveMergeResult(filePath, Buffer.concat([bom ? UTF8_BOM : Buffer.alloc(0), Buffer.from(m.text, 'utf8')]));
             close();

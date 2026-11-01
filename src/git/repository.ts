@@ -217,7 +217,7 @@ export class GitRepository {
     await this.run(['pull']);
   }
 
-  /** 是否為 ancestor 的祖先（含自己） */
+  /** ancestor 是否為 descendant 的祖先（含自己） */
   private async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
     return (await this.tryRun(['merge-base', '--is-ancestor', ancestor, descendant])) !== undefined;
   }
@@ -272,8 +272,6 @@ export class GitRepository {
    * 以明確的 refspec 推送：`git push <remote> <src>:refs/heads/<remoteBranch>`。
    * src 為 refs/heads/<branch> 或 commit hash（Push All up to Here）。
    * force 一律使用 --force-with-lease：遠端若有本機沒看過的 commit 就拒絕，不提供無保護的 --force。
-   */
-  /**
    * @param opts.force 搭配 lease：預覽時看到的遠端 commit（'' 表示遠端不應該有這個 branch）。
    *   遠端若已不是這個 commit（例如對話框開著時有人推了新 commit 又被 fetch 進來）就拒絕，避免覆蓋沒看過的 commit。
    */
@@ -470,7 +468,7 @@ export class GitRepository {
 
   /**
    * 執行互動式 rebase。entries 由舊到新；action 為 pick／reword／edit／squash／fixup／drop。
-   * 以 GIT_SEQUENCE_EDITOR 寫入我們的 todo；reword 以 exec 修改訊息（不開編輯器）；squash 沿用合併後的預設訊息。
+   * 以 GIT_SEQUENCE_EDITOR 寫入我們的 todo；reword 以 exec 修改訊息（不開編輯器）；squash 有 message 時以它取代合併後的訊息，否則沿用預設訊息。
    * 遇到衝突或 edit 時 rebase 會停下，回傳 'stopped'。
    */
   async interactiveRebase(base: string, entries: { hash: string; action: 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop'; message?: string }[]): Promise<'done' | 'stopped'> {
@@ -656,7 +654,7 @@ export class GitRepository {
    */
   async commitSelected(opts: { full: string[]; patches: { path: string; patch: Buffer }[]; message: string; amend?: boolean; signOff?: boolean; noVerify?: boolean }): Promise<{ head: string; indexError?: string }> {
     const { existsSync, promises: fsp } = await import('node:fs');
-    if (!opts.message.trim() && !opts.amend) throw new GitError('Commit message is empty', null, '');
+    if (!opts.message.trim()) throw new GitError('Commit message is empty', null, '');
     for (const p of [...opts.full, ...opts.patches.map((x) => x.path)]) assertRelPath(p);
     // merge／cherry-pick／revert 進行中時，只提交部分檔案會把另一邊的變更從歷史中丟掉
     const op = await this.operationInProgress();

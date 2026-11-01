@@ -1,5 +1,6 @@
 // 取消儲藏對話框（對應 IntelliJ 的 Unstash Changes）：選儲藏、看檔案，套用／套用並刪除／建立成分支
 import type { ChangedFile, StashInfo, ToWebview } from '../shared/protocol';
+import { stashLabel } from '../shared/stash';
 import { clear, el, formatDate } from './dom';
 import { dialogFilesPane, type DialogFiles } from './dialogFiles';
 import type { FileGroup } from './fileTree';
@@ -20,13 +21,6 @@ export function handleUnstashMessage(m: Msg): void {
   instance?.onMessage(m);
 }
 
-/** 「On main: msg」→「msg」；「WIP on main: abc123 subject」→「WIP: subject」 */
-function stashLabel(message: string): string {
-  const wip = /^WIP on [^:]+: [0-9a-f]+ (.*)$/.exec(message);
-  if (wip) return `WIP: ${wip[1]}`;
-  const on = /^On [^:]+: (.*)$/.exec(message);
-  return on ? on[1] : message;
-}
 
 class UnstashDialog {
   private repos: RepoStashes[] = [];
@@ -60,6 +54,22 @@ class UnstashDialog {
     this.pop.addEventListener('change', sync);
     this.branch.addEventListener('input', sync);
     this.applyButton.addEventListener('click', () => this.apply());
+    // 鍵盤：↑↓ 換儲藏、Enter 套用
+    this.list.addEventListener('keydown', (e) => {
+      const stashes = this.current?.stashes ?? [];
+      const i = stashes.findIndex((s) => s.hash === this.selected);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const next = stashes[Math.max(0, Math.min(stashes.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+        if (!next) return;
+        e.preventDefault();
+        this.selected = next.hash;
+        this.render();
+        this.list.querySelector('.push-commit.selected')?.scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' && this.selected) {
+        e.preventDefault();
+        this.apply();
+      }
+    });
     this.dropButton.addEventListener('click', () => {
       if (this.root && this.selected) post({ type: 'unstashDrop', root: this.root, hash: this.selected });
     });

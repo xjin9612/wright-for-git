@@ -12,6 +12,8 @@ let loaded = false;
 /** 選取的檔案：root\0path */
 const selected = new Set<string>();
 let anchor: string | undefined;
+/** 鍵盤焦點所在的檔案（Shift+方向鍵從 anchor 延伸到這裡） */
+let caret: string | undefined;
 let preferRoot: string | undefined;
 
 const keyOf = (root: string, p: string) => `${root}\0${p}`;
@@ -110,6 +112,7 @@ function select(k: string, add: boolean, range: boolean): void {
     selected.add(k);
     anchor = k;
   }
+  caret = k;
   render();
   list.focus();
 }
@@ -130,7 +133,8 @@ export function openConflictsDialog(args: { root?: string }): void {
   close.addEventListener('click', () => post({ type: 'closeDialog' }));
   list.addEventListener('keydown', (e) => {
     const keys = allFiles().map((f) => keyOf(f.root, f.file.path));
-    const i = anchor ? keys.indexOf(anchor) : -1;
+    const from = caret ?? anchor;
+    const i = from ? keys.indexOf(from) : -1;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       const next = keys[Math.max(0, Math.min(keys.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
       if (next) select(next, false, e.shiftKey);
@@ -182,6 +186,7 @@ export function handleConflictsMessage(m: Extract<ToWebview, { type: 'conflictsD
     if (pick) {
       selected.add(keyOf(pick.root, pick.file.path));
       anchor = keyOf(pick.root, pick.file.path);
+      caret = anchor;
     }
   }
   render();

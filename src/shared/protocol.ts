@@ -182,7 +182,7 @@ export type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'dr
 export interface RebaseEntry {
   hash: string;
   action: RebaseAction;
-  /** reword 的新訊息 */
+  /** reword／squash 的新訊息 */
   message?: string;
 }
 
@@ -238,7 +238,6 @@ export interface UserInfo {
   count: number;
 }
 
-/** Webview → Extension */
 /** 面板內設定框顯示的設定值 */
 export interface SettingsValues {
   language: 'auto' | 'en' | 'zh-tw';
@@ -249,6 +248,7 @@ export interface SettingsValues {
   issueLinks: number;
 }
 
+/** Webview → Extension */
 export type ToExtension =
   | { type: 'getSettings' }
   /** 編輯器分頁對話框的偏好（例如變更檔案的分組方式），存在 globalState，下次開啟沿用 */
@@ -284,13 +284,11 @@ export type ToExtension =
   | { type: 'copy'; text: string }
   /** 開啟外部連結（只接受 http／https） */
   | { type: 'openExternal'; url: string }
-  | { type: 'selectRepository' }
   /** 同步：對 roots 中的 repository 執行 */
   | { type: 'sync'; action: SyncAction; roots: string[] }
   /** Push 對話框：取得各 repo 要推的內容；upTo 為「Push All up to Here」的 commit */
   | { type: 'pushPreview'; requestId: number; roots: string[]; branch?: string; upTo?: { root: string; hash: string }; overrides?: PushTarget[] }
-  /** Push 對話框中點選 commit：取得變更檔案 */
-  /** hashes 有多筆時回傳這些 commit 合併後的淨變更（新到舊排列） */
+  /** Push 對話框中點選 commit：取得變更檔案；hashes 有多筆時回傳這些 commit 合併後的淨變更（新到舊排列） */
   | { type: 'pushCommitFiles'; requestId: number; root: string; hash: string; hashes?: string[] }
   /** 在編輯器分頁開啟 Push 對話框 */
   | { type: 'openPushPanel'; roots: string[]; branch?: string; upTo?: { root: string; hash: string } }
@@ -319,7 +317,7 @@ export type ToExtension =
   | { type: 'changelistMove'; keys: string[]; id?: string }
   | { type: 'stashSave' }
   | { type: 'openUnstash'; root?: string }
-  /** 逐段提交面板：選取的 hunk（以內容辨識） */
+  /** 逐段提交面板：選取的 hunk 序號（對應開啟時的 diff；extension 端再以內容比對） */
   | { type: 'hunksSelect'; root: string; path: string; selected: number[] }
   /** 進行中的 rebase／merge 等：繼續、略過、中止 */
   | { type: 'operation'; root: string; action: 'continue' | 'skip' | 'abort'; /** 畫面上顯示的進行中操作；與實際不符時不執行 */ expected?: 'cherry-pick' | 'revert' | 'merge' | 'rebase' }

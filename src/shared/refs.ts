@@ -12,17 +12,6 @@ export interface RefLabel {
   current: boolean;
 }
 
-/** 依 commit hash 建立 ref 索引 */
-export function indexRefs(refs: readonly RefInfo[]): Map<string, RefInfo[]> {
-  const map = new Map<string, RefInfo[]>();
-  for (const r of refs) {
-    const list = map.get(r.hash);
-    if (list) list.push(r);
-    else map.set(r.hash, [r]);
-  }
-  return map;
-}
-
 /**
  * 產生一個 commit 上要顯示的標籤：
  * - local branch 與同名 remote branch 指向同一 commit 時合併為「origin & main」

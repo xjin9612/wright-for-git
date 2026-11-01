@@ -47,8 +47,8 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
     b.addEventListener('click', () => setAction(current, action));
     return b;
   });
-  const up = el('button', { className: 'button secondary', text: '↑', title: t('Move Up (Alt+↑)'), attrs: { type: 'button' } });
-  const down = el('button', { className: 'button secondary', text: '↓', title: t('Move Down (Alt+↓)'), attrs: { type: 'button' } });
+  const up = el('button', { className: 'button secondary', text: '↑', title: t('Move Up (Alt+↑)'), attrs: { type: 'button', 'aria-label': t('Move Up (Alt+↑)') } });
+  const down = el('button', { className: 'button secondary', text: '↓', title: t('Move Down (Alt+↓)'), attrs: { type: 'button', 'aria-label': t('Move Down (Alt+↓)') } });
   up.addEventListener('click', () => move(-1));
   down.addEventListener('click', () => move(1));
 
@@ -63,8 +63,11 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
   const move = (delta: number) => {
     const j = current + delta;
     if (j < 0 || j >= items.length) return;
+    const edited = editing !== undefined ? items[editing] : undefined;
     [items[current], items[j]] = [items[j], items[current]];
     current = j;
+    // 正在編輯訊息的那一筆跟著移動
+    if (edited) editing = items.indexOf(edited);
     render();
   };
 
@@ -112,9 +115,11 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
         e.preventDefault();
         const from = Number(e.dataTransfer?.getData('text/plain'));
         if (!Number.isFinite(from) || from === i) return;
+        const edited = editing !== undefined ? items[editing] : undefined;
         const [moved] = items.splice(from, 1);
         items.splice(i, 0, moved);
         current = i;
+        if (edited) editing = items.indexOf(edited);
         render();
       });
       list.append(row);
@@ -132,6 +137,8 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
   };
 
   list.addEventListener('keydown', (e) => {
+    // 列內的動作下拉選單有自己的方向鍵與字母鍵操作
+    if ((e.target as HTMLElement).tagName === 'SELECT') return;
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
       move(e.key === 'ArrowUp' ? -1 : 1);

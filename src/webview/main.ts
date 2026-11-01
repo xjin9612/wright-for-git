@@ -288,6 +288,16 @@ function renderTabs(): void {
     const tabEl = el('div', { className: `log-tab${i === ui.activeTab ? ' active' : ''}`, title, attrs: { role: 'tab', 'aria-selected': String(i === ui.activeTab), tabindex: '0' } }, el('span', { className: 'log-tab-title', text: title }));
     if (i > 0) tabEl.append(iconButton('close', t('Close tab'), () => closeTab(i), 'tab-close'));
     tabEl.addEventListener('click', () => switchTab(i));
+    tabEl.addEventListener('keydown', (e) => {
+      if (e.target !== tabEl) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchTab(i);
+      } else if (e.key === 'Delete' && i > 0) {
+        e.preventDefault();
+        closeTab(i);
+      }
+    });
     tabEl.addEventListener('auxclick', (e) => {
       if (e.button === 1 && i > 0) closeTab(i);
     });
@@ -349,7 +359,7 @@ const rightSplitter = makeSplitter(
   () => persist(),
 );
 let dragStart = 0;
-const leftRestore = el('div', { className: 'pane-restore' }, iconButton('chevron-right', 'Show branches', () => setPaneVisible('left', true)));
+const leftRestore = el('div', { className: 'pane-restore' }, iconButton('chevron-right', t('Show Branches'), () => setPaneVisible('left', true)));
 
 const app = document.getElementById('app')!;
 app.className = 'workbench';
@@ -447,7 +457,7 @@ function renderChips(): void {
   renderOperations();
 }
 
-/** Branch 篩選有值、但沒有包含 HEAD 或任一可見 repo 的目前 branch 時，提示並提供一鍵加入 */
+/** Log 上方的進行中操作列：rebase／merge 等的繼續、略過、中止，以及衝突數與「解決衝突…」 */
 function renderOperations(): void {
   clear(opBar);
   // 進行中的操作，或沒有操作但有衝突（例如套用儲藏時的衝突）
@@ -482,6 +492,7 @@ function renderOperations(): void {
   }
 }
 
+/** Branch 篩選有值、但沒有包含 HEAD 或任一可見 repo 的目前 branch 時，提示並提供一鍵加入 */
 function renderHeadHint(): void {
   const f = ui.filter;
   const current = visibleRepos()
@@ -492,7 +503,7 @@ function renderHeadHint(): void {
   clear(headHint);
   headHint.classList.toggle('hidden', !missing);
   if (!missing) return;
-  const names = [...new Set(visibleRepos().map((r) => r.head.branch ?? 'detached HEAD'))].join(', ');
+  const names = [...new Set(visibleRepos().map((r) => r.head.branch ?? t('detached HEAD')))].join(', ');
   const add = el('a', { className: 'link', text: t('Show HEAD'), attrs: { href: '#' } });
   add.addEventListener('click', (e) => {
     e.preventDefault();
@@ -754,6 +765,8 @@ function filterChip(key: string, onOpen: () => void, onClear: () => void) {
   const element = el('div', { className: 'chip', attrs: { role: 'button', tabindex: '0', title: t('Filter by {0}', name) } }, label, value, caret, clearBtn);
   element.addEventListener('click', onOpen);
   element.addEventListener('keydown', (e) => {
+    // 焦點在裡面的清除按鈕時，Enter／空白鍵交給清除按鈕
+    if (e.target !== element) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onOpen();
@@ -1161,9 +1174,16 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       generation = m.generation;
       setIssueLinkRules(m.issueLinks);
       if (repos.length === 0) {
+        // 讓還在路上的 logBatch 失效（它的 repo 索引已不存在）
+        requestId++;
         commits = [];
         all = [];
         allKeyIndex = new Map();
+        keyIndex = allKeyIndex;
+        graphAll = new MultiGraph(true);
+        graph = graphAll;
+        runs = [];
+        runByCommit = new Map();
         table.setData([], new MultiGraph(true));
         table.setMessage(m.message ?? t('No repository'));
         branches.setRepos([]);
@@ -1174,12 +1194,22 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       if (before !== repos.map((r) => r.root).join('\n')) users = undefined;
       dirsByRoot.clear();
       dirsRequested.clear();
-      // 移除已不存在的 repo 篩選
+      // 移除已不存在的 repo 篩選（每個 Log 分頁都要清，切換分頁或重新載入後才不會帶回來）
       const roots = new Set(repos.map((r) => r.root));
-      if (ui.filter.roots.some((r) => !roots.has(r))) ui.filter = { ...ui.filter, roots: ui.filter.roots.filter((r) => roots.has(r)) };
-      if (ui.filter.pathsByRoot && Object.keys(ui.filter.pathsByRoot).some((r) => !roots.has(r))) {
-        const next = Object.fromEntries(Object.entries(ui.filter.pathsByRoot).filter(([r]) => roots.has(r)));
-        ui.filter = { ...ui.filter, pathsByRoot: Object.keys(next).length > 0 ? next : undefined };
+      const prune = (f: LogFilter): LogFilter => {
+        let next = f;
+        if (next.roots.some((r) => !roots.has(r))) next = { ...next, roots: next.roots.filter((r) => roots.has(r)) };
+        if (next.pathsByRoot && Object.keys(next.pathsByRoot).some((r) => !roots.has(r))) {
+          const kept = Object.fromEntries(Object.entries(next.pathsByRoot).filter(([r]) => roots.has(r)));
+          next = { ...next, pathsByRoot: Object.keys(kept).length > 0 ? kept : undefined };
+        }
+        return next;
+      };
+      const pruned = ui.tabs!.map((tab) => ({ filter: prune(tab.filter) }));
+      if (pruned.some((tab, i) => tab.filter !== ui.tabs![i].filter)) {
+        ui.tabs = pruned;
+        ui.filter = pruned[ui.activeTab!].filter;
+        persist();
       }
       table.setRepos(repos);
       details.setRepos(repos);

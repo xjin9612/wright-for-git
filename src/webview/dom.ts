@@ -114,8 +114,11 @@ export type MenuItem =
     }
   | '-';
 
-/** 關閉所有彈出選單 */
+/** 關閉所有彈出選單（含子選單）並移除選單掛在 document 上的監聽器 */
 export function closeMenus(): void {
+  const cleanup = menuCleanup;
+  menuCleanup = undefined;
+  cleanup?.();
   document.querySelectorAll('.context-menu').forEach((m) => m.remove());
 }
 
@@ -123,7 +126,7 @@ let menuCleanup: (() => void) | undefined;
 let keyboardOpen = false;
 
 /** 以鍵盤（選單鍵、Shift+F10）開啟選單：第一個項目直接取得焦點 */
-export function openMenuByKeyboard(open: () => void): void {
+function openMenuByKeyboard(open: () => void): void {
   keyboardOpen = true;
   try {
     open();
@@ -244,10 +247,10 @@ export function showMenu(x: number, y: number, items: MenuItem[]): void {
     e.stopPropagation();
   };
   const cleanup = () => {
-    closeMenus();
+    if (menuCleanup === cleanup) menuCleanup = undefined;
+    document.querySelectorAll('.context-menu').forEach((m) => m.remove());
     document.removeEventListener('mousedown', onMouse, true);
     document.removeEventListener('keydown', onKey, true);
-    menuCleanup = undefined;
   };
   menuCleanup = cleanup;
   // 按鍵立即接手（避免選單剛開時按鍵落到底下的清單）；滑鼠延後，以免開啟選單的那一下就把它關掉
@@ -269,15 +272,18 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
       continue;
     }
     const check = el('span', { className: 'menu-check' });
+    // row 在下面才建立；勾選狀態同步到 aria-checked（螢幕閱讀器讀得到）
+    let row: HTMLElement | undefined;
     const setCheck = (on: boolean | undefined) => {
       clear(check);
       if (on) check.append(icon('check'));
+      if (it.checked !== undefined) row?.setAttribute('aria-checked', String(!!on));
     };
     if (it.star) {
       const star = it.star;
       check.classList.add('menu-star');
-      check.title = star.on ? t('Remove from Favorites') : t('Add to Favorites');
       const paint = () => {
+        check.title = star.on ? t('Remove from Favorites') : t('Add to Favorites');
         clear(check);
         check.append(icon(star.on ? 'star' : 'star-outline', star.on ? 'favorite' : ''));
       };
@@ -291,9 +297,12 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
     } else {
       setCheck(it.checked);
     }
-    const row = el(
+    row = el(
       'div',
-      { className: `menu-item${it.disabled ? ' disabled' : ''}${it.submenu ? ' has-submenu' : ''}`, attrs: { role: 'menuitem' } },
+      {
+        className: `menu-item${it.disabled ? ' disabled' : ''}${it.submenu ? ' has-submenu' : ''}`,
+        attrs: { role: it.checked !== undefined ? 'menuitemcheckbox' : 'menuitem', ...(it.checked !== undefined ? { 'aria-checked': String(!!it.checked) } : {}), ...(it.disabled ? { 'aria-disabled': 'true' } : {}) },
+      },
       check,
       el('span', { className: 'menu-label', text: it.label }),
       it.detail ? el('span', { className: 'menu-detail', text: it.detail }) : null,
@@ -409,4 +418,9 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
     t = undefined;
   };
   return wrapped;
+}
+
+/** 樹狀清單一列的無障礙屬性：層級、展開狀態、是否選取 */
+export function treeItemAttrs(depth: number, expandable: boolean, expanded: boolean, selected: boolean): Record<string, string> {
+  return { role: 'treeitem', 'aria-level': String(depth + 1), 'aria-selected': String(selected), ...(expandable ? { 'aria-expanded': String(expanded) } : {}) };
 }

@@ -6,7 +6,7 @@ import { buildLabels, type RefLabel } from '../shared/refs';
 import { el, formatDate, icon, isContextMenuKey, openContextMenuFor } from './dom';
 import { plural, t } from './l10n';
 
-export const ROW_HEIGHT = 22;
+const ROW_HEIGHT = 22;
 const LANE_WIDTH = 14;
 const GRAPH_PAD = 6;
 const OVERSCAN = 8;
@@ -17,7 +17,7 @@ const NAMES_WIDTH = 92;
 const STRIP_GAP = 4;
 
 /** repo 色條顏色（與 lane 顏色錯開） */
-export const REPO_COLORS = ['#4C9AEB', '#E5A05B', '#73BD79', '#C48AE6', '#4FC1C1', '#E48AB8', '#DCC35C', '#F07178', '#8C8CF0', '#9AA0A8'];
+const REPO_COLORS = ['#4C9AEB', '#E5A05B', '#73BD79', '#C48AE6', '#4FC1C1', '#E48AB8', '#DCC35C', '#F07178', '#8C8CF0', '#9AA0A8'];
 
 const EMPTY_MODEL: GraphModel = new MultiGraph(true);
 
@@ -82,7 +82,7 @@ export interface ColumnWidths {
   hash: number;
 }
 
-export const DEFAULT_WIDTHS: ColumnWidths = { author: 120, date: 136, hash: 74 };
+const DEFAULT_WIDTHS: ColumnWidths = { author: 120, date: 136, hash: 74 };
 const COLS = ['author', 'date', 'hash'] as const;
 
 interface RowView {
@@ -396,9 +396,15 @@ export class LogTable {
 
   private selectRange(from: number, to: number, add: boolean): void {
     const set = add ? new Set(this.selectedIndices) : new Set<number>();
-    const [a, b] = from <= to ? [from, to] : [to, from];
-    for (let i = a; i <= b && set.size < LogTable.MAX_MULTI; i++) set.add(i);
-    this.selected = to;
+    // 從起點往終點填，超過上限時停在最後加入的一列（焦點列一定在選取範圍內）
+    const step = from <= to ? 1 : -1;
+    let last = from;
+    for (let i = from; step > 0 ? i <= to : i >= to; i += step) {
+      if (set.size >= LogTable.MAX_MULTI && !set.has(i)) break;
+      set.add(i);
+      last = i;
+    }
+    this.selected = last;
     this.applyMulti(set);
   }
 
@@ -566,6 +572,7 @@ export class LogTable {
     view.root.style.transform = `translateY(${idx * ROW_HEIGHT}px)`;
     (view.root.firstElementChild as HTMLElement).style.paddingLeft = `${graphWidth}px`;
     view.root.classList.toggle('selected', this.isSelected(idx));
+    view.root.setAttribute('aria-selected', String(this.isSelected(idx)));
     view.root.classList.toggle('focused', this.multi.size > 0 && idx === this.selected);
     view.root.classList.toggle('is-head', c.hash === head.hash);
     const key = `${c.repo}:${c.hash}`;

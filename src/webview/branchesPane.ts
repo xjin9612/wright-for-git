@@ -2,7 +2,7 @@
 import type { RepoState } from '../shared/protocol';
 import { mergeRefs, naturalCompare, type MergedRef } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, type IconName } from './dom';
+import { clear, el, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, treeItemAttrs, type IconName } from './dom';
 import { plural, t } from './l10n';
 
 interface Row {
@@ -32,7 +32,7 @@ export interface BranchOptions {
   navigateOnSelect: boolean;
 }
 
-export const DEFAULT_BRANCH_OPTIONS: BranchOptions = { groupByDirectory: true, groupByRepository: false, showTags: true, navigateOnSelect: false };
+const DEFAULT_BRANCH_OPTIONS: BranchOptions = { groupByDirectory: true, groupByRepository: false, showTags: true, navigateOnSelect: false };
 
 /** 工具列上針對選取分支的操作 */
 export type BranchToolbarAction = 'newBranch' | 'update' | 'delete' | 'compare' | 'compareWorkingTree' | 'navigate';
@@ -393,7 +393,7 @@ export class BranchesPane {
       {
         className: `tree-row${row.key === this.selectedKey ? ' selected' : ''}${row.current ? ' current' : ''}`,
         title: row.ref?.short ?? row.label,
-        attrs: { role: 'treeitem', 'data-key': row.key },
+        attrs: { ...treeItemAttrs(row.depth, row.expandable, row.expanded, row.key === this.selectedKey), 'data-key': row.key },
       },
       twisty,
       iconName ? icon(iconName, iconClass) : null,
@@ -412,6 +412,7 @@ export class BranchesPane {
       this.selectedKey = row.key;
       this.list.querySelector('.tree-row.selected')?.classList.remove('selected');
       div.classList.add('selected');
+      this.syncToolbar();
       this.cb.onContextMenu(row.ref, e.clientX, e.clientY);
     });
     div.addEventListener('dblclick', () => {
@@ -511,23 +512,19 @@ export class BranchesPane {
     this.render();
   }
 
+  /** 所有可展開的節點：逐層展開直到沒有新的節點（依儲存庫分組時節點帶 @root，與 buildRows 一致） */
   private collectAllKeys(): string[] {
-    const keys = ['local', 'remote', 'tags'];
-    if (this.states.length === 0) return keys;
-    const addFolders = (prefix: string, names: string[]) => {
-      for (const n of names) {
-        const parts = n.split('/');
-        for (let i = 1; i < parts.length; i++) keys.push(`${prefix}/${parts.slice(0, i).join('/')}`);
-      }
-    };
-    addFolders('local', this.refs.filter((r) => r.type === 'local').map((r) => r.short));
-    for (const name of new Set(this.states.flatMap((st) => st.remotes))) {
-      keys.push(`remote:${name}`);
-      addFolders(`remote:${name}`, this.refs.filter((r) => r.type === 'remote' && r.remote === name).map((r) => r.remoteBranch ?? ''));
+    const saved = new Set(this.expanded);
+    for (let level = 0; level < 32; level++) {
+      const before = this.expanded.size;
+      for (const r of this.buildRows()) if (r.expandable) this.expanded.add(r.key);
+      if (this.expanded.size === before) break;
     }
-    addFolders('tags', this.refs.filter((r) => r.type === 'tag').map((r) => r.short));
+    const keys = [...this.expanded];
+    this.expanded = saved;
     return keys;
   }
+
 }
 
 /** 領先／落後顯示文字：「↑2 ↓3」；upstream 已刪除時顯示「gone」 */

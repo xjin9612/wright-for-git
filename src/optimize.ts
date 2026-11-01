@@ -2,7 +2,7 @@
 // 不主動提示；大型 repo 想加快歷史與路徑篩選時由使用者自己執行（說明見 README）。
 import * as vscode from 'vscode';
 import { showGitError } from './gitConsole';
-import { t } from './i18n';
+import { plural, t } from './i18n';
 import type { WorkbenchViewProvider } from './provider';
 
 export async function optimizeRepositories(provider: WorkbenchViewProvider, roots?: string[]): Promise<void> {
@@ -34,7 +34,7 @@ export async function optimizeRepositories(provider: WorkbenchViewProvider, root
     void showGitError(t('Could not optimize: {0}', failed.join('\n')));
   } else {
     void vscode.window.showInformationMessage(
-      basic ? t('Optimized {0} repositories. Your git is older than 2.27, so path filters are not sped up.', targets.length) : t('Optimized {0} repositories.', targets.length),
+      plural(targets.length, 'Optimized {0} repository.', 'Optimized {0} repositories.') + (basic ? ` ${t('Your git is older than 2.27, so path filters are not sped up.')}` : ''),
     );
   }
   await provider.refresh(true);

@@ -8,7 +8,7 @@ import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './set
 import { buildPatch, parseFileDiff } from './git/parsers';
 import type { GitRepository } from './git/repository';
 import { onRepositoryChange } from './gitExtension';
-import { t } from './i18n';
+import { plural, t } from './i18n';
 import { showGitError } from './gitConsole';
 import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
@@ -32,7 +32,7 @@ const keyOf = (root: string, p: string) => `${root}\0${p}`;
 /** 以內容辨識 hunk（檔案在別處被修改後，段落序號可能改變） */
 const hunkId = (h: DiffHunk) => h.lines.join('\n');
 
-/** .gitignore 的一行：以 / 開頭只比對這個路徑，並跳脫 # ! * ? [ \\ 與結尾空白 */
+/** .gitignore 的一行：以 / 開頭只比對這個路徑（# ! 因此不需跳脫），並跳脫 * ? [ \\ 與結尾空白 */
 export function gitignoreEntry(p: string): string {
   const escaped = p.replace(/[\\*?[]/g, (c) => `\\${c}`).replace(/ +$/, (sp) => sp.replace(/ /g, '\\ '));
   return `/${escaped}`;
@@ -52,6 +52,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   private disposables: vscode.Disposable[] = [];
   private repoWatchers: vscode.Disposable[] = [];
   private watchedKey = '';
+  private watchGeneration = 0;
   /** 逐段提交：key → 選取的 hunk 內容 */
   private readonly partial = new Map<string, Set<string>>();
   /** 最近一次狀態（逐段選取需要 hunk 總數時使用） */
@@ -84,9 +85,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       this.watchedKey = key;
       this.repoWatchers.forEach((d) => d.dispose());
       this.repoWatchers = [];
+      // 非同步註冊：清單在這期間又換了，舊的監聽器直接丟掉
+      const gen = ++this.watchGeneration;
       for (const repo of repos) {
         void onRepositoryChange(repo.root, () => this.scheduleRefresh()).then((d) => {
-          if (d) this.repoWatchers.push(d);
+          if (!d) return;
+          if (gen === this.watchGeneration) this.repoWatchers.push(d);
+          else d.dispose();
         });
       }
     }
@@ -308,7 +313,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   private async rollback(items: { root: string; change: WorkingChange }[]): Promise<void> {
     const list = items.filter((x) => x.change.kind === 'changed' || x.change.kind === 'conflict');
     if (list.length === 0) {
-      void vscode.window.showInformationMessage(t('Only tracked changes can be rolled back. Unversioned files are left as they are.'));
+      void vscode.window.showInformationMessage(t('Only tracked changes can be rolled back. Untracked files are left as they are.'));
       return;
     }
     const names = list.map((x) => x.change.path);
@@ -392,7 +397,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       }
     });
     if (failed.length > 0) void showGitError(t('Commit failed: {0}', failed.join('\n')));
-    else vscode.window.setStatusBarMessage(`$(check) ${t('Committed to {0} repositories', committed.length)}`, 4000);
+    else vscode.window.setStatusBarMessage(`$(check) ${plural(committed.length, 'Committed to {0} repository', 'Committed to {0} repositories')}`, 4000);
     done(failed.length === 0);
     await this.refresh();
     await this.provider.refresh(true);

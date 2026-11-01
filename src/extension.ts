@@ -89,7 +89,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
         await provider.refresh(true);
       }
     }),
-    // 開啟本擴充套件的設定（語系、Issue 連結等）
     // 標題列齒輪：打開面板內的設定框（語言等設定立即生效）
     vscode.commands.registerCommand('gitWorkbench.openSettings', () => provider.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.commit.openSettings', () => commitView?.openSettingsPanel()),

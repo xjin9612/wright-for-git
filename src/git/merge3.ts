@@ -107,8 +107,6 @@ export function merge3(base: readonly string[], ours: readonly string[], theirs:
     if (last?.kind === 'stable') last.lines.push(...base.slice(from, to));
     else out.push({ kind: 'stable', lines: base.slice(from, to) });
   };
-  // 每一邊：base 位置 → 該邊位置的位移（前面的變更造成的行數差）
-  const shift = [0, 0];
   let pos = 0;
   let i = 0;
   while (i < hunks.length) {
@@ -134,7 +132,6 @@ export function merge3(base: readonly string[], ours: readonly string[], theirs:
     };
     const o = sideLines(0, ours);
     const t = sideLines(1, theirs);
-    for (const h of group) shift[h.side] += h.b1 - h.b0 - (h.a1 - h.a0);
     const both = o.changed && t.changed;
     out.push({ kind: 'chunk', base: base.slice(r0, r1), ours: o.lines, theirs: t.lines, oursChanged: o.changed, theirsChanged: t.changed, conflict: both && !same(o.lines, t.lines) });
     pos = r1;

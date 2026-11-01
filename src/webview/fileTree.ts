@@ -1,7 +1,7 @@
 // 變更檔案樹（記錄右欄、儲藏的檔案清單共用）：依目錄／儲存庫／模組分組（對應 IntelliJ 的 Group By）
 import type { ChangedFile } from '../shared/protocol';
 import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, icon, iconButton, showMenu } from './dom';
+import { clear, el, icon, iconButton, showMenu, treeItemAttrs } from './dom';
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { plural, t } from './l10n';
 
@@ -235,7 +235,7 @@ export class FileTree {
       const extra = f ? this.opts.fileDetail?.(f) : undefined;
       const row = el(
         'div',
-        { className: `tree-row${r.key === this.selected ? ' selected' : ''}`, title, attrs: { role: 'treeitem' } },
+        { className: `tree-row${r.key === this.selected ? ' selected' : ''}`, title, attrs: treeItemAttrs(r.depth, r.expandable, r.expanded, r.key === this.selected) },
         twisty,
         f ? fileIcon(f.path) : r.icon === 'section' ? null : icon(r.icon ?? 'folder'),
         el('span', { className: `tree-label${f ? ` ${statusClass(f.untracked ? 'untracked' : f.status)}` : ''}${r.icon === 'section' ? ' commit-section' : ''}`, text: r.label }),

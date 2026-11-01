@@ -6,6 +6,7 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
 import { t } from './i18n';
+import { opName } from './conflicts';
 import { showGitError } from './gitConsole';
 import { confirm, type ConfirmHost } from './dialogs';
 
@@ -46,9 +47,9 @@ async function withConflictCheck(target: RepoTarget, fn: () => Promise<void>): P
 /** 提示到原始檔控制解決衝突，或中止這次操作（不等待使用者回應，避免卡住進度通知） */
 function promptConflict(target: RepoTarget, op: Operation): void {
   const resolve = t('Resolve Conflicts…');
-  const abort = t('Abort {0}', op);
+  const abort = t('Abort {0}', opName(op));
   void vscode.window
-    .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them, then continue or abort.', target.name, op), resolve, abort)
+    .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them, then continue or abort.', target.name, opName(op)), resolve, abort)
     .then(async (answer) => {
       if (answer === resolve) await vscode.commands.executeCommand('gitWorkbench.resolveConflicts', target.repo.root);
       else if (answer === abort) {
@@ -98,7 +99,7 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
   }
 
   if (plan.length === 0) {
-    if (skipped.length > 0) void vscode.window.showWarningMessage(t('{0}: nothing to do. Skipped: {1}', SYNC_TITLES[action], skipped.join(', ')));
+    if (skipped.length > 0) void vscode.window.showWarningMessage(t('{0}: nothing to do. Skipped: {1}', t(SYNC_TITLES[action]), skipped.join(', ')));
     return;
   }
 

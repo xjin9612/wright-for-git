@@ -137,8 +137,10 @@ function lineEl(no: number, text: string, cls = ''): HTMLElement {
 }
 
 function sideButtons(b: Block, which: 'ours' | 'theirs', line?: number): HTMLElement[] {
-  const apply = el('button', { className: 'merge-btn apply', text: which === 'ours' ? '≫' : '≪', attrs: { type: 'button', title: which === 'ours' ? t('Apply change from the left') : t('Apply change from the right') } });
-  const ignore = el('button', { className: 'merge-btn ignore', text: '✕', attrs: { type: 'button', title: t('Ignore change') } });
+  const applyLabel = which === 'ours' ? t('Apply change from the left') : t('Apply change from the right');
+  // 按鈕只有符號：名稱放在 aria-label，螢幕閱讀器才不會只念出符號
+  const apply = el('button', { className: 'merge-btn apply', text: which === 'ours' ? '≫' : '≪', attrs: { type: 'button', title: applyLabel, 'aria-label': applyLabel } });
+  const ignore = el('button', { className: 'merge-btn ignore', text: '✕', attrs: { type: 'button', title: t('Ignore change'), 'aria-label': t('Ignore change') } });
   apply.addEventListener('click', () => change(() => setSide(b, which, 'applied', line)));
   ignore.addEventListener('click', () => change(() => setSide(b, which, 'ignored', line)));
   return which === 'ours' ? [apply, ignore] : [ignore, apply];

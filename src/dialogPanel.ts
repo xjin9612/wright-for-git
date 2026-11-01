@@ -1,4 +1,4 @@
-// 開在編輯器分頁的對話框（Push、取消儲藏）：比底部面板大，可拖到其他編輯器群組或用「移到新視窗」變成浮動視窗
+// 開在編輯器分頁的對話框（Push、取消儲藏、逐段選取、互動式 rebase、衝突清單、三方合併）：比底部面板大，可拖到其他編輯器群組或用「移到新視窗」變成浮動視窗
 import * as vscode from 'vscode';
 import { ConfirmHost, confirm } from './dialogs';
 import { ConflictResolver } from './conflicts';
@@ -94,7 +94,7 @@ export class DialogPanels {
         const result = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: t('Rebasing…') }, () => repo.interactiveRebase(m.base, m.entries));
         close();
         if (result === 'stopped') {
-          void vscode.window.showInformationMessage(t('Rebase stopped: resolve conflicts or amend the commit, then use Continue in the Git log.'));
+          void vscode.window.showInformationMessage(t('Rebase stopped: resolve conflicts or amend the commit, then use Continue in the Git Log.'));
         } else {
           vscode.window.setStatusBarMessage(`$(check) ${t('Rebase finished')}`, 4000);
         }
@@ -172,7 +172,13 @@ export class DialogPanels {
         const stash = await findStash(m.root, m.hash);
         if (!stash) return;
         if (await confirm(t('Drop {0}? Its changes will be lost.', stash.ref), { detail: stash.message, ok: t('Drop'), kind: 'danger' }, host)) {
-          await repoOf(m.root)?.stashDrop(stash.ref);
+          // 確認期間可能又新增了儲藏（stash@{n} 會位移）：依 hash 重新找一次再刪
+          const now = await findStash(m.root, m.hash);
+          if (!now) {
+            void vscode.window.showWarningMessage(t('This stash no longer exists.'));
+            return;
+          }
+          await repoOf(m.root)?.stashDrop(now.ref);
           reply({ type: 'stashChanged' });
           this.onStashChanged?.();
         }

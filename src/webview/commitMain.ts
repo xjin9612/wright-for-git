@@ -1,7 +1,8 @@
 // 提交視窗（側邊欄）：「提交｜儲藏」兩個分頁，對應 IntelliJ 的 Commit 工具視窗
 import { isContentConflict, type CommitState, type StashInfo, type ToWebview, type WorkingChange } from '../shared/protocol';
+import { stashLabel } from '../shared/stash';
 import { showConfirm } from './confirmDialog';
-import { clear, el, formatDate, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, type MenuItem } from './dom';
+import { clear, el, formatDate, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, treeItemAttrs, type MenuItem } from './dom';
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
@@ -79,6 +80,8 @@ function setTab(tab: 'commit' | 'stash'): void {
   persist();
   tabCommit.classList.toggle('active', tab === 'commit');
   tabStash.classList.toggle('active', tab === 'stash');
+  tabCommit.setAttribute('aria-selected', String(tab === 'commit'));
+  tabStash.setAttribute('aria-selected', String(tab === 'stash'));
   commitPane.classList.toggle('hidden', tab !== 'commit');
   stashPane.classList.toggle('hidden', tab !== 'stash');
   if (tab === 'stash') stash.load();
@@ -417,7 +420,8 @@ function checkState(files: { root: string; change: Change }[]): 'all' | 'some' |
 function setIncluded(files: { root: string; change: Change }[], value: boolean): void {
   const cleared: string[] = [];
   for (const f of files) {
-    if (f.change.kind === 'ignored') continue;
+    // 已忽略與衝突中的檔案不能提交（勾選框也是停用的）
+    if (f.change.kind === 'ignored' || f.change.kind === 'conflict') continue;
     const k = keyOf(f.root, f.change.path);
     explicit.set(k, value);
     if (state?.partial[k]) cleared.push(k);
@@ -430,6 +434,10 @@ function setIncluded(files: { root: string; change: Change }[], value: boolean):
 
 function render(): void {
   rows = buildRows();
+  // 已不在清單上的列（檔案消失、被收合）不再算選取或焦點
+  const shown = new Set(rows.map((r) => r.key));
+  for (const k of [...selected]) if (!shown.has(k)) selected.delete(k);
+  if (focusKey && !shown.has(focusKey)) focusKey = undefined;
   const scroll = tree.scrollTop;
   clear(tree);
   if (!state) {
@@ -483,7 +491,7 @@ function renderRow(r: Row): HTMLElement {
   const count = r.kind !== 'file' ? el('span', { className: 'tree-count', text: plural(r.files.length, '{0} file', '{0} files') }) : null;
   const div = el(
     'div',
-    { className: `tree-row${selected.has(r.key) ? ' selected' : ''}${focusKey === r.key ? ' focused' : ''}`, attrs: { role: 'treeitem', 'data-key': r.key } },
+    { className: `tree-row${selected.has(r.key) ? ' selected' : ''}${focusKey === r.key ? ' focused' : ''}`, attrs: { ...treeItemAttrs(r.depth, r.expandable, r.expanded, selected.has(r.key)), 'data-key': r.key } },
     twisty,
     box,
     iconEl,
@@ -539,8 +547,9 @@ function persistCollapsed(): void {
 }
 
 function select(r: Row, add: boolean, range: boolean): void {
-  if (range && focusKey) {
-    const a = rows.findIndex((x) => x.key === focusKey);
+  // 範圍選取的起點可能已被收合或消失：退回單選
+  const a = range && focusKey ? rows.findIndex((x) => x.key === focusKey) : -1;
+  if (a >= 0) {
     const b = rows.findIndex((x) => x.key === r.key);
     if (!add) selected.clear();
     for (let i = Math.min(a, b); i <= Math.max(a, b); i++) selected.add(rows[i].key);
@@ -561,6 +570,7 @@ function updateSelection(): void {
   for (const div of tree.querySelectorAll<HTMLElement>('.tree-row')) {
     const key = div.dataset.key ?? '';
     div.classList.toggle('selected', selected.has(key));
+    div.setAttribute('aria-selected', String(selected.has(key)));
     div.classList.toggle('focused', key === focusKey);
   }
 }
@@ -701,6 +711,8 @@ function showRowMenu(r: Row, x: number, y: number): void {
 }
 
 tree.addEventListener('keydown', (e) => {
+  // 焦點在列上的勾選框時，空白鍵交給勾選框本身（只切換那一列）
+  if ((e.target as HTMLElement).tagName === 'INPUT') return;
   if (isContextMenuKey(e)) {
     e.preventDefault();
     openContextMenuFor(tree.querySelector('.tree-row.focused') ?? tree.querySelector('.tree-row.selected'));
@@ -824,6 +836,27 @@ const stash = (() => {
     iconButton('trash', t('Drop'), needSel((s) => (post({ type: 'unstashDrop', root: s.root, hash: s.hash }), reloadSoon()))),
   );
   stashPane.append(bar, list, el('div', { className: 'stash-files-pane' }, filesBar, fileTree.element));
+  // 鍵盤：↑↓ 換儲藏、Enter 套用、選單鍵開右鍵選單
+  list.addEventListener('keydown', (e) => {
+    const flat = repos.flatMap((r) => r.stashes.map((s) => ({ root: r.root, hash: s.hash })));
+    const i = flat.findIndex((x) => x.root === sel?.root && x.hash === sel.hash);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const next = flat[Math.max(0, Math.min(flat.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (!next) return;
+      e.preventDefault();
+      sel = next;
+      render();
+      requestFiles();
+      list.querySelector('.tree-row.selected')?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && sel) {
+      e.preventDefault();
+      post({ type: 'unstashApply', root: sel.root, hash: sel.hash, pop: false, index: false });
+      reloadSoon();
+    } else if (isContextMenuKey(e)) {
+      e.preventDefault();
+      openContextMenuFor(list.querySelector('.tree-row.selected'));
+    }
+  });
 
   /** 建立成分支、還原暫存狀態等進階選項使用「取消儲藏」對話框 */
   function openUnstashDialog(): void {
@@ -924,13 +957,6 @@ const stash = (() => {
   };
 })();
 
-/** 「On main: msg」→「msg」；「WIP on main: abc123 subject」→「WIP: subject」 */
-function stashLabel(msg: string): string {
-  const wip = /^WIP on [^:]+: [0-9a-f]+ (.*)$/.exec(msg);
-  if (wip) return `WIP: ${wip[1]}`;
-  const on = /^On [^:]+: (.*)$/.exec(msg);
-  return on ? on[1] : msg;
-}
 
 // ---------- 訊息 ----------
 window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
@@ -941,7 +967,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'commitState':
       state = m.state;
-      // 已不存在的檔案：移除明確勾選紀錄與選取
+      // 已不存在的檔案：移除明確勾選紀錄；選取與焦點在重繪後只保留仍存在的列
       {
         const live = new Set(state.repos.flatMap((r) => r.changes.map((c) => keyOf(r.root, c.path))));
         for (const k of [...explicit.keys()]) if (!live.has(k)) explicit.delete(k);

@@ -12,13 +12,6 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** 「On main: msg」→「msg」；「WIP on main: abc123 subject」→「WIP: subject」 */
-export function stashLabel(message: string): string {
-  const wip = /^WIP on [^:]+: [0-9a-f]+ (.*)$/.exec(message);
-  if (wip) return `WIP: ${wip[1]}`;
-  const on = /^On [^:]+: (.*)$/.exec(message);
-  return on ? on[1] : message;
-}
 
 /** 儲藏變更：選擇範圍（已追蹤／含未追蹤／保留暫存）與說明；成功回傳 true */
 export async function stashChanges(repo: GitRepository): Promise<boolean> {
