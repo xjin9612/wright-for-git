@@ -92,7 +92,7 @@
 | 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
 | 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬）；◐ `npm run test:vscode`：真實 VS Code（`@vscode/test-electron`）中的 diff、指令、檔案監看、內建 Git 整合，Windows 本機 17 項全數通過，待 CI（Windows、Linux、1.90.0）驗證 |
-| 5.4 | ◐ 大型 repo 效能 | `npm run bench:vscode`：真實 VS Code 中量測 10 萬 commit 的各種篩選，並比較有無 commit-graph。Linux 容器（模擬 VS Code）初步結果：首屏約 0.6 秒、有 commit-graph 時約 0.2 秒；單一檔案路徑篩選 1.2 秒 → 0.25 秒；全部載入 5 萬筆約 5.6 秒。待 Windows 實測後決定是否提示 `git commit-graph write` |
+| 5.4 | ◐ 大型 repo 效能 | `npm run bench:vscode`：真實 VS Code 中量測 10 萬 commit 的各種篩選，並比較有無 commit-graph。Windows 實測（VS Code 1.144）：全部載入 5 萬筆約 1 秒；沒有 commit-graph 時首屏約 0.6 秒、路徑篩選約 1.2 秒，有 commit-graph 時首屏約 0.1 秒、單一檔案路徑篩選約 0.2 秒。是否提示寫入 commit-graph 待決定 |
 | 5.5 | Marketplace 發佈 | publisher 帳號、英文 CHANGELOG |
 
 ---
