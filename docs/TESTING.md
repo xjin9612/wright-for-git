@@ -30,6 +30,7 @@ npm run test:ui
 | `test/ui/sync.test.js` | Git 主控台記錄指令與失敗原因；Push 分頁（目標、commit、檔案、警告）；推送成功與被拒；Pull；Force Push 確認；新分支 New 與改名後設定 upstream；Push 到這裡為止；Fetch |
 | `test/ui/commit.test.js` | 空白鍵勾選、`Ctrl+Enter` 提交；提交視窗的清單與預設勾選；分組（模組、平鋪）；逐段提交且不動內建暫存區；跨 repo 提交；Amend（只改訊息）；捨棄變更；加入 .gitignore；Changelist；儲藏分頁（分組、未追蹤、diff、刪除後即時更新）；儲藏變更 |
 | `test/ui/rebase.test.js` | 滑鼠拖曳調整順序；reword（保留 `#` 開頭的行）、squash、調整順序、drop、自動儲藏；edit 停下後「繼續」；分支變動時拒絕；detached HEAD 拒絕 |
+| `test/ui/conflicts.test.js` | 合併後 Log 操作列的衝突數與「解決衝突…」；提交視窗衝突群組的種類說明、「解決…」連結、右鍵選單（標記已解決時的衝突標記確認、採用他們的刪除檔案）；衝突清單分頁（我的／他們的狀態、採用我的、全部解決後「繼續合併」）；三方合併分頁（不衝突的變更、整段 ≫ ✕、逐行、手動編輯後 ≫ 蓋掉、復原與重做、套用）；cherry-pick 衝突 |
 | `test/ui/misc.test.js` | 繁中介面與即時切換語言；面板內設定框；顯示 Git 歷史；與分支或標籤比較；取消儲藏分頁（以新分支取消儲藏）；沒有變更時的儲藏提示；切換 Git Blame；開啟設定；Fetch 指令 |
 
 ---
@@ -52,7 +53,7 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - `api-server`：main 領先遠端 2 筆；`feature/rate-limit` 尚未推送；`experiment/cache` 未合併；tag `v1.0.0`、`v1.1.0`；有 rename、刪除、中文檔名（`docs/中文說明.md`）
 - `api-server` 未提交的變更：`src/config.ts` 兩段修改、刪除 `config/db.yml`、未追蹤 `src/todo.ts`、已忽略 `node_modules/`、子模組 `packages/sdk` 內的修改
 - `api-server/libs/shared`：巢狀 repo
-- `web-app`：main 落後遠端 1 筆；2 個 stash；`conflict/theme` 與 main 改同一行（合併會衝突）；`src/pages/Login.tsx` 有未提交的修改
+- `web-app`：main 落後遠端 1 筆；2 個 stash；`src/pages/Login.tsx` 有未提交的修改；合併 `conflict/theme` 會產生兩個衝突：`src/theme.ts` 兩邊都改了第 2～3 行（另有兩處只有一邊改、不衝突），`src/legacy.ts` 我這邊修改、他們刪除
 - `notes`：一般資料夾，不是 repo
 - 作者 Alice／Bob／Carol／Dave；「我」是 Alice
 
@@ -77,8 +78,11 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] 列出 api-server、api-server/libs/shared、web-app（不含 notes）
 - [ ] 取消勾選某個 repo，記錄面板的 Paths 篩選同步；在 Paths 選單勾回來，側邊欄也同步
 
-## 5. 合併衝突的實際解決
-- [ ] web-app：分支右鍵 `conflict/theme` →「合併到目前的分支」→ 衝突提示選「開啟原始檔控制」→ 在衝突編輯器解決並暫存 → 記錄上方「合併進行中」按「繼續」完成
+## 5. 合併衝突（實際畫面）
+- [ ] web-app：分支右鍵 `conflict/theme` →「合併到目前的分支」→ 衝突提示選「解決衝突…」：開啟衝突清單分頁，`legacy.ts` 顯示「修改／刪除」
+- [ ] 雙擊 `theme.ts` 開啟三方合併分頁：三欄捲動一致、顏色在淺色／深色／高對比主題都看得清楚；在結果欄打字、`Ctrl+Z` 復原；`F7` 跳到下一個變更
+- [ ] 按「在 VS Code 合併編輯器開啟」：開啟內建的合併編輯器
+- [ ] 解決完後在衝突清單按「繼續合併」，或關掉清單、從 Log 上方的「繼續」完成
 
 ## 6. 真實環境
 - [ ] 你自己的 GitHub／GitLab repo（SSH 遠端）：Fetch、Pull、Push 各一次；提交訊息中的 `#123` 連到該 repo 的 issue 頁

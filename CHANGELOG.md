@@ -39,12 +39,21 @@
 - Interactive rebase in an editor tab: pick, reword (edit the message in place), edit, squash, fixup, drop; reorder by dragging or `Alt+↑↓`; single-key shortcuts. Local changes are stashed and restored automatically
 - While a rebase, merge, cherry-pick or revert is in progress, a bar above the log offers Continue, Skip and Abort (Abort asks first)
 - Issue numbers in commit messages become links: `#123` opens the issue on the repository's remote (GitHub, GitLab, …) by default; `gitWorkbench.issueLinks` replaces this with your own patterns (e.g. `PROJ-123` → your tracker)
-- On conflicts, offers to open Source Control to resolve them, or to abort
+- On conflicts, offers Resolve Conflicts… or Abort
 - Date filter: last 24 hours / 7 / 30 / 90 days / year, or a custom period
 - A hint appears when the Branch filter leaves out the current branch, with one-click Show HEAD / Show all branches
 - Text and User filters now draw a simplified graph that links each result to its nearest matching ancestor
 - Author, Date and Hash columns can be resized by dragging their left edge (double-click to reset)
 - Several log tabs, each with its own filters: 👁 → New Log Tab, or Show in New Tab on a branch
+
+### Merge conflicts
+- Resolve conflicts the IntelliJ way, for merge, rebase, cherry-pick, revert and stash conflicts alike
+- The Conflicts tab lists every repository's conflicted files with what each side did (Modified / Added / Deleted); Accept Yours, Accept Theirs, or Merge… a file. When a repository has no conflicts left, a Continue button finishes the merge, rebase or cherry-pick
+- The Merge tab shows Yours, Result and Theirs side by side. Each change has ≫ (apply) and ✕ (ignore); applying both sides of a conflict keeps both, yours first. Line by Line gives every line of a conflict its own ≫ ✕. The Result column is editable, and applying a change again replaces what you typed. Apply Non-Conflicting Changes, previous / next change (`F7` / `Shift+F7`), undo / redo for clicks and typing alike (`Ctrl+Z` / `Ctrl+Shift+Z`), Apply with `Ctrl+Enter`; Open in VS Code Merge Editor is one click away
+- Files that are not UTF-8 text can still be resolved by accepting one side
+- The Commit window's Merge Conflicts group shows the kind of conflict (both modified, deleted by them, …), has a Resolve… link, and its context menu offers Merge…, Resolve Conflicts…, Accept Yours, Accept Theirs and Mark as Resolved (asks first when the file still has conflict markers); double-click opens the merge
+- The bar above the log shows the number of conflicts and a Resolve Conflicts… link, also for stash conflicts where no operation is in progress
+- New command: Git Workbench: Resolve Conflicts…
 
 ### Changed files
 - Group by directory, repository or module from the 👁 menu; switch between tree and flat list; file-type icons
@@ -77,7 +86,7 @@
 - The gear in the Git log's and the Commit window's title bar opens a settings popover right in the panel: language (Follow VS Code / English / 繁體中文), max commits, repository scan depth and auto refresh take effect immediately; links lead to the issue link rules and all settings
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
 - UI end-to-end tests (`npm run test:ui`, Playwright) run in CI on Windows and Linux
-- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Previous Changed File / Next Changed File
+- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Resolve Conflicts… / Previous Changed File / Next Changed File
 
 ## 1.0.0
 
