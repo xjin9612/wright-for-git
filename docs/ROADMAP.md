@@ -1,6 +1,8 @@
 # 待辦清單（Roadmap）
 
-已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈）；下一版 1.1.0（CHANGELOG 的 Unreleased）：階段二～五全部項目（4.4 的長線性分支折疊除外）
+已完成：1.0.0（Log／Branches／詳情三欄、篩選、Highlight、多 repo、顯示 Git 歷史、自動發佈）
+
+下一版 1.1.0（CHANGELOG 的 Unreleased）：階段二～五、Git 主控台、面板內設定框、無障礙與介面收斂；進行中：合併衝突處理（階段六）。延到 1.1.0 之後的項目見最下方。
 
 ---
 
@@ -18,10 +20,11 @@
 | Stash 建立／套用／刪除 | ✅ | ✅ | — |
 | 變更清單、部分提交、discard、commit／amend | ✅（stage 模型） | ✅ Commit 視窗（勾選模型，不動暫存區） | — |
 | Blame | ✅ 內建 | ✅ 右鍵切換內建 blame | — |
-| 編輯器行號旁的變更標示、merge 衝突編輯器 | ✅ | ❌ | 沿用內建 |
+| 合併衝突處理 | ✅ 合併編輯器 | 進行中 | 階段六（1.1.0）：IntelliJ 式衝突清單與三方合併 |
+| 編輯器行號旁的變更標示 | ✅ | ❌ | 沿用內建 |
 | Clone／Init／Remote 管理 | ✅ | ❌ | 沿用內建 |
 
-定位：**歷史、branch、同步、stash、commit 由 Git Workbench 負責（IntelliJ 式勾選提交）；內建 Source Control 仍可並用**——Commit 視窗透過暫時 index 提交，不改動內建的暫存區狀態。行號旁的變更標示與衝突編輯器綁定 VS Code 的 SCM 介面，重做的成本高且會和內建重複。
+定位：**歷史、branch、同步、stash、commit 由 Git Workbench 負責（IntelliJ 式勾選提交）；內建 Source Control 仍可並用**——Commit 視窗透過暫時 index 提交，不改動內建的暫存區狀態。行號旁的變更標示綁定 VS Code 的 SCM 介面，重做的成本高且會和內建重複。
 
 ---
 
@@ -62,6 +65,14 @@
 
 側邊欄 Commit 視窗（`Alt+0`）：勾選提交、部分提交（hunk）、Changelist、未追蹤／已忽略檔案、依目錄／repo／模組分組、Amend／Sign-off／略過 hooks、提交並推送、捨棄變更。透過暫時 index 提交，避免與內建 Source Control 的暫存區互相干擾。
 
+## 階段六：合併衝突處理（1.1.0，進行中）
+
+| # | 項目 | 說明 |
+|---|---|---|
+| 6.1 | 提交視窗的衝突群組 | 右鍵：開啟合併工具、接受我的／他們的、標記已解決；一邊刪除一邊修改的衝突只給保留／刪除；「合併進行中」提示條的「解決衝突…」 |
+| 6.2 | 衝突清單分頁 | 各 repo 的衝突檔案；全部解決後直接繼續 |
+| 6.3 | 三方合併分頁 | 我的／結果／他們的三欄；衝突區塊 ≫ ✕，「逐行」模式每行各自 ≫ ✕；結果欄可直接編輯；可改用 VS Code 合併編輯器；merge、rebase、cherry-pick、取消儲藏共用 |
+
 ## 其他已完成（1.1.0）
 
 - Branches 工具列照 IntelliJ 順序、分組與點選行為選項；Branch 篩選串接選單
@@ -69,6 +80,10 @@
 - Push、取消儲藏、hunk 選擇、互動式 rebase 改開在編輯器分頁
 - 確認框顯示在面板內；介面語言可獨立切換（英文／繁中）
 - 檔案總管右鍵 Git Workbench 子選單
+- Git 主控台：「輸出」面板的 Git Workbench 頻道記錄每個 git 指令、耗時與失敗原因；錯誤通知可直接開啟
+- 面板內設定框：Git 記錄與提交視窗標題列的齒輪，語言切換立即生效
+- 無障礙：右鍵選單可用鍵盤操作（Shift+F10／選單鍵、方向鍵、Enter、Esc）、高對比主題、減少動態效果
+- 介面收斂：狀態字母與線條圖示、提交類型只為 feat／fix／revert 上色、4px 間距與圓角一致
 
 ## 工程與發佈
 
@@ -79,3 +94,14 @@
 | 5.3 | ◐ 整合測試 | ✅ `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬），CI 執行；真實 VS Code 中的流程（`@vscode/test-electron`）未做 |
 | 5.4 | 大型 repo 效能 | 模擬環境 10 萬 commit：首屏約 1.4 秒、全部載入約 6.4 秒；待實測 VS Code 內的數字，再評估提示 `git commit-graph write` |
 | 5.5 | Marketplace 發佈 | publisher 帳號、英文 CHANGELOG |
+
+---
+
+## 1.1.0 之後
+
+| # | 項目 | 說明 |
+|---|---|---|
+| 4.4 | 長線性分支折疊 | 路徑高亮已完成；折疊需要調整 graph 版面 |
+| 5.3 | 真實 VS Code 測試 | `@vscode/test-electron` 跑原生 diff、選單、快捷鍵；目前由手動清單涵蓋 |
+| 5.4 | 大型 repo 效能實測 | 在 VS Code 內量測後再評估提示 `git commit-graph write` |
+| 5.5 | Marketplace 發佈 | 建立 publisher 帳號；目前以 GitHub Release 發佈 |
