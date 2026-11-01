@@ -22,7 +22,7 @@
   - 右鍵：複製 hash／subject、checkout revision、新建 branch／tag、cherry-pick、revert、reset（soft／mixed／hard）、Push 到這裡為止、與工作區比較、從這裡互動式 rebase
   - `Ctrl`／`Shift` 多選：右欄顯示合併後的變更，可一次 cherry-pick 或 revert 多個 commit
   - 互動式 rebase：pick、reword、edit、squash、fixup、drop，拖曳或 `Alt+↑↓` 調整順序；rebase／merge／cherry-pick 進行中時，Log 上方顯示解決衝突、繼續、略過、中止
-  - 提交訊息中的 issue 編號轉連結（`gitWorkbench.issueLinks`）；選取 commit 時淡化不在其路徑上的列
+  - 提交訊息中的 issue 編號轉連結（`gitWorkbench.issueLinks`）；選取 commit 時淡化不在其路徑上的列；👁 選單「收合線性分支」把分支上連續的 commit 收成一列虛線的「⋯ N commits」，點一下展開
 - **Commit 視窗**（`Alt+0`）：勾選要提交的檔案或只提交部分 hunk；Changelist；未追蹤與已忽略檔案；依目錄／repo／模組分組；Amend、Sign-off、略過 hooks、提交並推送；捨棄變更、加入 `.gitignore`。透過暫時 index 提交，不影響內建原始檔控制的暫存區。另有「儲藏」分頁列出所有 repo 的 stash
 - **合併衝突**：衝突清單分頁（採用我的／採用他們的／合併…，解決完直接繼續）與三方合併分頁：左邊我的、中間可直接編輯的結果、右邊他們的，每個變更有 ≫ ✕，「逐行」模式每一行各有 ≫ ✕；套用所有不衝突的變更、復原／重做。merge、rebase、cherry-pick、revert、套用儲藏的衝突都適用
 - **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框（編輯器分頁），列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後

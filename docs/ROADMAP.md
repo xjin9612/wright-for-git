@@ -59,7 +59,7 @@
 | 4.1 | ✅ Interactive rebase | pick／reword／edit／squash／fixup／drop、拖曳或 `Alt+↑↓` 調整順序；進行中的 rebase／merge 在 Log 上方顯示繼續／略過／中止 |
 | 4.2 | ✅ Annotate（blame） | 沿用 VS Code 內建 blame，編輯器右鍵切換（不重做） |
 | 4.3 | ✅ Issue 連結 | `gitWorkbench.issueLinks` 自訂規則；預設 `#123` 連到遠端 issues |
-| 4.4 | ◐ 路徑高亮 | ✅ 選取 commit 時淡化不在其路徑上的列；長線性分支折疊未做 |
+| 4.4 | ✅ 路徑高亮與分支折疊 | 選取 commit 時淡化不在其路徑上的列；長線性分支折疊（👁 選單全部收合／展開、點收合列展開、點分支線收合；主線不收，分支頭尾保留，中間至少 3 筆才收） |
 
 ## 階段五：IntelliJ 風格 Commit 視窗 ✅
 
@@ -101,7 +101,7 @@
 
 | # | 項目 | 說明 |
 |---|---|---|
-| 4.4 | 長線性分支折疊 | 路徑高亮已完成；折疊需要調整 graph 版面 |
+| 4.4 | ✅ 長線性分支折疊 | 完成（見上方 4.4） |
 | 5.3 | ◐ 真實 VS Code 測試 | 進行中（見上方 5.3） |
 | 5.4 | ✅ 大型 repo 效能實測 | 完成（見上方 5.4） |
 | 5.5 | Marketplace 發佈 | 建立 publisher 帳號；目前以 GitHub Release 發佈 |
