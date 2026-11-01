@@ -75,6 +75,7 @@ export async function runAll(): Promise<void> {
   const grep = process.env.GWB_GREP ?? '';
   const list = tests.filter((x) => !grep || x.name.includes(grep));
   let failed = 0;
+  const failures: string[] = [];
   const started = Date.now();
   for (const x of list) {
     const t0 = Date.now();
@@ -89,9 +90,13 @@ export async function runAll(): Promise<void> {
       console.log(`✔ ${x.name} (${Date.now() - t0}ms)`);
     } catch (e) {
       failed++;
-      console.log(`✖ ${x.name} (${Date.now() - t0}ms)\n  ${(e instanceof Error ? (e.stack ?? e.message) : String(e)).split('\n').join('\n  ')}`);
+      const text = `✖ ${x.name} (${Date.now() - t0}ms)\n  ${(e instanceof Error ? (e.stack ?? e.message) : String(e)).split('\n').join('\n  ')}`;
+      failures.push(text);
+      console.log(text);
     }
   }
+  // 失敗的測試在最後再列一次，不用往上捲找
+  if (failures.length > 0) console.log(`\n✖ failing tests:\n\n${failures.join('\n\n')}\n`);
   console.log(`ℹ tests ${list.length}\nℹ pass ${list.length - failed}\nℹ fail ${failed}\nℹ duration_ms ${Date.now() - started}`);
   if (failed > 0) throw new Error(`${failed} 個測試失敗`);
 }
