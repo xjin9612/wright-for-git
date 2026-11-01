@@ -4,7 +4,7 @@
 //   GWB_GREP=diff          只跑名稱含這段文字的測試
 //   GWB_MODE=bench         改跑大型 repo 效能量測（npm run bench:vscode）；GWB_BENCH_COMMITS 指定 commit 數（預設 100000）
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { runTests } from '@vscode/test-electron';
@@ -13,7 +13,8 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 async function main(): Promise<void> {
   const bench = process.env.GWB_MODE === 'bench';
-  const tmp = mkdtempSync(path.join(tmpdir(), 'gwb-vscode-'));
+  // Windows 的暫存路徑可能是 8.3 短檔名（C:\Users\RUNNER~1\…）；git 回報的 repo 路徑是長檔名，先展開才比對得上
+  const tmp = mkdtempSync(path.join(realpathSync.native(tmpdir()), 'gwb-vscode-'));
   const playground = path.join(tmp, bench ? 'large-repo' : 'playground');
   if (bench) {
     // 效能量測：產生大型 repo（約 15 秒）
