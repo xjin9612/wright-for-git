@@ -23,13 +23,19 @@ test('記錄開 diff：新增的檔案左邊是空的；中文檔名的內容正
   assert.match(d.label, /· [12]\/2$/);
 });
 
-test('diff 的 → 切換到同一個 commit 的下一個檔案，標題的位置跟著變；← 回來', async () => {
+test('diff 的 ← → 切換同一個 commit 的其他檔案，標題的位置跟著變；到頭時停在原處', async () => {
   const before = activeDiff()!;
-  await vscode.commands.executeCommand('gitWorkbench.diff.nextFile');
-  const after = await until(() => activeDiff()?.modified.toString() !== before.modified.toString() && activeDiff(), '切換到下一個檔案');
-  assert.notEqual(after.label, before.label);
-  assert.match(after.label, /· [12]\/2$/);
-  await vscode.commands.executeCommand('gitWorkbench.diff.previousFile');
+  // 檔案順序由 git 決定：目前在最後一個就先往前，在第一個就先往後
+  const atLast = /· 2\/2$/.test(before.label);
+  const [go, back] = atLast ? ['gitWorkbench.diff.previousFile', 'gitWorkbench.diff.nextFile'] : ['gitWorkbench.diff.nextFile', 'gitWorkbench.diff.previousFile'];
+  await vscode.commands.executeCommand(go);
+  const after = await until(() => activeDiff()?.modified.toString() !== before.modified.toString() && activeDiff(), '切換到另一個檔案');
+  assert.match(after.label, atLast ? /· 1\/2$/ : /· 2\/2$/);
+  // 已經在頭（或尾）：再往同一個方向不會換檔案
+  await vscode.commands.executeCommand(go);
+  await new Promise((r) => setTimeout(r, 800));
+  assert.equal(activeDiff()?.modified.toString(), after.modified.toString());
+  await vscode.commands.executeCommand(back);
   await until(() => activeDiff()?.modified.toString() === before.modified.toString(), '切回原本的檔案');
 });
 
