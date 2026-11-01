@@ -358,13 +358,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         }
         case 'openDiff':
-          this.diffNav = m.files && m.files.length > 1 ? { root: m.root, hash: m.hash, parent: m.parent, files: m.files, index: m.files.findIndex((f) => f.path === m.file.path) } : undefined;
-          {
-            const nav = this.diffNav;
-            const right = await this.openDiff(m.root, m.hash, m.parent, m.file, undefined, nav && nav.index >= 0 ? `${nav.index + 1}/${nav.files.length}` : undefined);
-            if (this.diffNav) this.diffNav.right = right;
-            this.updateDiffNavContext();
-          }
+          await this.openLogDiff(m.root, m.hash, m.parent, m.file, m.files);
           break;
         case 'checkout':
           await this.checkoutRef(m.ref, m.roots);
@@ -888,6 +882,26 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       }
     }
     await this.refresh(true);
+  }
+
+  /** 從記錄開 diff（雙擊右欄檔案）：files 為同一個 commit 的檔案，供 diff 標題列的 ← → 切換 */
+  async openLogDiff(root: string, hash: string, parent: string | undefined, file: ChangedFile, files?: ChangedFile[]): Promise<void> {
+    this.diffNav = files && files.length > 1 ? { root, hash, parent, files, index: files.findIndex((f) => f.path === file.path) } : undefined;
+    const nav = this.diffNav;
+    const right = await this.openDiff(root, hash, parent, file, undefined, nav && nav.index >= 0 ? `${nav.index + 1}/${nav.files.length}` : undefined);
+    if (this.diffNav) this.diffNav.right = right;
+    this.updateDiffNavContext();
+  }
+
+  /** 目前 Log 使用中的篩選（webview 套用後回報） */
+  get logFilter(): LogFilter {
+    return this.currentFilter;
+  }
+
+  /** 某個 repo 目前讀到的 ref 名稱與 HEAD（自動化測試確認重新整理） */
+  repoSnapshot(root: string): { head?: string; refs: string[] } | undefined {
+    const e = this.find(root);
+    return e ? { head: e.state?.head.hash, refs: e.state?.refs.map((r) => r.name) ?? [] } : undefined;
   }
 
   /** 對話框分頁的偏好（變更檔案的分組方式等） */

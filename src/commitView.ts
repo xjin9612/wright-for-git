@@ -56,6 +56,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   private readonly partial = new Map<string, Set<string>>();
   /** 最近一次狀態（逐段選取需要 hunk 總數時使用） */
   private partialCounts: Record<string, { selected: number; total: number }> = {};
+  /** 最近一次送給 webview 的狀態（自動化測試讀取） */
+  lastState: CommitState | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -180,7 +182,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     const counts: CommitState['partial'] = {};
     for (const [k, set] of this.partial) counts[k] = { selected: set.size, total: this.partialCounts[k]?.total ?? set.size };
     this.partialCounts = counts;
-    this.post({ type: 'commitState', state: { repos, changelists: store.lists, activeList: store.active, assign, partial: counts, showIgnored: this.showIgnored } });
+    this.lastState = { repos, changelists: store.lists, activeList: store.active, assign, partial: counts, showIgnored: this.showIgnored };
+    this.post({ type: 'commitState', state: this.lastState });
   }
 
   /** 標題列齒輪：打開提交視窗內的設定框 */
@@ -287,7 +290,8 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
 
   // ---------- 檔案操作 ----------
 
-  private async openDiff(root: string, c: WorkingChange): Promise<void> {
+  /** 雙擊變更：開啟「HEAD ↔ 工作區」diff（右邊是實際檔案，可直接編輯） */
+  async openDiff(root: string, c: WorkingChange): Promise<void> {
     const repo = this.provider.getRepository(root);
     if (!repo) return;
     const file = vscode.Uri.file(path.join(root, c.path));

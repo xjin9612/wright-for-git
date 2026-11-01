@@ -24,6 +24,19 @@ jobs:
       # UI 端對端測試（Playwright + Chromium；webview 與 git 都是真的，VS Code API 為模擬）
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
+      # 真實 VS Code 測試（@vscode/test-electron）；Linux 沒有畫面，用 xvfb 提供虛擬顯示器
+      - name: 真實 VS Code 測試
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:vscode
+      - name: 真實 VS Code 測試
+        if: runner.os == 'Windows'
+        run: npm run test:vscode
+      # 最低支援版本（package.json 的 engines.vscode）：抓出不小心用了新版才有的 API
+      - name: 真實 VS Code 測試（1.90.0）
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_VERSION: 1.90.0
       - run: npm run package
       - uses: actions/upload-artifact@v7
         if: matrix.os == 'ubuntu-latest'

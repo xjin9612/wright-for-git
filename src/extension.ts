@@ -9,8 +9,9 @@ import { stashChanges } from './stashView';
 import { initI18n, resetI18n, t } from './i18n';
 import { registerGitConsole } from './gitConsole';
 import { registerExplorerCommands } from './explorerCommands';
+import { createTestApi, type TestApi } from './testApi';
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export async function activate(context: vscode.ExtensionContext): Promise<TestApi> {
   initI18n(context);
   registerGitConsole(context);
   const gitPath = await resolveGitPath();
@@ -102,6 +103,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.window.setStatusBarMessage(on ? t('Git blame annotations off') : t('Git blame annotations on'), 2500);
     }),
   );
+  // 給自動化測試（test/vscode）讀取狀態用
+  return createTestApi(provider, () => commitView);
 }
 
 export function deactivate(): void {

@@ -7,6 +7,13 @@ import { setGitLogger, type GitCommandRecord } from './git/gitRunner';
 import { t } from './i18n';
 
 let channel: vscode.LogOutputChannel | undefined;
+/** 最近的寫入指令與失敗（自動化測試失敗時印出，方便判斷卡在哪一步） */
+const recent: string[] = [];
+const remember = (line: string) => {
+  recent.push(line);
+  if (recent.length > 40) recent.shift();
+};
+export const recentGitLog = (): readonly string[] => recent;
 
 /** 指令列顯示：含空白的參數加引號；參數很多（如一次加入數百個路徑）時截短 */
 export function formatCommand(args: readonly string[]): string {
@@ -38,6 +45,7 @@ function onEnd(r: GitCommandRecord): void {
     const out = indent(r.stderr);
     // 只讀取的指令失敗多半是預期中的查詢（例如檢查 MERGE_HEAD 是否存在），只在除錯層級顯示
     const log = r.readOnly ? channel.debug.bind(channel) : channel.error.bind(channel);
+    if (!r.readOnly) remember(`error ${head} ${formatCommand(r.args)}: ${r.stderr.trim().split('\n')[0] ?? ''}`);
     log(`${head} ${formatCommand(r.args)}\n    ${t('exit code {0}', String(r.exitCode))} · ${time} · ${r.cwd}${out ? `\n${out}` : ''}`);
     return;
   }
@@ -47,6 +55,7 @@ function onEnd(r: GitCommandRecord): void {
   }
   // push／fetch 等把結果寫到 stderr（如「To origin … main -> main」），一併顯示
   const out = indent(r.stderr);
+  remember(`ok ${head} ${formatCommand(r.args)}`);
   channel.info(`${head} ✓ ${r.args.find((a) => !a.startsWith('-')) ?? ''} (${time})${out ? `\n${out}` : ''}`);
 }
 

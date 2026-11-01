@@ -1,4 +1,4 @@
-// 建置腳本：extension（Node/CJS）、webview（瀏覽器/IIFE）、單元測試
+// 建置腳本：extension（Node/CJS）、webview（瀏覽器/IIFE）、單元測試、真實 VS Code 測試
 import * as esbuild from 'esbuild';
 import { readdirSync } from 'node:fs';
 
@@ -14,7 +14,15 @@ const common = {
 };
 
 /** @type {esbuild.BuildOptions[]} */
-const targets = args.has('--tests')
+const vscodeTests = [
+  // 真實 VS Code 自動化測試：啟動程式（Node）與在 VS Code 裡面執行的測試
+  { ...common, entryPoints: ['test/vscode/run.ts'], outfile: 'out/vscode/run.js', platform: 'node', format: 'cjs', target: 'node20', external: ['@vscode/test-electron'], sourcemap: true, minify: false },
+  { ...common, entryPoints: ['test/vscode/suite/index.ts'], outfile: 'out/vscode/suite/index.js', platform: 'node', format: 'cjs', target: 'node20', external: ['vscode'], sourcemap: true, minify: false },
+];
+
+const targets = args.has('--vscode-tests')
+  ? vscodeTests
+  : args.has('--tests')
   ? [{
       ...common,
       entryPoints: readdirSync('test').filter((f) => f.endsWith('.test.ts')).map((f) => `test/${f}`),
