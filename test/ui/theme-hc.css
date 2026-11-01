@@ -1,0 +1,14 @@
+--vscode-font-family: "Segoe UI", system-ui, sans-serif; --vscode-font-size: 13px;
+--vscode-editor-font-family: Consolas, "DejaVu Sans Mono", monospace;
+--vscode-foreground:#ffffff; --vscode-descriptionForeground:#ffffffb3; --vscode-panel-background:#000000; --vscode-panel-border:#6fc3df;
+--vscode-contrastBorder:#6fc3df; --vscode-contrastActiveBorder:#f38518;
+--vscode-input-background:#000000; --vscode-input-foreground:#ffffff; --vscode-input-border:#6fc3df; --vscode-input-placeholderForeground:#ffffffb3;
+--vscode-focusBorder:#f38518; --vscode-list-focusOutline:#f38518; --vscode-icon-foreground:#ffffff;
+--vscode-gitDecoration-addedResourceForeground:#a1e3ad; --vscode-gitDecoration-modifiedResourceForeground:#e2c08d; --vscode-gitDecoration-deletedResourceForeground:#c74e39;
+--vscode-gitDecoration-untrackedResourceForeground:#73c991; --vscode-gitDecoration-ignoredResourceForeground:#a7a8a9; --vscode-gitDecoration-conflictingResourceForeground:#c74e39;
+--vscode-charts-green:#89d185; --vscode-charts-orange:#d18616; --vscode-charts-red:#f14c4c; --vscode-charts-purple:#b180d7; --vscode-charts-yellow:#ffd700;
+--vscode-textLink-foreground:#21a6ff; --vscode-quickInput-background:#000000; --vscode-widget-border:#6fc3df; --vscode-progressBar-background:#6fc3df;
+--vscode-editorWidget-background:#0c141f; --vscode-editorWidget-foreground:#ffffff; --vscode-editorWidget-border:#6fc3df; --vscode-editor-background:#000000;
+--vscode-button-background:#000000; --vscode-button-foreground:#ffffff; --vscode-button-border:#6fc3df; --vscode-button-secondaryForeground:#ffffff;
+--vscode-badge-background:#000000; --vscode-badge-foreground:#ffffff; --vscode-dropdown-background:#000000; --vscode-dropdown-border:#6fc3df; --vscode-dropdown-foreground:#ffffff;
+--vscode-editorWarning-foreground:#ffd370;

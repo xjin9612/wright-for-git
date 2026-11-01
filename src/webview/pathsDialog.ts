@@ -66,7 +66,7 @@ export function openPathsDialog(opts: PathsDialogOptions): void {
   const filterInput = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: t('Filter folders'), spellcheck: 'false' } });
   const list = el('div', { className: 'tree paths-tree', attrs: { tabindex: '0' } });
   const ok = el('button', { className: 'button primary', text: t('OK'), attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
   const clearBtn = el('button', { className: 'button secondary', text: t('Clear'), attrs: { type: 'button' } });
 
   /** 祖先（含 repo 本身）是否已勾選：子資料夾顯示為已勾選且不可單獨取消 */

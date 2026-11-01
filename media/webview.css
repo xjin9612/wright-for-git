@@ -24,27 +24,10 @@
   --st-untracked: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
   --st-ignored: var(--vscode-gitDecoration-ignoredResourceForeground, #8c8c8c);
 
-  /* Conventional Commits 類型色 */
-  --cc-feat: #73bd79;
-  --cc-fix: #e5a05b;
-  --cc-docs: #70aeff;
-  --cc-refactor: #c48ae6;
-  --cc-perf: #dcc35c;
-  --cc-test: #4fc1c1;
-  --cc-style: #e48ab8;
-  --cc-chore: #9aa0a8;
-  --cc-revert: #f07178;
-}
-body.vscode-light, body.vscode-high-contrast-light {
-  --cc-feat: #1d7d2a;
-  --cc-fix: #b25400;
-  --cc-docs: #1e5fc2;
-  --cc-refactor: #7b2fa8;
-  --cc-perf: #8a6d00;
-  --cc-test: #00796b;
-  --cc-style: #ad1457;
-  --cc-chore: #6b6f76;
-  --cc-revert: #c62828;
+  /* Conventional Commits：只有新功能、修正、還原有顏色，其餘類型用次要文字色（顏色只留給有意義的地方） */
+  --cc-feat: var(--vscode-charts-green, #89d185);
+  --cc-fix: var(--vscode-charts-orange, #d18616);
+  --cc-revert: var(--vscode-charts-red, #f14c4c);
 }
 
 * { box-sizing: border-box; }
@@ -100,13 +83,13 @@ button { font: inherit; color: inherit; }
 
 .search-box {
   display: flex; align-items: center; gap: 2px; height: 26px; padding: 0 4px;
-  border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 3px;
+  border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 2px;
   background: var(--vscode-input-background); color: var(--muted);
 }
 .search-box:focus-within { border-color: var(--vscode-focusBorder); }
 
 .toggle-button {
-  height: 20px; min-width: 22px; padding: 0 4px; border: 1px solid transparent; border-radius: 3px;
+  height: 20px; min-width: 22px; padding: 0 4px; border: 1px solid transparent; border-radius: 2px;
   background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-family: var(--vscode-editor-font-family, monospace);
 }
 .toggle-button:hover { background: var(--vscode-inputOption-hoverBackground, var(--hover)); }
@@ -164,7 +147,7 @@ button { font: inherit; color: inherit; }
 .log-search { width: 280px; min-width: 140px; flex: 0 1 280px; }
 
 .chip {
-  display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 6px; border-radius: 3px;
+  display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 6px; border-radius: 4px;
   color: var(--muted); cursor: pointer; white-space: nowrap; max-width: 260px; flex: none;
 }
 .chip:hover, .chip.open { background: var(--hover); }
@@ -189,7 +172,7 @@ button { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--border);
 }
 .log-hint {
-  flex: none; display: flex; align-items: center; gap: 8px; padding: 3px 8px; font-size: 0.92em; white-space: nowrap; overflow: hidden;
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 0.92em; white-space: nowrap; overflow: hidden;
   background: var(--vscode-editorInfo-background, rgba(55, 148, 255, 0.1));
   border-bottom: 1px solid var(--border);
 }
@@ -203,9 +186,11 @@ button { font: inherit; color: inherit; }
 .log-spacer { width: 1px; }
 .log-rows { position: absolute; top: 0; left: 0; right: 0; }
 .log-overlay {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   color: var(--muted); pointer-events: none; padding: 16px; text-align: center; white-space: pre-wrap;
 }
+.log-overlay br { display: none; }
+.log-overlay-action { pointer-events: auto; }
 
 .log-row {
   position: absolute; left: 0; right: 0; top: 0; height: var(--row-h);
@@ -220,16 +205,11 @@ button { font: inherit; color: inherit; }
 
 .cc-type { font-weight: 600; }
 .cc-scope, .cc-colon { color: var(--muted); }
-.cc-breaking { color: var(--cc-revert); font-weight: 700; }
+.cc-breaking { color: var(--cc-revert); font-weight: 600; }
 .cc-feat { color: var(--cc-feat); }
 .cc-fix { color: var(--cc-fix); }
-.cc-docs { color: var(--cc-docs); }
-.cc-refactor { color: var(--cc-refactor); }
-.cc-perf { color: var(--cc-perf); }
-.cc-test { color: var(--cc-test); }
-.cc-style { color: var(--cc-style); }
-.cc-build, .cc-ci, .cc-chore { color: var(--cc-chore); }
 .cc-revert { color: var(--cc-revert); }
+.cc-docs, .cc-refactor, .cc-perf, .cc-test, .cc-style, .cc-build, .cc-ci, .cc-chore { color: var(--muted); }
 .log-viewport:focus .log-row.selected .cc-type,
 .log-viewport:focus .log-row.selected .cc-scope,
 .log-viewport:focus .log-row.selected .cc-colon { color: inherit; }
@@ -295,11 +275,11 @@ button { font: inherit; color: inherit; }
 .picker { padding: 6px; gap: 4px; }
 .picker-input {
   resize: none; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background);
-  border: 1px solid var(--vscode-focusBorder); border-radius: 3px; padding: 3px 6px; outline: none;
+  border: 1px solid var(--vscode-focusBorder); border-radius: 2px; padding: 4px 6px; outline: none;
 }
 .picker-hint { color: var(--muted); font-size: 0.88em; padding: 0 2px 2px; }
 .picker-list { overflow: auto; min-height: 0; flex: 1; }
-.picker-item { display: flex; align-items: center; gap: 6px; height: var(--row-h); padding: 0 6px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+.picker-item { display: flex; align-items: center; gap: 6px; height: var(--row-h); padding: 0 6px; border-radius: 2px; cursor: pointer; white-space: nowrap; }
 .picker-item:hover, .picker-item.active { background: var(--vscode-quickInputList-focusBackground, var(--hover)); color: var(--vscode-quickInputList-focusForeground, inherit); }
 .picker-check { width: 16px; display: inline-flex; flex: none; }
 .picker-value { overflow: hidden; text-overflow: ellipsis; }
@@ -346,7 +326,7 @@ button { font: inherit; color: inherit; }
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background, var(--vscode-panel-background)));
   color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
   border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, transparent));
-  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.4)); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.4)); border-radius: 6px; overflow: hidden;
 }
 .push-header { padding: 8px 12px; font-weight: 600; border-bottom: 1px solid var(--vscode-panel-border, var(--border)); flex: none; }
 .push-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
@@ -355,7 +335,7 @@ button { font: inherit; color: inherit; }
 .push-files-title { padding: 6px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
 .push-files { overflow: auto; flex: 1; }
 .push-files .tree-row { padding-left: 10px; }
-.push-repo { display: flex; align-items: center; gap: 5px; min-height: 26px; padding: 0 10px; white-space: nowrap; }
+.push-repo { display: flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 10px; white-space: nowrap; }
 .push-repo input[type="checkbox"] { margin: 0 2px 0 0; }
 .push-repo-name { font-weight: 600; margin-right: 4px; }
 .push-source.hash { font-family: var(--vscode-editor-font-family); }
@@ -370,7 +350,7 @@ select.push-remote {
 }
 .push-branch:hover { border-color: var(--vscode-input-border, var(--border)); }
 .push-branch:focus { outline: none; border-color: var(--vscode-focusBorder); background: var(--vscode-input-background); color: var(--vscode-input-foreground); }
-.push-badge { font-size: 0.85em; padding: 0 5px; border-radius: 8px; border: 1px solid var(--vscode-badge-background); color: var(--muted); }
+.push-badge { font-size: 0.85em; padding: 0 6px; border-radius: 8px; border: 1px solid var(--vscode-badge-background); color: var(--muted); }
 .push-badge.new { background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
 .push-warning { display: flex; align-items: flex-start; gap: 6px; padding: 2px 10px 4px 34px; color: var(--vscode-editorWarning-foreground, #cca700); white-space: normal; }
 .warning-text { overflow: hidden; text-overflow: ellipsis; }
@@ -431,7 +411,7 @@ select.push-remote {
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background, var(--vscode-panel-background)));
   color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
   border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, transparent));
-  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.4)); border-radius: 4px; overflow: hidden;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.4)); border-radius: 6px; overflow: hidden;
 }
 .confirm-body { display: flex; gap: 12px; padding: 16px 16px 8px; min-height: 0; overflow: auto; }
 .confirm-icon { flex: none; line-height: 0; }
@@ -474,7 +454,7 @@ body.dialog-page { overflow: hidden; }
 
 /* ---------- 逐段選取 ---------- */
 .hunks-list { flex: 1; min-height: 0; overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 10px; }
-.hunk { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.hunk { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
 .hunk.excluded .hunk-body { opacity: 0.45; }
 .hunk-head { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--vscode-editorGroupHeader-tabsBackground, rgba(128, 128, 128, 0.1)); cursor: pointer; }
 .hunk-range { font-family: var(--vscode-editor-font-family); color: var(--vscode-textLink-foreground); }
@@ -491,7 +471,7 @@ body.dialog-page { overflow: hidden; }
 /* ---------- 提交視窗 ---------- */
 .commit-app { display: flex; flex-direction: column; height: 100vh; }
 .commit-tabs { display: flex; gap: 2px; padding: 4px 6px 0; flex: none; }
-.commit-tab { background: transparent; border: none; padding: 3px 10px; border-radius: 3px; cursor: pointer; color: var(--muted); }
+.commit-tab { background: transparent; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; color: var(--muted); }
 .commit-tab.active { background: var(--vscode-toolbar-activeBackground, var(--hover)); color: var(--vscode-foreground); }
 .commit-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .commit-toolbar { flex: none; }
@@ -499,8 +479,8 @@ body.dialog-page { overflow: hidden; }
 .commit-tree .tree-row.focused { outline: 1px solid var(--vscode-list-focusOutline, var(--vscode-focusBorder)); outline-offset: -1px; }
 .commit-check { margin: 0 4px 0 0; flex: none; }
 .commit-section { font-weight: 600; }
-.active-list { font-weight: 700; }
-.commit-partial { font-size: 0.85em; padding: 0 5px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-left: 6px; flex: none; }
+.active-list { font-weight: 600; }
+.commit-partial { font-size: 0.85em; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); margin-left: 6px; flex: none; }
 .commit-bottom { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 8px; min-height: 120px; }
 .commit-amend-row { display: flex; align-items: center; }
 .commit-summary { font-size: 0.9em; }
@@ -514,11 +494,11 @@ body.dialog-page { overflow: hidden; }
 .stash-files-pane { flex: 1 1 50%; min-height: 60px; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
 .stash-files { flex: 1; overflow: auto; }
 .stash-repo { font-weight: 600; }
-.toolbar-sep-h { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+.toolbar-sep-h { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 
 /* ---------- 進行中的 rebase／merge ---------- */
 .log-ops { flex: none; display: flex; flex-direction: column; border-bottom: 1px solid var(--border); background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12)); }
-.log-op { display: flex; align-items: center; gap: 10px; padding: 3px 8px; font-size: 0.92em; }
+.log-op { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 0.92em; }
 .log-op .icon { color: var(--vscode-editorWarning-foreground, #cca700); }
 
 /* ---------- 互動式 rebase ---------- */
@@ -553,3 +533,7 @@ body.dialog-page { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .progress.active::after { animation: none; left: 0; width: 100%; opacity: 0.5; }
 }
+
+/* Windows：主要按鈕在左、取消在右 */
+.os-windows .dialog-cancel { order: 1; }
+.empty-text .link { display: inline-block; margin-top: 4px; }

@@ -208,13 +208,23 @@ test('鍵盤：Shift+F10 開右鍵選單，方向鍵移動、Enter 執行、Esc 
   assert.equal(await page.locator('.context-menu').count(), 0);
   await page.keyboard.press('Shift+F10');
   await page.keyboard.press('End');
-  assert.notEqual(await page.locator('.context-menu .menu-item.active').innerText(), 'Copy Revision Number');
+  assert.doesNotMatch(await page.locator('.context-menu .menu-item.active .menu-label').innerText(), /^Copy Revision/);
   await page.keyboard.press('Home');
-  assert.equal(await page.locator('.context-menu .menu-item.active').innerText(), 'Copy Revision Number');
+  assert.equal(await page.locator('.context-menu .menu-item.active .menu-label').innerText(), 'Copy Revision Number');
+  assert.equal(await page.locator('.context-menu .menu-item.active .menu-key').innerText(), 'Ctrl+C');
   await page.keyboard.press('Enter');
   const hash = h.git(`${pg}/api-server`, 'log', '-1', '--format=%H', '--grep=add API keys');
   await h.until(() => app.calls.clipboard === hash);
   assert.equal(await page.locator('.context-menu').count(), 0);
+});
+
+test('沒有符合的 commit：提示並可一鍵清除篩選', async () => {
+  await search('no-such-commit-xyz');
+  assert.match(await page.locator('.log-overlay').innerText(), /No commits matching filters/);
+  await page.locator('.log-overlay-action', { hasText: 'Clear filters' }).click();
+  await settle();
+  assert.equal(await page.locator('.log-search input').inputValue(), '');
+  assert.ok((await subjects()).length > 20);
 });
 
 test('變更檔案列尾顯示狀態字母', async () => {

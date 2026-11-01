@@ -95,7 +95,7 @@ class PushDialog {
       const r = this.caretButton.getBoundingClientRect();
       showMenu(r.right - 200, r.bottom + 2, [{ label: t('Force Push (with lease)…'), disabled: !this.canPush(), action: () => this.confirm(true) }]);
     });
-    const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+    const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => this.close());
 
     const title = opts.upTo ? t('Push Commits up to {0}', opts.upTo.hash.slice(0, 8)) : opts.branch ? t('Push {0}', opts.branch) : t('Push Commits');

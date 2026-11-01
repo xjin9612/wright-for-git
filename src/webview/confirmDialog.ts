@@ -32,7 +32,7 @@ function next(): void {
   const iconBox = el('span', { className: `confirm-icon ${m.kind}` });
   iconBox.innerHTML = `<svg viewBox="0 0 16 16" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${ICONS[m.kind]}</svg>`;
   const ok = el('button', { className: `button ${m.kind === 'danger' ? 'danger' : 'primary'}`, text: m.ok, attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: m.cancel, attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary dialog-cancel', text: m.cancel, attrs: { type: 'button' } });
   const dialog = el(
     'div',
     { className: 'confirm-dialog', attrs: { role: 'alertdialog', 'aria-modal': 'true', 'aria-label': m.message } },

@@ -436,7 +436,12 @@ function render(): void {
     return;
   }
   if (rows.length === 0 || rows.every((r) => r.kind === 'section' && r.files.length === 0)) {
-    tree.append(el('div', { className: 'empty-text', text: t('No local changes') }));
+    const refreshLink = el('a', { className: 'link', text: t('Refresh'), attrs: { href: '#' } });
+    refreshLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      post({ type: 'commitRefresh', showIgnored: ui.showIgnored });
+    });
+    tree.append(el('div', { className: 'empty-text' }, t('No local changes'), el('br'), refreshLink));
   }
   const frag = document.createDocumentFragment();
   for (const r of rows) frag.append(renderRow(r));
@@ -586,7 +591,7 @@ function showRowMenu(r: Row, x: number, y: number): void {
     );
   }
   menu.push(
-    { label: t('Show Diff'), disabled: !single || single.change.kind === 'ignored', action: () => single && post({ type: 'commitDiff', root: single.root, change: single.change }) },
+    { label: t('Show Diff'), keybinding: 'Enter', disabled: !single || single.change.kind === 'ignored', action: () => single && post({ type: 'commitDiff', root: single.root, change: single.change }) },
     { label: t('Open File'), disabled: !single || single.change.status === 'D', action: () => single && post({ type: 'commitOpenFile', root: single.root, path: single.change.path }) },
     {
       label: t('Select Changes to Commit…'),
@@ -763,7 +768,14 @@ const stash = (() => {
   function render(): void {
     clear(list);
     const all = repos.filter((r) => r.stashes.length > 0);
-    if (all.length === 0) list.append(el('div', { className: 'empty-text', text: t('No stashes') }));
+    if (all.length === 0) {
+      const stashLink = el('a', { className: 'link', text: t('Stash Changes…'), attrs: { href: '#' } });
+      stashLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        post({ type: 'stashSave' });
+      });
+      list.append(el('div', { className: 'empty-text' }, t('No stashes'), el('br'), stashLink));
+    }
     const multi = repos.length > 1;
     for (const r of all) {
       if (multi) list.append(el('div', { className: 'tree-row stash-repo' }, icon('repo'), el('span', { className: 'tree-label', text: r.name }), el('span', { className: 'tree-count', text: String(r.stashes.length) })));

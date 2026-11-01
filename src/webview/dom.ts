@@ -68,6 +68,12 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
+// Windows 的對話框慣例是主要按鈕在左、取消在右（與 VS Code 相同）；macOS／Linux 為取消在左
+if (typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)) document.documentElement.classList.add('os-windows');
+
+/** 目前平台的修飾鍵名稱（快捷鍵提示用） */
+export const MOD_KEY = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+';
+
 export function icon(name: IconName, className = ''): HTMLSpanElement {
   const span = document.createElement('span');
   span.className = `icon ${className}`.trim();

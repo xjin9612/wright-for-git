@@ -4,7 +4,7 @@ import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type 
 import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
 import { DetailsPane, type FileGrouping } from './detailsPane';
-import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, showMenu, type MenuItem } from './dom';
+import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, MOD_KEY, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
 import { showConfirm } from './confirmDialog';
 import { setIssueLinkRules } from './issueLinks';
@@ -521,7 +521,7 @@ function openDateRange(): void {
   if (isDay(ui.filter.since)) from.value = dayOf(ui.filter.since);
   if (isDay(ui.filter.until)) to.value = dayOf(ui.filter.until);
   const apply = el('button', { className: 'button primary', text: t('Apply'), attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
   const box = el(
     'div',
     { className: 'date-range context-menu', attrs: { role: 'dialog', 'aria-label': t('Select period') } },
@@ -796,7 +796,7 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
     table.releaseScroll();
     setWarnings(m.warnings);
     if (commits.length === 0) {
-      table.setMessage(hasActiveFilter() ? t('No commits matching filters') : t('No commits'));
+      table.setMessage(hasActiveFilter() ? t('No commits matching filters') : t('No commits'), hasActiveFilter() ? { label: t('Clear filters'), run: () => clearAllFilters() } : undefined);
       details.renderEmpty(t('No commit selected'));
     } else if (table.selectedIndex < 0) {
       pendingSelect = undefined;
@@ -809,6 +809,13 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
       table.select(headIdx ?? 0, true, 'center');
     }
   }
+}
+
+/** 清除所有篩選（沒有符合的 commit 時的「清除篩選」） */
+function clearAllFilters(): void {
+  searchInput.value = '';
+  applyText.cancel();
+  setFilter({ text: '', users: [], branches: [], paths: [], roots: [], pathsByRoot: undefined, since: undefined, until: undefined });
 }
 
 function hasActiveFilter(): boolean {
@@ -851,7 +858,7 @@ function showContextMenu(index: number, x: number, y: number): void {
   if (!c || !root) return;
   const act = (action: CommitAction) => () => post({ type: 'commitAction', action, root, hash: c.hash, parents: c.parents, subject: c.subject });
   showMenu(x, y, [
-    { label: t('Copy Revision Number'), action: () => post({ type: 'copy', text: c.hash }) },
+    { label: t('Copy Revision Number'), keybinding: `${MOD_KEY}C`, action: () => post({ type: 'copy', text: c.hash }) },
     { label: t('Copy Subject'), action: () => post({ type: 'copy', text: c.subject }) },
     '-',
     { label: t('Checkout Revision…'), action: () => post({ type: 'checkoutRevision', root, hash: c.hash }) },

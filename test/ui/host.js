@@ -9,7 +9,13 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DIST = path.join(ROOT, 'dist');
-const THEME = fs.readFileSync(path.join(__dirname, 'theme-dark.css'), 'utf8');
+/** 主題：dark（預設）、light、hc（高對比）；CSS 變數取近似 VS Code 內建主題的值 */
+const THEMES = {
+  dark: { css: 'theme-dark.css', body: 'vscode-dark' },
+  light: { css: 'theme-light.css', body: 'vscode-light' },
+  hc: { css: 'theme-hc.css', body: 'vscode-high-contrast' },
+};
+let theme = THEMES.dark;
 
 // ---------- 假的 vscode 模組 ----------
 
@@ -316,8 +322,8 @@ function remotePush(playground, repo) {
 
 // ---------- webview 頁面 ----------
 
-const pageHtml = (script, extraHead) => `<!DOCTYPE html><html><head><style>:root{${THEME}}</style><style>${fs.readFileSync(path.join(ROOT, 'media', 'webview.css'), 'utf8')}</style></head>
-<body class="vscode-dark"><div id="app"></div>${extraHead}<script>
+const pageHtml = (script, extraHead) => `<!DOCTYPE html><html><head><style>:root{${fs.readFileSync(path.join(__dirname, theme.css), 'utf8')}}</style><style>${fs.readFileSync(path.join(ROOT, 'media', 'webview.css'), 'utf8')}</style></head>
+<body class="${theme.body}"><div id="app"></div>${extraHead}<script>
 let __s = null; window.acquireVsCodeApi = () => ({ postMessage: (m) => window.__host(m), getState: () => __s, setState: (s) => { __s = s; } });
 </script><script>${fs.readFileSync(path.join(DIST, script), 'utf8')}</script></body></html>`;
 
@@ -371,11 +377,12 @@ async function attachWebviewView(browser, provider, script, viewport) {
 /**
  * 啟動 extension 與 Log 面板。
  * @param {string} workspace playground 路徑
- * @param {{ config?: Record<string, unknown>, language?: string, width?: number, height?: number }} [opts]
+ * @param {{ config?: Record<string, unknown>, language?: string, width?: number, height?: number, theme?: 'dark' | 'light' | 'hc' }} [opts]
  */
 async function launch(workspace, opts = {}) {
   const { chromium } = require('playwright');
   resetCalls();
+  theme = THEMES[opts.theme ?? 'dark'];
   Object.assign(calls.config, opts.config ?? {});
   vscode.env.language = opts.language ?? 'en';
   vscode.workspace.workspaceFolders = [{ uri: Uri.file(workspace), name: path.basename(workspace), index: 0 }];

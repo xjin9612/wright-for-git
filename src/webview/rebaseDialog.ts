@@ -40,7 +40,7 @@ export function openRebaseDialog(args: { root: string; base: string; branch?: st
   const msgPane = el('div', { className: 'rebase-message-pane hidden' }, el('div', { className: 'muted', text: t('New commit message') }), msgBox);
   const warn = el('div', { className: 'push-warning rebase-warning' });
   const start = el('button', { className: 'button primary', text: t('Start Rebasing'), attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
   const reset = el('button', { className: 'button secondary', text: t('Reset'), attrs: { type: 'button' } });
   const actionButtons = ACTIONS.map(({ action, key }) => {
     const b = el('button', { className: 'button secondary rebase-action', text: LABEL[action](), title: `${LABEL[action]()} (${key.toUpperCase()})`, attrs: { type: 'button' } });

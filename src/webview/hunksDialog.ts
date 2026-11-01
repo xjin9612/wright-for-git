@@ -9,7 +9,7 @@ export function openHunksDialog(args: { root: string; path: string; hunks: DiffH
   const list = el('div', { className: 'hunks-list' });
   const summary = el('span', { className: 'muted' });
   const apply = el('button', { className: 'button primary', text: t('Apply'), attrs: { type: 'button' } });
-  const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+  const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
   const all = el('button', { className: 'button secondary', text: t('Select All'), attrs: { type: 'button' } });
   const none = el('button', { className: 'button secondary', text: t('Select None'), attrs: { type: 'button' } });
   const boxes: HTMLInputElement[] = [];

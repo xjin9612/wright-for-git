@@ -61,7 +61,7 @@ class UnstashDialog {
     this.clearButton.addEventListener('click', () => {
       if (this.root) post({ type: 'unstashClear', root: this.root });
     });
-    const cancel = el('button', { className: 'button secondary', text: t('Cancel'), attrs: { type: 'button' } });
+    const cancel = el('button', { className: 'button secondary dialog-cancel', text: t('Cancel'), attrs: { type: 'button' } });
     cancel.addEventListener('click', () => post({ type: 'closeDialog' }));
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !document.querySelector('.confirm-dialog')) post({ type: 'closeDialog' });

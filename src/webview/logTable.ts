@@ -22,6 +22,10 @@ const EMPTY_MODEL: GraphModel = new MultiGraph(true);
 
 /** lane 顏色（深淺主題皆可辨識） */
 const PALETTE = ['#5FB950', '#D99A3D', '#4C9AEB', '#C674D9', '#E06666', '#3DBDBD', '#C9B53D', '#8C8CF0', '#E07FB0', '#7DB86B'];
+/** 淺色主題用較深的同色系，白底上才看得清楚 */
+const PALETTE_LIGHT = ['#2E8B2E', '#B06A00', '#1F6FD1', '#9A3FB5', '#C23B3B', '#00838A', '#8A7400', '#5A5AD6', '#B8417D', '#4F8A3A'];
+const REPO_COLORS_LIGHT = ['#1F6FD1', '#B06A00', '#2E8B2E', '#9A3FB5', '#00838A', '#B8417D', '#8A7400', '#C23B3B', '#5A5AD6', '#6B6F76'];
+const isLightTheme = () => document.body.classList.contains('vscode-light') || document.body.classList.contains('vscode-high-contrast-light');
 
 export interface Columns {
   author: boolean;
@@ -289,8 +293,17 @@ export class LogTable {
     this.schedule();
   }
 
-  setMessage(text: string | undefined): void {
+  /** 表格中間的提示文字；action 為提示下方的連結（如「清除篩選」） */
+  setMessage(text: string | undefined, action?: { label: string; run: () => void }): void {
     this.overlay.textContent = text ?? '';
+    if (text && action) {
+      const link = el('a', { className: 'link log-overlay-action', text: action.label, attrs: { href: '#' } });
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        action.run();
+      });
+      this.overlay.append(el('br'), link);
+    }
     this.overlay.classList.toggle('hidden', !text);
   }
 
@@ -553,7 +566,8 @@ export class LogTable {
     ctx.lineCap = 'round';
 
     const x = (repo: number, lane: number) => graphLeft + GRAPH_PAD + ((frame.offsets.get(repo) ?? 0) + lane) * LANE_WIDTH + LANE_WIDTH / 2;
-    const color = (i: number) => PALETTE[i % PALETTE.length];
+    const palette = isLightTheme() ? PALETTE_LIGHT : PALETTE;
+    const color = (i: number) => palette[i % palette.length];
     const line = (c: number, x0: number, y0: number, x1: number, y1: number) => {
       ctx.strokeStyle = color(c);
       ctx.beginPath();
@@ -573,7 +587,8 @@ export class LogTable {
       const mid = y0 + ROW_HEIGHT / 2;
       const y1 = y0 + ROW_HEIGHT;
       if (multi) {
-        ctx.fillStyle = REPO_COLORS[repo % REPO_COLORS.length];
+        const repoColors = isLightTheme() ? REPO_COLORS_LIGHT : REPO_COLORS;
+        ctx.fillStyle = repoColors[repo % repoColors.length];
         if (this.repoNames) {
           // 名稱欄：同 repo 連續的列合成一塊，名稱寫在這一塊的第一列
           ctx.globalAlpha = 0.35;
