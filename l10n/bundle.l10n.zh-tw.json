@@ -480,5 +480,12 @@
   "Optimizing repositories…": "正在最佳化儲存庫…",
   "Could not optimize: {0}": "無法最佳化：{0}",
   "Optimized {0} repositories. Your git is older than 2.27, so path filters are not sped up.": "已最佳化 {0} 個儲存庫。你的 git 版本早於 2.27，路徑篩選不會變快。",
-  "Optimized {0} repositories.": "已最佳化 {0} 個儲存庫。"
+  "Optimized {0} repositories.": "已最佳化 {0} 個儲存庫。",
+  "Collapse Linear Branches": "收合線性分支",
+  "Expand Linear Branches": "展開線性分支",
+  "Collapse Linear Branch": "收合這段線性分支",
+  "Expand Linear Branch": "展開這段線性分支",
+  "Click to expand": "點一下展開",
+  "{0} commit is collapsed. Click the row or press Enter to expand it.": "已收起 {0} 個 commit。點這一列或按 Enter 展開。",
+  "{0} commits are collapsed. Click the row or press Enter to expand them.": "已收起 {0} 個 commit。點這一列或按 Enter 展開。"
 }

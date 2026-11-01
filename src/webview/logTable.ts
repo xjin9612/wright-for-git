@@ -1,9 +1,10 @@
 // 中欄表格：虛擬捲動 + Canvas 畫 commit graph
 import type { CommitInfo, HeadInfo, RefInfo, RepoState } from '../shared/protocol';
+import type { CollapsedRow } from '../shared/collapse';
 import { MultiGraph, type FrameLayout, type GraphModel } from '../shared/multiGraph';
 import { buildLabels, type RefLabel } from '../shared/refs';
 import { el, formatDate, icon, isContextMenuKey, openContextMenuFor } from './dom';
-import { t } from './l10n';
+import { plural, t } from './l10n';
 
 export const ROW_HEIGHT = 22;
 const LANE_WIDTH = 14;
@@ -26,6 +27,17 @@ const PALETTE = ['#5FB950', '#D99A3D', '#4C9AEB', '#C674D9', '#E06666', '#3DBDBD
 const PALETTE_LIGHT = ['#2E8B2E', '#B06A00', '#1F6FD1', '#9A3FB5', '#C23B3B', '#00838A', '#8A7400', '#5A5AD6', '#B8417D', '#4F8A3A'];
 const REPO_COLORS_LIGHT = ['#1F6FD1', '#B06A00', '#2E8B2E', '#9A3FB5', '#00838A', '#B8417D', '#8A7400', '#C23B3B', '#5A5AD6', '#6B6F76'];
 const isLightTheme = () => document.body.classList.contains('vscode-light') || document.body.classList.contains('vscode-high-contrast-light');
+
+/** 表格中的一列：commit，或收起來的一段（collapsed 有值時） */
+export type LogRow = CommitInfo & { collapsed?: CollapsedRow };
+
+/** 收合列到它下端之間以虛線畫的範圍（列索引） */
+interface DashRange {
+  repo: number;
+  from: number;
+  to: number;
+  color?: number;
+}
 
 export interface Columns {
   author: boolean;
@@ -58,6 +70,10 @@ export interface LogTableCallbacks {
   onRepoNamesChange?: (show: boolean) => void;
   /** 拖曳調整欄寬結束 */
   onColumnWidths?: (widths: ColumnWidths) => void;
+  /** 點收合列（展開），或點可收合 commit 的分支線（收合） */
+  onToggleCollapse?: (index: number) => void;
+  /** 這一列是否在可收合的段落中（點它的分支線會收合） */
+  canCollapse?: (index: number) => boolean;
 }
 
 export interface ColumnWidths {
@@ -88,7 +104,12 @@ export class LogTable {
   private readonly overlay: HTMLDivElement;
   private pool: RowView[] = [];
 
-  private commits: CommitInfo[] = [];
+  private commits: LogRow[] = [];
+  /** graph 用的 parent（收合後上端改接收合列）；沒有的列用 commit 本身的 parents */
+  private graphParents: ReadonlyMap<string, readonly string[]> = new Map();
+  private dashRanges: DashRange[] = [];
+  /** 最近一次繪製的 graph 版面（點擊分支線時換算位置） */
+  private lastFrame: { first: number; frame: FrameLayout; graphLeft: number } | undefined;
   private graph: GraphModel = EMPTY_MODEL;
   /** key = `${repo}:${hash}` */
   private refsByKey = new Map<string, RefInfo[]>();
@@ -145,6 +166,12 @@ export class LogTable {
         this.cb.onRepoNamesChange?.(this.repoNames);
         return;
       }
+      // 點收合列：展開；點可收合 commit 的分支線（節點所在的 lane 上）：收合
+      if (e.button === 0 && !e.shiftKey && !e.ctrlKey && !e.metaKey && (this.commits[idx]?.collapsed || this.onBranchLine(idx, e.clientX))) {
+        e.preventDefault();
+        this.cb.onToggleCollapse?.(idx);
+        return;
+      }
       // 右鍵點在已選取的列上：保留多選（右鍵選單作用於整個選取）
       if (e.button !== 0 && this.isSelected(idx)) return;
       if (e.button === 0 && e.shiftKey) {
@@ -164,6 +191,16 @@ export class LogTable {
       this.cb.onContextMenu(idx, e.clientX, e.clientY);
     });
     this.applyColumns();
+  }
+
+  /** 點的位置是否在這一列節點所在的分支線上，且這一列可以收合 */
+  private onBranchLine(idx: number, clientX: number): boolean {
+    const f = this.lastFrame;
+    if (!f || !this.cb.canCollapse?.(idx)) return false;
+    const fr = f.frame.rows[idx - f.first];
+    if (!fr) return false;
+    const x = f.graphLeft + GRAPH_PAD + ((f.frame.offsets.get(fr.repo) ?? 0) + fr.row.col) * LANE_WIDTH + LANE_WIDTH / 2;
+    return Math.abs(clientX - this.rowsLayer.getBoundingClientRect().left - x) <= LANE_WIDTH / 2;
   }
 
   setRepoNames(show: boolean): void {
@@ -282,10 +319,19 @@ export class LogTable {
     this.heldScroll = undefined;
   }
 
-  setData(commits: CommitInfo[], graph: GraphModel): void {
+  setData(commits: LogRow[], graph: GraphModel, graphParents: ReadonlyMap<string, readonly string[]> = new Map()): void {
     if (commits !== this.commits || commits.length < this.indexByKey.size) this.indexByKey = new Map();
     for (let i = this.indexByKey.size; i < commits.length; i++) this.indexByKey.set(`${commits[i].repo}:${commits[i].hash}`, i);
     this.commits = commits;
+    this.graphParents = graphParents;
+    this.dashRanges = [];
+    if (graphParents.size > 0) {
+      commits.forEach((c, i) => {
+        const to = c.collapsed ? this.indexByKey.get(`${c.repo}:${c.collapsed.last}`) : undefined;
+        if (c.collapsed) this.dashRanges.push({ repo: c.repo, from: i, to: to ?? i });
+      });
+    }
+    for (const v of this.pool) v.index = -1;
     if (this.selected >= 0) this.computePath();
     this.graph = graph;
     this.spacer.style.height = `${commits.length * ROW_HEIGHT}px`;
@@ -319,7 +365,7 @@ export class LogTable {
     while (i !== undefined && !this.pathRows.has(i)) {
       this.pathRows.add(i);
       const c: CommitInfo | undefined = this.commits[i];
-      const parent: string | undefined = c?.parents[0];
+      const parent: string | undefined = c ? (this.graphParents.get(`${c.repo}:${c.hash}`) ?? c.parents)[0] : undefined;
       i = parent ? this.indexByKey.get(`${c.repo}:${parent}`) : undefined;
     }
   }
@@ -437,6 +483,12 @@ export class LogTable {
       case 'Home':
         next = 0;
         break;
+      case 'Enter':
+        // 收合列：Enter 展開
+        if (!this.commits[this.selected]?.collapsed) return;
+        e.preventDefault();
+        this.cb.onToggleCollapse?.(this.selected);
+        return;
       case 'End':
         next = this.commits.length - 1;
         break;
@@ -492,6 +544,7 @@ export class LogTable {
       this.fillRow(view, idx, graphWidth, multi);
     }
 
+    this.lastFrame = { first, frame, graphLeft };
     this.drawGraph(first, st, vh, vw, graphWidth, graphLeft, frame, multi);
     this.placeResizers();
   }
@@ -522,6 +575,18 @@ export class LogTable {
     view.root.dataset.key = key;
     const st = this.states[c.repo];
     view.root.title = multi && st ? st.name : '';
+    view.root.classList.toggle('is-collapsed', !!c.collapsed);
+    if (c.collapsed) {
+      view.root.classList.remove('is-mine', 'is-merge');
+      view.subject.textContent = `⋯ ${plural(c.collapsed.count, '{0} commit', '{0} commits')}`;
+      view.subject.title = t('Click to expand');
+      view.labels.replaceChildren();
+      view.author.textContent = '';
+      view.author.title = '';
+      view.date.textContent = '';
+      view.hash.textContent = '';
+      return;
+    }
 
     const h = this.highlights;
     const me = { name: st?.userName, email: st?.userEmail };
@@ -568,13 +633,24 @@ export class LogTable {
     const x = (repo: number, lane: number) => graphLeft + GRAPH_PAD + ((frame.offsets.get(repo) ?? 0) + lane) * LANE_WIDTH + LANE_WIDTH / 2;
     const palette = isLightTheme() ? PALETTE_LIGHT : PALETTE;
     const color = (i: number) => palette[i % palette.length];
-    const line = (c: number, x0: number, y0: number, x1: number, y1: number) => {
+    const line = (c: number, x0: number, y0: number, x1: number, y1: number, dashed = false) => {
       ctx.strokeStyle = color(c);
+      ctx.setLineDash(dashed ? [2, 3] : []);
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.lineTo(x1, y1);
       ctx.stroke();
+      if (dashed) ctx.setLineDash([]);
     };
+    // 收合的段落：從收合列到它的下端以虛線連接
+    const last = first + frame.rows.length;
+    const ranges = this.dashRanges.filter((r) => r.from < last && r.to >= first);
+    for (const r of ranges) {
+      if (r.color === undefined) r.color = (r.from >= first ? frame.rows[r.from - first] : this.graph.frame(r.from, r.from + 1).rows[0])?.row.color;
+    }
+    /** 第 i 列中，這個 repo、這個顏色的線是否屬於收合段落；at：'through' 直通、'top' 匯入節點、'bottom' 從節點出發 */
+    const dashed = (repo: number, c: number, i: number, at: 'through' | 'top' | 'bottom') =>
+      ranges.some((r) => r.repo === repo && r.color === c && (at === 'through' ? r.from < i && i < r.to : at === 'top' ? r.from <= i && i <= r.to : r.from <= i && i < r.to));
 
     const dimming = this.pathRows.size > 1;
     const DIM = 0.28;
@@ -606,16 +682,16 @@ export class LogTable {
       // 突顯路徑：路徑上的列與連到上一個路徑節點的線維持原樣，其他淡化
       const dimAll = dimming && !this.pathRows.has(i);
       ctx.globalAlpha = dimming ? DIM : 1;
-      for (const t of fr.through) line(t.color, x(repo, t.lane), y0, x(repo, t.lane), y1);
-      for (const o of fr.others) line(o.color, x(o.repo, o.lane), y0, x(o.repo, o.lane), y1);
+      for (const t of fr.through) line(t.color, x(repo, t.lane), y0, x(repo, t.lane), y1, dashed(repo, t.color, i, 'through'));
+      for (const o of fr.others) line(o.color, x(o.repo, o.lane), y0, x(o.repo, o.lane), y1, dashed(o.repo, o.color, i, 'through'));
       ctx.globalAlpha = dimAll ? DIM : 1;
       for (const s of row.top) {
         if (dimming && !dimAll) ctx.globalAlpha = s.to === row.col ? 1 : DIM;
-        line(s.color, x(repo, s.from), y0, x(repo, s.to), mid);
+        line(s.color, x(repo, s.from), y0, x(repo, s.to), mid, s.to === row.col && dashed(repo, s.color, i, 'top'));
       }
       for (const s of row.bottom) {
         if (dimming && !dimAll) ctx.globalAlpha = s.from === row.col ? 1 : DIM;
-        line(s.color, x(repo, s.from), mid, x(repo, s.to), y1);
+        line(s.color, x(repo, s.from), mid, x(repo, s.to), y1, s.from === row.col && dashed(repo, s.color, i, 'bottom'));
       }
       ctx.globalAlpha = 1;
     });
@@ -639,7 +715,15 @@ export class LogTable {
       const cy = i * ROW_HEIGHT - st + ROW_HEIGHT / 2;
       const c = color(row.color);
       ctx.globalAlpha = dimming && !this.pathRows.has(i) ? DIM : 1;
-      if (this.commits[i]?.hash === this.headOf(repo).hash) {
+      if (this.commits[i]?.collapsed) {
+        // 收合列：沒有節點，畫三個小點表示省略
+        ctx.fillStyle = c;
+        for (const dy of [-5, 0, 5]) {
+          ctx.beginPath();
+          ctx.arc(cx, cy + dy, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (this.commits[i]?.hash === this.headOf(repo).hash) {
         // HEAD：挖空圓心（露出列底色，選取列也正確），再畫外環與中心點
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';

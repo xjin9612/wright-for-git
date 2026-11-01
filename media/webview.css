@@ -628,3 +628,7 @@ body.dialog-page { overflow: hidden; }
 .push-repo { cursor: default; border-radius: 2px; }
 .push-repo:hover { background: var(--hover); }
 .push-repo.selected { background: var(--sel-bg); color: var(--sel-fg); }
+
+/* ---------- 長線性分支折疊 ---------- */
+.log-row.is-collapsed .cell-subject-text { color: var(--muted); font-style: italic; cursor: pointer; }
+.log-row.is-collapsed:hover .cell-subject-text { color: var(--vscode-textLink-foreground); }

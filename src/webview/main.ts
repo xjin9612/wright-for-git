@@ -1,11 +1,12 @@
 // Webview 進入點：組合三欄、管理篩選與資料流
+import { applyCollapse, findLinearRuns, type LinearRun } from '../shared/collapse';
 import { MultiGraph } from '../shared/multiGraph';
 import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RefAction, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
 import { mergeRefs, type MergedRef } from '../shared/refs';
 import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
 import { DetailsPane, type FileGrouping } from './detailsPane';
 import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, MOD_KEY, showMenu, type MenuItem } from './dom';
-import { LogTable, type ColumnWidths, type Columns, type Highlights } from './logTable';
+import { LogTable, type ColumnWidths, type Columns, type Highlights, type LogRow } from './logTable';
 import { showConfirm } from './confirmDialog';
 import { setIssueLinkRules } from './issueLinks';
 import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
@@ -80,10 +81,23 @@ const persist = debounce(() => saveState(ui), 200);
 // ---------- 狀態 ----------
 /** 所有 repository；commit.repo 為索引 */
 let repos: RepoState[] = [];
-let commits: CommitInfo[] = [];
-/** key = `${repo}:${hash}` */
+/** 表格上顯示的列（收合時含收合列）；未收合時與 all 相同 */
+let commits: LogRow[] = [];
+/** key = `${repo}:${hash}` → commits 的索引 */
 let keyIndex = new Map<string, number>();
 let graph = new MultiGraph(true);
+/** 載入的所有 commit（不含收合列） */
+let all: CommitInfo[] = [];
+let allKeyIndex = new Map<string, number>();
+let graphAll = new MultiGraph(true);
+/** 這次載入是否畫完整 graph（文字等篩選時為 false，不收合） */
+let graphMode = true;
+// 長線性分支折疊：collapseAll 為全部收合的模式；exceptions 為與模式相反的段落（收合模式下展開的、展開模式下收合的）
+let collapseAll = false;
+const exceptions = new Set<string>();
+let runs: LinearRun[] = [];
+/** `${repo}:${hash}`（可收的 commit）→ 所屬段落 */
+let runByCommit = new Map<string, LinearRun>();
 let requestId = 0;
 /** extension 端 repos 清單的版本，loadLog 時帶回 */
 let generation = 0;
@@ -140,6 +154,11 @@ const table = new LogTable(
   {
     onSelect: (i) => onCommitSelected(i),
     onMultiSelect: (indices) => onCommitsSelected(indices),
+    onToggleCollapse: (i) => onToggleCollapse(i),
+    canCollapse: (i) => {
+      const c = commits[i];
+      return !!c && !c.collapsed && runByCommit.has(`${c.repo}:${c.hash}`);
+    },
     onRepoNamesChange: (show) => {
       ui.repoNames = show;
       persist();
@@ -161,7 +180,7 @@ const details = new DetailsPane(
   {
     onOpenDiff: (root, file, hash, parent, files) => post({ type: 'openDiff', root, hash, parent, file, files }),
     onPickCommit: (root, hash) => {
-      const idx = keyIndex.get(`${repos.findIndex((r) => r.root === root)}:${hash}`);
+      const idx = indexOf(repos.findIndex((r) => r.root === root), hash);
       if (idx !== undefined) table.select(idx, true, 'center');
     },
     onCopy: (text) => post({ type: 'copy', text }),
@@ -761,9 +780,14 @@ function loadLog(keepScroll = false): void {
   setWarnings(undefined);
   const selected = commits[table.selectedIndex];
   if (selected) pendingSelect = selectionKey(selected);
-  commits = [];
-  keyIndex = new Map();
-  graph = new MultiGraph(true);
+  all = [];
+  allKeyIndex = new Map();
+  graphAll = new MultiGraph(true);
+  commits = all;
+  keyIndex = allKeyIndex;
+  graph = graphAll;
+  runs = [];
+  runByCommit = new Map();
   table.clearSelection();
   table.setData(commits, graph);
   branches.setRepos(visibleRepos());
@@ -778,19 +802,22 @@ function setLoading(v: boolean): void {
 
 function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
   if (m.requestId !== requestId) return;
-  if (commits.length === 0 && graph.length === 0) graph = new MultiGraph(m.graph);
-  const fresh = m.commits.filter((c) => !keyIndex.has(`${c.repo}:${c.hash}`));
-  for (const c of fresh) {
-    keyIndex.set(`${c.repo}:${c.hash}`, commits.length);
-    commits.push(c);
+  if (all.length === 0 && graphAll.length === 0) {
+    graphAll = new MultiGraph(m.graph);
+    graphMode = m.graph;
   }
-  graph.add(fresh);
-  table.setData(commits, graph);
+  const fresh = m.commits.filter((c) => !allKeyIndex.has(`${c.repo}:${c.hash}`));
+  for (const c of fresh) {
+    allKeyIndex.set(`${c.repo}:${c.hash}`, all.length);
+    all.push(c);
+  }
+  graphAll.add(fresh);
+  refreshView();
 
   if (pendingSelect) {
     const [root, hash] = pendingSelect.split('|');
     const repoIdx = repos.findIndex((r) => r.root === root);
-    const idx = keyIndex.get(`${repoIdx}:${hash}`);
+    const idx = indexOf(repoIdx, hash);
     if (idx !== undefined) {
       pendingSelect = undefined;
       table.select(idx, true, quietReload ? 'none' : 'center');
@@ -809,12 +836,100 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
       // 預設選取最上方的 HEAD（多 repo 時為最近有動的 repo）
       let headIdx: number | undefined;
       for (const st of visibleRepos()) {
-        const idx = st.head.hash ? keyIndex.get(`${repos.indexOf(st)}:${st.head.hash}`) : undefined;
+        const idx = st.head.hash ? indexOf(repos.indexOf(st), st.head.hash) : undefined;
         if (idx !== undefined && (headIdx === undefined || idx < headIdx)) headIdx = idx;
       }
       table.select(headIdx ?? 0, true, 'center');
     }
   }
+}
+
+// ---------- 長線性分支折疊 ----------
+
+/** 依收合狀態重算表格上的列；只在畫完整 graph 時收合 */
+function refreshView(): void {
+  runs = graphMode && all.length > 0 ? findLinearRuns(all, headsOf(), labeledCommits()) : [];
+  runByCommit = new Map(runs.flatMap((r) => r.hidden.map((h) => [`${r.repo}:${h}`, r] as const)));
+  const isCollapsed = (r: LinearRun) => collapseAll !== exceptions.has(r.key);
+  const before = commits[table.selectedIndex];
+  if (!runs.some(isCollapsed)) {
+    commits = all;
+    keyIndex = allKeyIndex;
+    graph = graphAll;
+    table.setData(commits, graph);
+  } else {
+    const { view, graphParents } = applyCollapse<LogRow>(all, runs, isCollapsed, (run, first) => ({
+      ...first,
+      hash: `collapsed:${run.key}`,
+      parents: [run.last],
+      subject: '',
+      collapsed: { key: run.key, count: run.hidden.length, last: run.last },
+    }));
+    commits = view;
+    keyIndex = new Map(view.map((c, i) => [`${c.repo}:${c.hash}`, i]));
+    graph = new MultiGraph(true);
+    graph.add(view.map((c) => ({ ...c, parents: graphParents.get(`${c.repo}:${c.hash}`) ?? c.parents })));
+    table.setData(commits, graph, graphParents);
+  }
+  // 保留選取：選取的 commit 被收起來時改選它所在的收合列
+  if (before && table.selectedIndex >= 0) {
+    const idx = keyIndex.get(`${before.repo}:${before.hash}`) ?? collapsedIndexOf(before.repo, before.hash);
+    if (idx !== undefined && idx !== table.selectedIndex) table.select(idx, false, 'none');
+  }
+}
+
+/** 各 repo 的 HEAD（主線不收） */
+function headsOf(): Map<number, string | undefined> {
+  return new Map(repos.map((r, i) => [i, r.head.hash]));
+}
+
+/** 有分支或 tag 標籤的 commit（不收） */
+function labeledCommits(): Set<string> {
+  return new Set(repos.flatMap((r, i) => r.refs.map((ref) => `${i}:${ref.hash}`)));
+}
+
+/** commit 所在的收合列索引（沒有被收起來時為 undefined） */
+function collapsedIndexOf(repo: number, hash: string): number | undefined {
+  const run = runByCommit.get(`${repo}:${hash}`);
+  return run ? keyIndex.get(`${run.repo}:collapsed:${run.key}`) : undefined;
+}
+
+/** commit 在表格上的索引；被收起來時展開那一段（搜尋、跳到 commit、還原選取） */
+function indexOf(repo: number, hash: string): number | undefined {
+  const k = `${repo}:${hash}`;
+  const idx = keyIndex.get(k);
+  if (idx !== undefined) return idx;
+  const run = runByCommit.get(k);
+  if (!run || collapsedIndexOf(repo, hash) === undefined) return undefined;
+  toggleRun(run.key);
+  return keyIndex.get(k);
+}
+
+/** 展開或收合一段 */
+function toggleRun(key: string): void {
+  if (exceptions.has(key)) exceptions.delete(key);
+  else exceptions.add(key);
+  refreshView();
+}
+
+function setCollapseAll(on: boolean): void {
+  collapseAll = on;
+  exceptions.clear();
+  refreshView();
+}
+
+/** 點收合列（展開）或點可收合 commit 的分支線（收合） */
+function onToggleCollapse(index: number): void {
+  const c = commits[index];
+  if (!c) return;
+  const key = c.collapsed?.key ?? runByCommit.get(`${c.repo}:${c.hash}`)?.key;
+  if (!key) return;
+  toggleRun(key);
+  // 展開後選取那一段原本的第一筆；收合後選取收合列
+  const run = runs.find((r) => r.key === key);
+  const idx = run && (keyIndex.get(`${run.repo}:${run.hidden[0]}`) ?? keyIndex.get(`${run.repo}:collapsed:${run.key}`));
+  if (idx !== undefined) table.select(idx, true, 'nearest');
+  table.focus();
 }
 
 /** 清除所有篩選（沒有符合的 commit 時的「清除篩選」） */
@@ -836,7 +951,7 @@ let multiRequest = 0;
 /** 多選：右欄顯示選取 commit 的合併變更 */
 function onCommitsSelected(indices: number[]): void {
   requestDetails.cancel();
-  const list = indices.map((i) => commits[i]).filter((c): c is CommitInfo => !!c && !!repos[c.repo]);
+  const list = indices.map((i) => commits[i]).filter((c): c is LogRow => !!c && !c.collapsed && !!repos[c.repo]);
   details.showMulti(list.map((c) => ({ root: repos[c.repo].root, hash: c.hash, subject: c.subject, author: c.author, authorTime: c.authorTime })));
   multiRequest++;
   post({ type: 'selectCommits', requestId: multiRequest, items: list.map((c) => ({ root: repos[c.repo].root, hash: c.hash, parents: c.parents })) });
@@ -846,6 +961,11 @@ function onCommitSelected(index: number): void {
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
   if (!c || !root) return;
+  if (c.collapsed) {
+    requestDetails.cancel();
+    details.renderEmpty(plural(c.collapsed.count, '{0} commit is collapsed. Click the row or press Enter to expand it.', '{0} commits are collapsed. Click the row or press Enter to expand them.'));
+    return;
+  }
   ui.selectedHash = selectionKey(c);
   persist();
   details.showLoading();
@@ -854,7 +974,7 @@ function onCommitSelected(index: number): void {
 
 // ---------- 選單 ----------
 function showContextMenu(index: number, x: number, y: number): void {
-  const selected = table.selectedIndices.map((i) => commits[i]).filter((c): c is CommitInfo => !!c);
+  const selected = table.selectedIndices.map((i) => commits[i]).filter((c): c is LogRow => !!c && !c.collapsed);
   if (selected.length > 1) {
     showMultiMenu(selected, x, y);
     return;
@@ -862,6 +982,11 @@ function showContextMenu(index: number, x: number, y: number): void {
   const c = commits[index];
   const root = c && repos[c.repo]?.root;
   if (!c || !root) return;
+  if (c.collapsed) {
+    showMenu(x, y, [{ label: t('Expand Linear Branch'), keybinding: 'Enter', action: () => onToggleCollapse(index) }]);
+    return;
+  }
+  const run = runByCommit.get(`${c.repo}:${c.hash}`);
   const act = (action: CommitAction) => () => post({ type: 'commitAction', action, root, hash: c.hash, parents: c.parents, subject: c.subject });
   showMenu(x, y, [
     { label: t('Copy Revision Number'), keybinding: `${MOD_KEY}C`, action: () => post({ type: 'copy', text: c.hash }) },
@@ -878,6 +1003,8 @@ function showContextMenu(index: number, x: number, y: number): void {
     { label: t('Interactively Rebase from Here…'), action: () => post({ type: 'openRebase', root, hash: c.hash }) },
     '-',
     { label: t('Compare with Local'), action: act('compareLocal') },
+    // 在可收合的段落中：收起這一段分支
+    ...(run ? (['-', { label: t('Collapse Linear Branch'), action: () => onToggleCollapse(index) }] as MenuItem[]) : []),
   ]);
 }
 
@@ -923,7 +1050,7 @@ function navigateToRef(ref: MergedRef): void {
   for (const root of ref.roots) {
     const repoIdx = repos.findIndex((r) => r.root === root);
     const hash = repos[repoIdx]?.refs.find((r) => r.name === ref.name)?.hash;
-    const idx = hash ? keyIndex.get(`${repoIdx}:${hash}`) : undefined;
+    const idx = hash ? indexOf(repoIdx, hash) : undefined;
     if (idx !== undefined) {
       table.select(idx, true, 'center');
       table.focus();
@@ -995,6 +1122,10 @@ function showViewMenu(): void {
     { label: t('Dim Merge Commits'), checked: ui.highlights.merges, action: toggleHl('merges') },
     { label: t('Highlight Path of Selected Commit'), checked: !!ui.highlights.path, action: toggleHl('path') },
     '-',
+    // 長線性分支折疊（只在畫完整 graph 時有效；文字、作者等篩選時 graph 已簡化）
+    { label: t('Collapse Linear Branches'), disabled: !graphMode, action: () => setCollapseAll(true) },
+    { label: t('Expand Linear Branches'), disabled: !graphMode, action: () => setCollapseAll(false) },
+    '-',
     { label: t('New Log Tab'), action: () => openTab({}) },
     '-',
     { label: t('Show Branches'), checked: ui.leftVisible, action: () => setPaneVisible('left', !ui.leftVisible) },
@@ -1006,7 +1137,7 @@ function showViewMenu(): void {
 table.element.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
     const c = commits[table.selectedIndex];
-    if (c) post({ type: 'copy', text: c.hash });
+    if (c && !c.collapsed) post({ type: 'copy', text: c.hash });
   }
 });
 document.addEventListener('keydown', (e) => {
@@ -1031,6 +1162,8 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       setIssueLinkRules(m.issueLinks);
       if (repos.length === 0) {
         commits = [];
+        all = [];
+        allKeyIndex = new Map();
         table.setData([], new MultiGraph(true));
         table.setMessage(m.message ?? t('No repository'));
         branches.setRepos([]);
@@ -1064,6 +1197,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
         const map = new Map(m.parents.map(([repo, hash, ps]) => [`${repo}:${hash}`, ps]));
         graph = new MultiGraph(true);
         graph.add(commits.map((c) => ({ ...c, parents: map.get(`${c.repo}:${c.hash}`) ?? [] })));
+        graphAll = graph;
         table.setData(commits, graph);
       }
       break;
