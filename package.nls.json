@@ -33,5 +33,6 @@
   "config.issueLinks": "Turn issue references in commit messages into links. Each rule has a regular expression `pattern` and a `url` that can use `$0`, `$1`… and `{repo}` (the web URL of `origin`). Example: `{ \"pattern\": \"PROJ-\\\\d+\", \"url\": \"https://jira.example.com/browse/$0\" }`. When empty, `#123` links to the issue on GitHub / GitLab.",
   "config.issueLinks.pattern": "Regular expression to match",
   "config.issueLinks.url": "Link URL; $0 is the whole match, $1… are groups, {repo} is the web URL of origin",
-  "command.toggleBlame": "Annotate with Git Blame (toggle)"
+  "command.toggleBlame": "Annotate with Git Blame (toggle)",
+  "command.openSettings": "Open Settings"
 }

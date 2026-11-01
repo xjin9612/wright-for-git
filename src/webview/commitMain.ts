@@ -3,6 +3,7 @@ import type { CommitState, StashInfo, ToWebview, WorkingChange } from '../shared
 import { showConfirm } from './confirmDialog';
 import { clear, el, formatDate, icon, iconButton, showMenu, type MenuItem } from './dom';
 import { fileIcon } from './fileIcons';
+import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
 import { loadState, post, saveState } from './vscodeApi';
 
@@ -23,6 +24,8 @@ interface Persisted {
   /** 使用者明確勾選／取消的檔案 */
   explicit: [string, boolean][];
   split: number;
+  /** 儲藏分頁檔案清單的分組 */
+  stashGrouping?: FileGrouping;
 }
 
 const saved = loadState<Persisted>();
@@ -39,6 +42,7 @@ const ui: Persisted = {
   collapsed: saved?.collapsed ?? [],
   explicit: saved?.explicit ?? [],
   split: saved?.split ?? 0.5,
+  stashGrouping: saved?.stashGrouping,
 };
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 const persist = () => {
@@ -695,8 +699,30 @@ const stash = (() => {
   let filesReq = 0;
   let seq = 1;
   const list = el('div', { className: 'tree stash-list', attrs: { tabindex: '0' } });
-  const files = el('div', { className: 'tree stash-files' });
-  const filesTitle = el('div', { className: 'push-files-title muted', text: t('Changed files') });
+  const filesTitle = el('div', { className: 'push-files-title muted stash-files-title', text: t('Changed files') });
+  let filesFor: { root: string; hash: string } | undefined;
+  const fileTree = new FileTree({
+    grouping: ui.stashGrouping ?? { directory: true, repository: true, module: false },
+    onGroupChange: (g) => {
+      ui.stashGrouping = g;
+      persist();
+    },
+    repoName: (root) => repos.find((r) => r.root === root)?.name ?? '',
+    onOpen: (_g, file) => {
+      if (filesFor) post({ type: 'openStashDiff', root: filesFor.root, hash: filesFor.hash, file });
+    },
+  });
+  fileTree.element.classList.add('stash-files');
+  const filesBar = el(
+    'div',
+    { className: 'pane-toolbar stash-files-toolbar' },
+    iconButton('diff', t('Show diff (Enter)'), () => fileTree.openSelected()),
+    fileTree.groupButton,
+    filesTitle,
+    el('div', { className: 'toolbar-spacer' }),
+    iconButton('expand-all', t('Expand all'), () => fileTree.expandAll()),
+    iconButton('collapse-all', t('Collapse all'), () => fileTree.collapseAll()),
+  );
   const needSel = (fn: (s: { root: string; hash: string }) => void) => () => {
     if (sel) fn(sel);
   };
@@ -715,7 +741,7 @@ const stash = (() => {
     iconButton('branch', t('Unstash as Branch…'), () => openUnstashDialog()),
     iconButton('trash', t('Drop'), needSel((s) => (post({ type: 'unstashDrop', root: s.root, hash: s.hash }), reloadSoon()))),
   );
-  stashPane.append(bar, list, el('div', { className: 'stash-files-pane' }, filesTitle, files));
+  stashPane.append(bar, list, el('div', { className: 'stash-files-pane' }, filesBar, fileTree.element));
 
   /** 建立成分支、還原暫存狀態等進階選項使用「取消儲藏」對話框 */
   function openUnstashDialog(): void {
@@ -769,8 +795,13 @@ const stash = (() => {
   }
 
   function requestFiles(): void {
-    clear(files);
-    if (!sel) return;
+    if (!sel) {
+      filesFor = undefined;
+      filesTitle.textContent = t('Changed files');
+      fileTree.setEmpty('');
+      return;
+    }
+    fileTree.setLoading();
     const s = repos.find((r) => r.root === sel!.root)?.stashes.find((x) => x.hash === sel!.hash);
     filesTitle.textContent = s ? `${s.ref} ${stashLabel(s.message)}` : t('Changed files');
     filesReq = seq++;
@@ -792,23 +823,14 @@ const stash = (() => {
     },
     onFiles(m: Extract<ToWebview, { type: 'unstashFiles' }>) {
       if (m.requestId !== filesReq || !sel) return;
-      clear(files);
-      if (m.files.length === 0) files.append(el('div', { className: 'empty-text', text: t('No changes') }));
-      for (const f of m.files) {
-        const name = f.path.slice(f.path.lastIndexOf('/') + 1);
-        const dir = f.path.slice(0, Math.max(0, f.path.lastIndexOf('/')));
-        const row = el(
-          'div',
-          { className: 'tree-row', title: `${f.path}\n${t('Double-click to show the diff')}` },
-          fileIcon(f.path),
-          el('span', { className: `tree-label status-${f.status}`, text: name }),
-          el('span', { className: 'tree-count', text: [dir, f.untracked ? t('untracked') : ''].filter(Boolean).join(' · ') }),
-        );
-        row.style.paddingLeft = '8px';
-        const cur = sel;
-        row.addEventListener('dblclick', () => post({ type: 'openStashDiff', root: cur.root, hash: cur.hash, file: f }));
-        files.append(row);
-      }
+      const same = filesFor?.root === m.root && filesFor.hash === m.hash;
+      filesFor = { root: m.root, hash: m.hash };
+      // 與 IntelliJ 相同：追蹤中的變更在上，未追蹤的檔案另成一組
+      const tracked = m.files.filter((f) => !f.untracked);
+      const untracked = m.files.filter((f) => f.untracked);
+      const groups = [{ root: m.root, files: tracked }];
+      if (untracked.length > 0) groups.push({ root: m.root, files: untracked, section: t('Untracked files') } as (typeof groups)[number]);
+      fileTree.setGroups(tracked.length === 0 && untracked.length > 0 ? groups.slice(1) : groups, same);
     },
   };
 })();

@@ -1,23 +1,13 @@
 // 右欄：變更檔案樹 + Commit 詳情
 import type { ChangedFile, CommitDetails, HeadInfo, RefInfo, RepoState } from '../shared/protocol';
 import { buildLabels } from '../shared/refs';
-import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, formatDate, icon, iconButton, makeSplitter, showMenu } from './dom';
+import { clear, el, formatDate, iconButton, makeSplitter } from './dom';
+import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
-import { fileIcon } from './fileIcons';
 import { linkify } from './issueLinks';
 import { renderLabel } from './logTable';
 
-function fileName(p: string): string {
-  return p.slice(p.lastIndexOf('/') + 1);
-}
-
-/** 變更檔案的分組方式（對應 IntelliJ 的 Group By：目錄／儲存庫／模組） */
-export interface FileGrouping {
-  directory: boolean;
-  repository: boolean;
-  module: boolean;
-}
+export type { FileGrouping };
 
 export interface DetailsCallbacks {
   /** 開啟 diff：單一 commit 時 parent 取自真正的 parent（不受路徑篩選改寫影響）；多選時 file 自帶 left／right */
@@ -32,17 +22,6 @@ export interface DetailsCallbacks {
   onGroupChange?: (group: FileGrouping) => void;
 }
 
-const STATUS_TEXT: Record<string, string> = {
-  A: t('Added'),
-  M: t('Modified'),
-  D: t('Deleted'),
-  R: t('Renamed'),
-  C: t('Copied'),
-  T: t('Type changed'),
-  U: t('Unmerged'),
-  X: t('Unknown'),
-};
-
 /** 多選時資訊區列出的 commit */
 export interface SelectedCommit {
   root: string;
@@ -52,36 +31,18 @@ export interface SelectedCommit {
   authorTime: number;
 }
 
-interface FileRow {
-  key: string;
-  root: string;
-  icon?: 'repo' | 'module';
-  detail?: string;
-  depth: number;
-  label: string;
-  count?: number;
-  file?: ChangedFile;
-  expanded: boolean;
-  expandable: boolean;
-}
-
 export class DetailsPane {
   readonly element: HTMLElement;
-  private readonly fileList: HTMLElement;
+  private readonly tree: FileTree;
   private readonly info: HTMLElement;
   private readonly filesSection: HTMLElement;
   private details: CommitDetails | null = null;
   /** 多選模式：各 repo 的合併變更（null 表示單選或尚未載入） */
   private multi: { commits: SelectedCommit[]; groups: { root: string; files: ChangedFile[] }[] | null } | null = null;
   private states = new Map<string, RepoState>();
-  private collapsed = new Set<string>();
-  private selectedFile: string | undefined;
-  private rows: FileRow[] = [];
   private containing: { root: string; hash: string; branches: string[] } | undefined;
   private showAllBranches = false;
   private splitRatio: number;
-  private grouping: FileGrouping;
-  private readonly groupButton: HTMLButtonElement;
 
   constructor(
     private readonly cb: DetailsCallbacks,
@@ -89,27 +50,26 @@ export class DetailsPane {
     grouping?: Partial<FileGrouping>,
   ) {
     this.splitRatio = splitRatio ?? 0.55;
-    this.grouping = { directory: true, repository: true, module: false, ...grouping };
-    this.groupButton = iconButton('eye', t('Group By'), () => this.showGroupMenu());
+    this.tree = new FileTree({
+      grouping,
+      onGroupChange: cb.onGroupChange,
+      repoName: (root) => this.states.get(root)?.name ?? '',
+      onOpen: (g, file, files) => {
+        if (this.details) cb.onOpenDiff(g.root, file, this.details.hash, this.details.parents[0], files);
+        else if (file.right !== undefined) cb.onOpenDiff(g.root, file, file.right, file.left, files);
+      },
+    });
     const toolbar = el(
       'div',
       { className: 'pane-toolbar' },
-      iconButton('diff', t('Show diff (Enter)'), () => this.openSelected()),
-      this.groupButton,
+      iconButton('diff', t('Show diff (Enter)'), () => this.tree.openSelected()),
+      this.tree.groupButton,
       el('div', { className: 'toolbar-spacer' }),
-      iconButton('expand-all', t('Expand all'), () => {
-        this.collapsed.clear();
-        this.renderFiles();
-      }),
-      iconButton('collapse-all', t('Collapse all'), () => {
-        for (const r of this.rows) if (r.expandable) this.collapsed.add(r.key);
-        this.renderFiles();
-      }),
+      iconButton('expand-all', t('Expand all'), () => this.tree.expandAll()),
+      iconButton('collapse-all', t('Collapse all'), () => this.tree.collapseAll()),
       iconButton('close', t('Hide details'), () => cb.onCollapsePane()),
     );
-    this.fileList = el('div', { className: 'tree file-tree', attrs: { tabindex: '0', role: 'tree' } });
-    this.fileList.addEventListener('keydown', (e) => this.onKey(e));
-    this.filesSection = el('div', { className: 'details-files' }, toolbar, this.fileList);
+    this.filesSection = el('div', { className: 'details-files' }, toolbar, this.tree.element);
     this.info = el('div', { className: 'details-info' });
 
     let startHeight = 0;
@@ -126,25 +86,6 @@ export class DetailsPane {
     this.element = el('div', { className: 'details-pane' }, this.filesSection, splitter, this.info);
     this.applySplit();
     this.renderEmpty(t('Select a commit to view changes'));
-  }
-
-  private showGroupMenu(): void {
-    const r = this.groupButton.getBoundingClientRect();
-    const toggle = (k: keyof FileGrouping) => ({
-      keepOpen: true,
-      action: () => {
-        this.grouping = { ...this.grouping, [k]: !this.grouping[k] };
-        this.cb.onGroupChange?.(this.grouping);
-        this.renderFiles();
-        return this.grouping[k];
-      },
-    });
-    showMenu(r.left, r.bottom + 2, [
-      { label: t('Group By'), disabled: true },
-      { label: t('Directory'), checked: this.grouping.directory, ...toggle('directory') },
-      { label: t('Repository'), checked: this.grouping.repository, ...toggle('repository') },
-      { label: t('Module'), checked: this.grouping.module, ...toggle('module') },
-    ]);
   }
 
   private applySplit(): void {
@@ -172,58 +113,38 @@ export class DetailsPane {
   renderEmpty(text: string): void {
     this.details = null;
     this.multi = null;
-    this.fileList.classList.remove('loading');
-    this.rows = [];
-    clear(this.fileList);
-    this.fileList.append(el('div', { className: 'empty-text', text }));
+    this.tree.setEmpty(text);
     clear(this.info);
   }
 
   showLoading(): void {
-    this.fileList.classList.add('loading');
+    this.tree.setLoading();
   }
 
   /** 多選：先顯示 commit 清單，變更載入後再呼叫 setMultiFiles */
   showMulti(commits: SelectedCommit[]): void {
     this.details = null;
     this.multi = { commits, groups: null };
-    this.selectedFile = undefined;
-    this.fileList.classList.add('loading');
-    this.renderFiles();
+    this.tree.setEmpty('');
+    this.tree.setLoading();
     this.renderInfo();
   }
 
   setMultiFiles(groups: { root: string; files: ChangedFile[] }[]): void {
     if (!this.multi) return;
     this.multi.groups = groups;
-    this.fileList.classList.remove('loading');
-    this.renderFiles();
-  }
-
-  /** 目前顯示中的檔案群組（單選時只有一組） */
-  private get groups(): { root: string; files: ChangedFile[] }[] {
-    if (this.details) return [{ root: this.details.root, files: this.details.files }];
-    return this.multi?.groups ?? [];
-  }
-
-  private openFile(root: string, file: ChangedFile): void {
-    // 同一個 repo 的檔案依樹狀顯示順序，供 diff 視窗切換上一個／下一個
-    const files = this.buildAllFileRows().filter((r) => r.root === root).map((r) => r.file!);
-    if (this.details) this.cb.onOpenDiff(root, file, this.details.hash, this.details.parents[0], files);
-    else if (file.right !== undefined) this.cb.onOpenDiff(root, file, file.right, file.left, files);
+    this.tree.setGroups(groups);
   }
 
   setDetails(d: CommitDetails): void {
     this.multi = null;
     const sameCommit = this.details?.hash === d.hash && this.details.root === d.root;
     this.details = d;
-    this.fileList.classList.remove('loading');
     if (!sameCommit) {
-      this.selectedFile = undefined;
       this.showAllBranches = false;
       if (this.containing?.hash !== d.hash || this.containing.root !== d.root) this.containing = undefined;
     }
-    this.renderFiles();
+    this.tree.setGroups([{ root: d.root, files: d.files }], sameCommit);
     this.renderInfo();
     if (!this.containing) this.cb.onRequestContaining(d.root, d.hash);
   }
@@ -231,162 +152,6 @@ export class DetailsPane {
   setContaining(root: string, hash: string, branches: string[]): void {
     this.containing = { root, hash, branches };
     if (this.details?.hash === hash && this.details.root === root) this.renderInfo();
-  }
-
-  // ---------- 檔案樹 ----------
-
-  /** 不受收合狀態影響的所有檔案列（依顯示順序） */
-  private buildAllFileRows(): FileRow[] {
-    const saved = this.collapsed;
-    this.collapsed = new Set();
-    try {
-      return this.buildRows().filter((r) => r.file);
-    } finally {
-      this.collapsed = saved;
-    }
-  }
-
-  private buildRows(): FileRow[] {
-    const rows: FileRow[] = [];
-    const { directory, repository, module } = this.grouping;
-    const addFiles = (root: string, files: ChangedFile[], depth: number, prefix: string, base: string) => {
-      const rel = (f: ChangedFile) => (base && f.path.startsWith(`${base}/`) ? f.path.slice(base.length + 1) : f.path);
-      if (!directory) {
-        // 平鋪：檔名在前、所在目錄淡色顯示在後
-        const sorted = [...files].sort((a, b) => fileName(a.path).localeCompare(fileName(b.path)) || a.path.localeCompare(b.path));
-        for (const f of sorted) rows.push({ key: `${root}\u0000${f.path}`, root, depth, label: fileName(f.path), file: f, expanded: false, expandable: false });
-        return;
-      }
-      const walk = (nodes: TreeNode<ChangedFile>[], d: number) => {
-        for (const n of nodes) {
-          if (n.item) {
-            rows.push({ key: `${root}\u0000${n.item.path}`, root, depth: d, label: n.name, file: n.item, expanded: false, expandable: false });
-          } else {
-            const key = `${root}\u0000${prefix}${n.path}/`;
-            const open = !this.collapsed.has(key);
-            rows.push({ key, root, depth: d, label: n.name, count: n.count, expanded: open, expandable: true });
-            if (open) walk(n.children, d + 1);
-          }
-        }
-      };
-      walk(buildTree(files, rel), depth);
-    };
-    for (const g of this.groups) {
-      let depth = 0;
-      if (repository || this.groups.length > 1) {
-        const rootKey = `\u0000root:${g.root}`;
-        const rootOpen = !this.collapsed.has(rootKey);
-        rows.push({ key: rootKey, root: g.root, depth: 0, label: this.states.get(g.root)?.name ?? '', count: g.files.length, expanded: rootOpen, expandable: true, icon: 'repo' });
-        if (!rootOpen) continue;
-        depth = 1;
-      }
-      if (module) {
-        const byModule = new Map<string, ChangedFile[]>();
-        for (const f of g.files) {
-          const m = f.module ?? '\u0000none';
-          byModule.set(m, [...(byModule.get(m) ?? []), f]);
-        }
-        for (const [m, files] of [...byModule].sort((a, b) => a[0].localeCompare(b[0]))) {
-          if (m === '\u0000none') {
-            addFiles(g.root, files, depth, 'nomodule:', '');
-            continue;
-          }
-          const key = `${g.root}\u0000module:${m}`;
-          const open = !this.collapsed.has(key);
-          const label = m ? m.slice(m.lastIndexOf('/') + 1) : (this.states.get(g.root)?.name ?? '');
-          rows.push({ key, root: g.root, depth, label, count: files.length, expanded: open, expandable: true, icon: 'module', detail: m || undefined });
-          if (open) addFiles(g.root, files, depth + 1, `module:${m}/`, m);
-        }
-      } else {
-        addFiles(g.root, g.files, depth, '', '');
-      }
-    }
-    return rows;
-  }
-
-
-  private renderFiles(): void {
-    this.rows = this.buildRows();
-    clear(this.fileList);
-    if (!this.details && !this.multi?.groups) return;
-    if (this.groups.every((g) => g.files.length === 0)) {
-      this.fileList.append(el('div', { className: 'empty-text', text: t('No changes') }));
-      return;
-    }
-    const frag = document.createDocumentFragment();
-    for (const r of this.rows) {
-      const twisty = r.expandable ? icon(r.expanded ? 'chevron-down' : 'chevron-right', 'twisty') : el('span', { className: 'twisty' });
-      const f = r.file;
-      const title = f ? `${STATUS_TEXT[f.status] ?? f.status}: ${f.oldPath ? `${f.oldPath} → ` : ''}${f.path}` : r.label;
-      const row = el(
-        'div',
-        { className: `tree-row${r.key === this.selectedFile ? ' selected' : ''}`, title, attrs: { role: 'treeitem' } },
-        twisty,
-        f ? fileIcon(f.path) : icon(r.icon ?? 'folder'),
-        el('span', { className: `tree-label${f ? ` status-${f.status}` : ''}`, text: r.label }),
-        r.count !== undefined ? el('span', { className: 'tree-count', text: plural(r.count, '{0} file', '{0} files') }) : null,
-        f && !this.grouping.directory && f.path.includes('/') ? el('span', { className: 'tree-count', text: f.path.slice(0, f.path.lastIndexOf('/')) }) : null,
-        r.detail ? el('span', { className: 'tree-count', text: r.detail }) : null,
-        f?.oldPath ? el('span', { className: 'tree-count', text: `← ${f.oldPath}` }) : null,
-      );
-      row.style.paddingLeft = `${4 + r.depth * 14}px`;
-      row.addEventListener('click', () => {
-        this.selectedFile = r.key;
-        if (r.expandable) this.toggle(r.key);
-        else this.renderFiles();
-      });
-      row.addEventListener('dblclick', () => {
-        if (f) this.openFile(r.root, f);
-      });
-      frag.append(row);
-    }
-    this.fileList.append(frag);
-  }
-
-  private toggle(key: string, open?: boolean): void {
-    const next = open ?? this.collapsed.has(key);
-    if (next) this.collapsed.delete(key);
-    else this.collapsed.add(key);
-    this.renderFiles();
-  }
-
-  private openSelected(): void {
-    const row = this.rows.find((r) => r.key === this.selectedFile && r.file) ?? this.rows.find((r) => r.file);
-    if (row?.file) this.openFile(row.root, row.file);
-  }
-
-  private onKey(e: KeyboardEvent): void {
-    const idx = this.rows.findIndex((r) => r.key === this.selectedFile);
-    const row = this.rows[idx];
-    const moveTo = (i: number) => {
-      const r = this.rows[Math.max(0, Math.min(this.rows.length - 1, i))];
-      if (!r) return;
-      this.selectedFile = r.key;
-      this.renderFiles();
-      this.fileList.querySelector('.tree-row.selected')?.scrollIntoView({ block: 'nearest' });
-    };
-    switch (e.key) {
-      case 'ArrowDown':
-        moveTo(idx + 1);
-        break;
-      case 'ArrowUp':
-        moveTo(idx - 1);
-        break;
-      case 'ArrowRight':
-        if (row?.expandable && !row.expanded) this.toggle(row.key, true);
-        else moveTo(idx + 1);
-        break;
-      case 'ArrowLeft':
-        if (row?.expandable && row.expanded) this.toggle(row.key, false);
-        break;
-      case 'Enter':
-        if (row?.file) this.openFile(row.root, row.file);
-        else if (row?.expandable) this.toggle(row.key);
-        break;
-      default:
-        return;
-    }
-    e.preventDefault();
   }
 
   // ---------- 詳情 ----------

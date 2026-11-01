@@ -25,6 +25,7 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 ## 開啟與版面
 - [ ] 活動列 Git Workbench 圖示：側邊欄依序出現「提交」與 Repositories，底部 Log 面板同時開啟
 - [ ] 狀態列「Git Log」按鈕與 `Alt+9` 都能開啟 Log 面板；`Alt+0` 開啟提交視窗
+- [ ] Log 面板、提交、儲存庫的標題列都有齒輪按鈕，按下開啟 Git Workbench 的設定頁（只列出本擴充套件的設定）
 - [ ] 三欄分隔線可拖曳；左右欄可收合再展開；重新載入視窗後寬度保留
 - [ ] 切換淺色／深色主題，顏色正常
 
@@ -115,7 +116,8 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] 右鍵：複製 N 個 Revision 編號、複製標題；同一 repo 時可一次 Cherry-Pick／Revert（含 merge commit 時會提示）
 
 ## 儲藏（提交視窗的「儲藏」分頁、檔案總管右鍵）
-- [ ] 「儲藏」分頁列出所有 repo 的 stash（web-app 有 2 個）；展開看到檔案（未追蹤檔案標示「未追蹤」），雙擊檔案開 diff
+- [ ] 「儲藏」分頁列出所有 repo 的 stash（web-app 有 2 個）；選一個 stash，下方列出檔案，未追蹤的檔案另列在「未追蹤的檔案」底下；雙擊檔案開 diff
+- [ ] 檔案清單上方 👁「分組方式」：目錄／儲存庫／模組，與 Log 右欄相同；重新載入視窗後保留
 - [ ] 右鍵：套用、套用並還原暫存狀態、套用並刪除、從儲藏建立分支…、刪除…；「清除所有儲藏…」會先確認
 - [ ] 工具列「儲藏變更…」：選 repo、選模式（已追蹤／含未追蹤／保留已暫存）、輸入說明 → 出現在清單
 - [ ] 沒有變更時提示「沒有可儲藏的本機變更」

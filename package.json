@@ -177,6 +177,12 @@
         "command": "gitWorkbench.toggleBlame",
         "title": "%command.toggleBlame%",
         "category": "Git Workbench"
+      },
+      {
+        "command": "gitWorkbench.openSettings",
+        "title": "%command.openSettings%",
+        "category": "Git Workbench",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
@@ -200,6 +206,21 @@
           "command": "gitWorkbench.refreshRepositories",
           "when": "view == gitWorkbench.repositories",
           "group": "navigation"
+        },
+        {
+          "command": "gitWorkbench.openSettings",
+          "when": "view == gitWorkbench.log",
+          "group": "navigation@9"
+        },
+        {
+          "command": "gitWorkbench.openSettings",
+          "when": "view == gitWorkbench.commit",
+          "group": "navigation@9"
+        },
+        {
+          "command": "gitWorkbench.openSettings",
+          "when": "view == gitWorkbench.repositories",
+          "group": "navigation@9"
         }
       ],
       "explorer/context": [

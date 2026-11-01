@@ -9,7 +9,7 @@
 - Commit, Commit and Push…, Amend last commit (loads the previous message), Sign-off, Skip Git hooks; `Ctrl+Enter` commits. Committing across several repositories creates one commit per repository with the same message
 - Context menu: Show Diff, Open File, Rollback… (restores modified and deleted files to HEAD; added files go back to unversioned; asks first), Add to .gitignore, Copy Path, Move to Another Changelist…
 - Changelists: create, rename, delete, set the active one; new changes go to the active changelist. Stored per workspace
-- Stash tab: the stash list of every repository with its files (double-click for the diff); Apply, Apply with Index, Pop, Unstash as Branch…, Drop, Clear All Stashes…; Stash Changes… from the toolbar. This replaces the separate Stashes view
+- Stash tab: the stash list of every repository with its files, grouped by directory, repository or module like the log, untracked files listed separately (double-click for the diff); Apply, Apply with Index, Pop, Unstash as Branch…, Drop, Clear All Stashes…; Stash Changes… from the toolbar. This replaces the separate Stashes view
 
 ### Sync
 - Fetch in the Branches toolbar; Pull and Push in the log toolbar. Pull follows your `pull.rebase` setting
@@ -58,8 +58,9 @@
 ### Other
 - English and Traditional Chinese UI. The new `gitWorkbench.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
 - Confirmations triggered from the panel or a dialog tab (delete, force push, hard reset, checkout a tag or revision, rollback, …) are shown inside it in the same style as the Push dialog; destructive actions use a red button with Cancel focused
+- Gear button in the Git log, Commit and Repositories title bars opens Git Workbench's settings (language, issue links, …)
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
-- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Previous Changed File / Next Changed File
+- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Previous Changed File / Next Changed File
 
 ## 1.0.0
 

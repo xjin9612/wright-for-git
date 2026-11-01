@@ -4,6 +4,7 @@ import { ConfirmHost, confirm } from './dialogs';
 import { t } from './i18n';
 import type { WorkbenchViewProvider } from './provider';
 import type { DiffHunk, RebaseCommit, ToExtension, ToWebview } from './shared/protocol';
+import { ModuleResolver } from './modules';
 import { openStashFile } from './stashView';
 
 export interface PushDialogArgs {
@@ -114,7 +115,8 @@ export class DialogPanels {
       }
       case 'unstashFiles': {
         const stash = await findStash(m.root, m.hash);
-        const files = stash ? ((await repoOf(m.root)?.getStashFiles(stash)) ?? []) : [];
+        const modules = new ModuleResolver(m.root);
+        const files = stash ? ((await repoOf(m.root)?.getStashFiles(stash)) ?? []).map((f) => ({ ...f, module: modules.moduleOf(f.path) })) : [];
         reply({ type: 'unstashFiles', requestId: m.requestId, root: m.root, hash: m.hash, files });
         return;
       }
