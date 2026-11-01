@@ -107,7 +107,9 @@ test('取消儲藏分頁：選 stash 看檔案；以新分支取消儲藏', asyn
   await d.page.locator('.unstash-branch').fill('from-stash');
   await d.page.locator('.button.primary').click();
   await h.until(() => h.git(web, 'rev-parse', '--abbrev-ref', 'HEAD') === 'from-stash');
-  assert.match(h.git(web, 'status', '--porcelain'), /Draft\.tsx/);
+  // 直接看檔案：使用者的 git 可能設定 status.showUntrackedFiles=no，status 不會列出未追蹤檔案
+  assert.ok(require('node:fs').existsSync(path.join(web, 'src/Draft.tsx')), '儲藏中的未追蹤檔案已還原');
+  assert.match(h.git(web, 'status', '--porcelain'), /App\.css/);
   await d.page.close();
 });
 
