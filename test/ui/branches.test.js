@@ -152,15 +152,34 @@ test('雙擊遠端分支：有衝突的本機修改時顯示錯誤；乾淨時�
 });
 
 test('合併衝突：Log 上方顯示合併進行中；中止需確認', async () => {
-  await tool('Expand all').click();
-  await page.locator('.branch-tree .tree-row', { hasText: /^\s*theme\b/ }).first().click({ button: 'right' });
-  app.calls.picks.push((x) => /web-app/.test(typeof x === 'string' ? x : x.label));
-  await h.menu(page, 'Merge');
-  // 合併前可能先跳確認框（Windows 上較慢出現）：等到確認框出現就按確認，或直接進入衝突
-  await h.until(async () => {
-    if (await page.locator('.confirm-dialog').count()) await confirmPanel(true);
-    return h.git(web, 'status', '--porcelain').includes('UU');
-  }, 40000);
+  const conflicted = () => {
+    try {
+      return h.git(web, 'status', '--porcelain').includes('UU');
+    } catch {
+      return false; // git 暫時鎖住 index（重新整理中）
+    }
+  };
+  // Windows 上檔案監看的重新整理較慢：右鍵選單可能剛打開就因分支樹重繪而關閉，Merge 沒被按到。
+  // 每次嘗試後等一段時間，還沒開始合併就重新右鍵再按一次。
+  for (let attempt = 1; !conflicted(); attempt++) {
+    if (attempt > 4) assert.fail(`嘗試 ${attempt - 1} 次都沒有進入合併衝突`);
+    await page.keyboard.press('Escape');
+    await settle();
+    await tool('Expand all').click();
+    await settle();
+    const row = page.locator('.branch-tree .tree-row', { hasText: /^\s*theme\b/ }).first();
+    await row.click({ button: 'right' });
+    const item = page.locator('.context-menu .menu-item', { hasText: /^Merge .* into Current/ }).first();
+    if (!(await item.isVisible().catch(() => false))) continue;
+    if (!app.calls.picks.length) app.calls.picks.push((x) => /web-app/.test(typeof x === 'string' ? x : x.label));
+    await item.dispatchEvent('mousedown');
+    // 合併前可能先跳確認框：出現就按確認
+    await h.until(async () => {
+      if (await page.locator('.confirm-dialog').count()) await confirmPanel(true);
+      return conflicted();
+    }, 15000).catch(() => undefined);
+  }
+  app.calls.picks.length = 0;
   await app.waitOps(true);
   assert.match(await page.locator('.log-ops').innerText(), /web-app.*Merge/);
   await page.locator('.log-ops .link', { hasText: 'Abort' }).click();

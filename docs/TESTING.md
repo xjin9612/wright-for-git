@@ -19,7 +19,7 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-每個測試檔會在系統暫存資料夾建立一份新的 playground，不會動到專案旁邊的 `playground`。失敗時訊息會指出哪一個步驟、預期與實際的內容。
+每個測試檔會在系統暫存資料夾建立一份新的 playground，不會動到專案旁邊的 `playground`。失敗時訊息會指出哪一個步驟、預期與實際的內容；等待逾時還會附上診斷：各 repo 的 `git status`、錯誤與警告通知、Git 主控台最後幾行、當下開著的選單與確認框。回報失敗時請連同這段一起貼上。
 
 ### UI 測試涵蓋的項目（不需手動再測）
 

@@ -319,6 +319,20 @@ function git(cwd, ...args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LC_ALL: 'C', LANG: 'C', LANGUAGE: 'C' } }).trim();
 }
 
+/** workspace 下的 repo（深度 2 以內，含巢狀） */
+function findRepos(dir, depth = 0) {
+  const out = [];
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  if (entries.some((e) => e.name === '.git')) out.push(dir);
+  if (depth < 2) for (const e of entries) if (e.isDirectory() && e.name !== '.git' && e.name !== 'node_modules') out.push(...findRepos(path.join(dir, e.name), depth + 1));
+  return out;
+}
+
 /** 模擬另一台電腦推送一筆 commit */
 function remotePush(playground, repo) {
   execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'make-playground.mjs'), 'remote-push', repo, playground], { stdio: 'ignore' });
@@ -410,6 +424,11 @@ async function launch(workspace, opts = {}) {
   const log = await attachWebviewView(browser, calls.providers['gitWorkbench.log'], 'webview.js', { width: opts.width ?? 1400, height: opts.height ?? 520 });
   const page = log.page;
   await page.waitForFunction(() => document.querySelectorAll('.log-row').length > 0 && !document.querySelector('.progress.active'), null, { timeout: 30000 });
+  const extraPages = [];
+  current = {
+    repos: () => findRepos(workspace),
+    pages: () => [['Log', page], ...extraPages.filter(([, p]) => !p.isClosed())],
+  };
 
   return {
     browser,
@@ -423,6 +442,7 @@ async function launch(workspace, opts = {}) {
     /** 開啟提交視窗 */
     async commitView(viewport = { width: 420, height: 760 }) {
       const v = await attachWebviewView(browser, calls.providers['gitWorkbench.commit'], 'commit.js', viewport);
+      extraPages.push(['提交視窗', v.page]);
       await v.page.waitForSelector('.commit-tree .tree-row, .commit-tree .empty-text');
       return v;
     },
@@ -432,6 +452,7 @@ async function launch(workspace, opts = {}) {
       if (!panel) throw new Error('沒有開啟的對話框分頁');
       const p = await browser.newPage({ viewport });
       const plog = watchPage(p);
+      extraPages.push(['對話框分頁', p]);
       await p.exposeFunction('__host', (m) => panel._onMsg(m));
       panel._post = async (m) => {
         await p.evaluate((msg) => window.postMessage(msg, '*'), m).catch(() => undefined);
@@ -467,6 +488,7 @@ async function launch(workspace, opts = {}) {
       for (const w of calls.watchers) for (const h of w.handlers) h(uri ?? Uri.file(workspace));
     },
     async close() {
+      current = undefined;
       await browser.close();
       for (const d of ctx.subscriptions) {
         try {
@@ -482,7 +504,41 @@ async function launch(workspace, opts = {}) {
 /** webview 端的錯誤（console.error、未捕捉例外） */
 const pageErrors = (log) => log.filter((l) => /^\[(error|pageerror)\]/.test(l));
 
-/** 等條件成立（輪詢） */
+/** 目前 launch 的狀態，逾時時印出，方便判斷卡在哪一步 */
+let current;
+async function diagnose() {
+  if (!current) return '';
+  const out = [];
+  const tail = (a, n = 5) => a.slice(-n).map((x) => `    ${String(x).slice(0, 300)}`).join('\n');
+  for (const dir of current.repos()) {
+    try {
+      out.push(`  git status（${path.basename(dir)}）：${git(dir, 'status', '--porcelain', '-b').split('\n').join(' | ')}`);
+    } catch (e) {
+      out.push(`  git status（${path.basename(dir)}）失敗：${String(e.message).split('\n')[0]}`);
+    }
+  }
+  if (calls.errors?.length) out.push(`  錯誤通知：\n${tail(calls.errors)}`);
+  if (calls.warnings?.length) out.push(`  警告通知：\n${tail(calls.warnings)}`);
+  const cons = (calls.console ?? []).filter(([l]) => l === 'info' || l === 'warn' || l === 'error').map(([l, t]) => `${l} ${t}`);
+  if (cons.length) out.push(`  Git 主控台最後幾行：\n${tail(cons, 8)}`);
+  if (calls.picks?.length) out.push(`  尚未用到的 QuickPick 回答：${calls.picks.length} 個`);
+  for (const [name, pg] of current.pages()) {
+    try {
+      const state = await pg.evaluate(() => ({
+        menu: [...document.querySelectorAll('.context-menu .menu-item')].map((e) => e.textContent.trim()).slice(0, 12),
+        confirm: document.querySelector('.confirm-dialog')?.innerText.replace(/\s+/g, ' ').slice(0, 200),
+        progress: !!document.querySelector('.progress.active'),
+        ops: document.querySelector('.log-ops:not(.hidden)')?.innerText.replace(/\s+/g, ' ').slice(0, 200),
+      }));
+      out.push(`  頁面 ${name}：選單=${state.menu.length ? state.menu.join('／') : '無'}；確認框=${state.confirm ?? '無'}；載入中=${state.progress}${state.ops ? `；進行中操作=${state.ops}` : ''}`);
+    } catch {
+      // 頁面已關閉
+    }
+  }
+  return out.length ? `診斷：\n${out.join('\n')}` : '';
+}
+
+/** 等條件成立（輪詢）；逾時時附上診斷資訊 */
 async function until(fn, timeout = 20000, interval = 100) {
   const end = Date.now() + timeout;
   for (;;) {
@@ -493,7 +549,7 @@ async function until(fn, timeout = 20000, interval = 100) {
       v = undefined; // 條件中的 git 指令暫時失敗（例如 upstream 尚未設定）視為還沒成立
     }
     if (v) return v;
-    if (Date.now() > end) throw new Error('等待逾時');
+    if (Date.now() > end) throw new Error(`等待逾時（${timeout / 1000} 秒）\n${await diagnose()}`);
     await new Promise((r) => setTimeout(r, interval));
   }
 }
@@ -528,7 +584,12 @@ async function logRow(page, text) {
 /** 點選單項目（選單在 mousedown 時觸發） */
 async function menu(page, label, level) {
   const scope = level === undefined ? page.locator('.context-menu') : page.locator(`.context-menu[data-level="${level}"]`);
-  await scope.locator('.menu-item', { hasText: label }).first().dispatchEvent('mousedown');
+  const item = scope.locator('.menu-item', { hasText: label }).first();
+  // 選單可能因重新整理而關閉：找不到時附上診斷，而不是只等到 Playwright 逾時
+  await item.waitFor({ state: 'visible', timeout: 10000 }).catch(async () => {
+    throw new Error(`找不到選單項目「${label}」\n${await diagnose()}`);
+  });
+  await item.dispatchEvent('mousedown');
 }
 
 module.exports = { launch, makePlayground, git, remotePush, pageErrors, until, eventually, texts, menu, logRow, ROOT };
