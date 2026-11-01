@@ -1,6 +1,5 @@
 **
-!dist/extension.js
-!dist/webview.js
+!dist/*.js
 !media/**
 !l10n/**
 !package.json
