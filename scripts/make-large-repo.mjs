@@ -1,19 +1,31 @@
-// 建立大型測試 repo（效能量測用）：以 git fast-import 快速產生大量 commit、合併、分支與 tag。
-// 用法：node scripts/make-large-repo.mjs <資料夾> [commit 數，預設 100000]
-// 內容全部是虛構的（作者、訊息、檔案），可安全分享。
+// 建立大型測試 repo（效能量測、長線性分支折疊）：以 git fast-import 快速產生大量 commit、合併、分支與 tag。
+// 用法：node scripts/make-large-repo.mjs [資料夾] [commit 數] [--force]
+//   資料夾預設為 ../vscode-git-workbench-test/large-repo（見 sandbox.mjs）；commit 數預設 100000
+//   例：node scripts/make-large-repo.mjs 3000          （3000 筆，看分支折疊）
+//       node scripts/make-large-repo.mjs --force       （刪除舊的再重建）
+// 內容全部是虛構的（作者、訊息、檔案），可安全分享；main 每 100 筆合併一條 5 筆的 feature 分支。
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import * as path from 'node:path';
+import { SANDBOX } from './sandbox.mjs';
 
-const dir = process.argv[2];
-const total = Number(process.argv[3] ?? 100000);
-if (!dir || !Number.isFinite(total) || total < 10) {
-  console.error('用法：node scripts/make-large-repo.mjs <資料夾> [commit 數]');
+const args = process.argv.slice(2);
+const force = args.includes('--force');
+const positional = args.filter((a) => !a.startsWith('--'));
+// 只給一個數字時是 commit 數
+const [dirArg, countArg] = positional.length === 1 && /^\d+$/.test(positional[0]) ? [undefined, positional[0]] : positional;
+const dir = path.resolve(dirArg ?? path.join(SANDBOX, 'large-repo'));
+const total = Number(countArg ?? 100000);
+if (!Number.isFinite(total) || total < 10) {
+  console.error('用法：node scripts/make-large-repo.mjs [資料夾] [commit 數] [--force]');
   process.exit(1);
 }
-if (existsSync(path.join(dir, '.git'))) {
-  console.error(`${dir} 已經是 git repo，請換一個資料夾`);
-  process.exit(1);
+if (existsSync(dir)) {
+  if (!force) {
+    console.error(`${dir} 已存在。加上 --force 會先刪除再重建。`);
+    process.exit(1);
+  }
+  rmSync(dir, { recursive: true, force: true });
 }
 mkdirSync(dir, { recursive: true });
 const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -116,4 +128,4 @@ if (stale.length > 0) execFileSync('git', ['update-ref', '--stdin'], { cwd: dir,
 git('symbolic-ref', 'HEAD', 'refs/heads/main');
 git('reset', '-q', '--hard');
 const count = git('rev-list', '--count', '--all');
-console.log(`已建立 ${dir}：${count} 筆 commit、${git('branch', '--list').split('\n').length} 個分支、${git('tag').split('\n').length} 個 tag（${((Date.now() - started) / 1000).toFixed(1)} 秒）`);
+console.log(`已建立 ${dir}：${count} 筆 commit、${git('branch', '--list').split('\n').filter(Boolean).length} 個分支、${git('tag').split('\n').filter(Boolean).length} 個 tag（${((Date.now() - started) / 1000).toFixed(1)} 秒）`);

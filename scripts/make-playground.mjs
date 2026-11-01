@@ -2,11 +2,11 @@
 // 建立手動測試用的 playground（docs/TESTING.md 的各種情境），全部是虛構的人名與內容。
 //
 //   node scripts/make-playground.mjs [目標資料夾] [--force]
-//       建立 playground（預設為專案的上一層資料夾下的 playground）；--force 會先刪除舊的
+//       建立 playground（預設為 ../vscode-git-workbench-test/playground，見 sandbox.mjs）；--force 會先刪除舊的
 //   node scripts/make-playground.mjs remote-push <repo> [目標資料夾]
 //       模擬「另一台電腦」對 <repo>（api-server／web-app）推一個新 commit，用來測試 Pull 與 Push 被拒
 //
-// 產生的結構：
+// 產生的結構（預設在 ../vscode-git-workbench-test/ 底下）：
 //   playground/                 ← 用 VS Code 開這個資料夾（本身不是 git repo）
 //     api-server/               ← repo；main 領先遠端 2 筆、有沒有 upstream 的新 branch、未合併的 branch、tag、
 //                                  未提交的變更（Commit 視窗）、packages/sdk 子模組
@@ -18,9 +18,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { SANDBOX } from './sandbox.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const force = args.includes('--force');
 const positional = args.filter((a) => !a.startsWith('--'));
@@ -247,7 +246,7 @@ function buildWebApp(root, remotes) {
 function main() {
   if (positional[0] === 'remote-push') {
     const repo = positional[1];
-    const root = path.resolve(positional[2] ?? path.join(here, '..', '..', 'playground'));
+    const root = path.resolve(positional[2] ?? path.join(SANDBOX, 'playground'));
     const remotes = `${root}-remotes`;
     if (!repo || !existsSync(path.join(remotes, `${repo}.git`))) {
       console.error('用法：node scripts/make-playground.mjs remote-push <api-server|web-app> [playground 資料夾]');
@@ -258,7 +257,7 @@ function main() {
     return;
   }
 
-  const root = path.resolve(positional[0] ?? path.join(here, '..', '..', 'playground'));
+  const root = path.resolve(positional[0] ?? path.join(SANDBOX, 'playground'));
   const remotes = `${root}-remotes`;
   if (existsSync(root) || existsSync(remotes)) {
     if (!force) {
