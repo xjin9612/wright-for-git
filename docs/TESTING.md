@@ -25,7 +25,7 @@ npm run test:ui
 
 | 檔案 | 內容 |
 |---|---|
-| `test/ui/log.test.js` | 多 repo 合併顯示與標籤；文字、hash、regex 篩選；User（`me`）、Branch 串接選單、Date、Paths（Ctrl+點選）篩選；HEAD 不在篩選中的提示；repo 名稱欄；選取 commit 的檔案與詳情；issue 連結；多選合併變更；右鍵選單；Log 分頁；欄寬拖曳與隱藏欄位 |
+| `test/ui/log.test.js` | 鍵盤開啟與操作右鍵選單；狀態字母；沒有結果時清除篩選；多 repo 合併顯示與標籤；文字、hash、regex 篩選；User（`me`）、Branch 串接選單、Date、Paths（Ctrl+點選）篩選；HEAD 不在篩選中的提示；repo 名稱欄；選取 commit 的檔案與詳情；issue 連結；多選合併變更；右鍵選單；Log 分頁；欄寬拖曳與隱藏欄位 |
 | `test/ui/branches.test.js` | Branches 樹與資料夾、同名分支合併；搜尋；新增分支（名稱驗證）；刪除已合併／未合併（確認框）；重新命名；右鍵選單與停用項目；我的最愛；雙擊遠端分支（失敗與成功）；合併衝突、進行中列、中止確認 |
 | `test/ui/sync.test.js` | Push 分頁（目標、commit、檔案、警告）；推送成功與被拒；Pull；Force Push 確認；新分支 New 與改名後設定 upstream；Push 到這裡為止；Fetch |
 | `test/ui/commit.test.js` | 提交視窗的清單與預設勾選；分組（模組、平鋪）；逐段提交且不動內建暫存區；跨 repo 提交；Amend（只改訊息）；捨棄變更；加入 .gitignore；Changelist；儲藏分頁（分組、未追蹤、diff、刪除後即時更新）；儲藏變更 |
@@ -61,7 +61,8 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] 狀態列「Git Log」按鈕與 `Alt+9` 開啟記錄面板；`Alt+0` 開啟提交視窗
 - [ ] 記錄面板、提交、儲存庫的標題列都有齒輪按鈕，按下後開啟設定頁，且只列出 Git Workbench 的設定
 - [ ] 記錄面板三欄的分隔線可拖曳；左右兩欄可收合再展開。重新載入視窗後，寬度、收合狀態、欄寬、分組選項、我的最愛都保留
-- [ ] 切換淺色／深色主題（「喜好設定: 色彩佈景主題」），面板、選單、對話框分頁顏色都正常、文字看得清楚
+- [ ] 切換淺色、深色、高對比主題（「喜好設定: 色彩佈景主題」）：面板、選單、對話框分頁顏色都正常、文字看得清楚；高對比時選取與滑過的列有邊框
+- [ ] 對話框按鈕順序：Windows 上主要按鈕在左、取消在右（與 VS Code 的對話框相同）
 
 ## 2. 原生 diff
 - [ ] 記錄右欄雙擊檔案：開啟 VS Code 的 diff；新增的檔案左側為空、刪除的檔案右側為空；選 `docs: API reference for orders` 開 `中文說明.md`，中文檔名正常

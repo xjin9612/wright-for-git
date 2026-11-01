@@ -61,6 +61,16 @@
 - Unstash Changes opens a dialog in an editor tab: pick a stash, see its files, Apply / Pop / Drop / Clear, or unstash as a branch
 - Editor context menu: Toggle Git Blame, which switches VS Code's built-in blame annotations
 
+### Accessibility and look
+- Menus work from the keyboard: `Shift+F10` or the Menu key opens the context menu of the selected row, arrows and `Home` / `End` move, `→` / `←` open and close submenus, `Enter` runs, `Esc` closes; shortcuts are shown next to menu items
+- Changed files show a status letter (`A`, `M`, `D`, `R`, `U`, `!`) at the end of the row, so the status no longer depends on color alone
+- File status colors come from the theme's git decoration colors, the same as the Explorer and Source Control
+- High contrast themes get borders and outlines for hover, selection, menus and dialogs; lists show a keyboard focus outline; the loading bar stops when reduced motion is on
+- File icons are single-color line icons by file kind; graph and repository colors are darker in light themes
+- Commit type highlighting colors only `feat`, `fix` and `revert`; other types use the secondary text color
+- Empty states offer the next step: Clear filters when nothing matches, Refresh in an empty Commit window, Stash Changes… in an empty Stash tab
+- Dialog buttons follow the platform order (on Windows the primary button comes first)
+
 ### Other
 - English and Traditional Chinese UI. The new `gitWorkbench.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
 - Confirmations triggered from the panel or a dialog tab (delete, force push, hard reset, checkout a tag or revision, rollback, …) are shown inside it in the same style as the Push dialog; destructive actions use a red button with Cancel focused
