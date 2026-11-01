@@ -16,6 +16,8 @@ export function makeRepo(): { dir: string; git: (...args: string[]) => string; c
   git('config', 'user.name', 'Alice');
   git('config', 'user.email', 'alice@example.com');
   git('config', 'commit.gpgsign', 'false');
+  // Windows（含 GitHub Actions 的 Windows runner）預設 core.autocrlf=true，取出檔案時會轉成 CRLF；測試比對內容時固定不轉換
+  git('config', 'core.autocrlf', 'false');
   const commit = (msg: string, files: Record<string, string> = {}, date?: string) => {
     tick++;
     const d = date ?? `2026-01-01T00:${String(Math.floor(tick / 60)).padStart(2, '0')}:${String(tick % 60).padStart(2, '0')}Z`;
