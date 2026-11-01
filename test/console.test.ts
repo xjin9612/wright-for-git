@@ -5,7 +5,7 @@ import { isReadOnlyCommand, runGit, setGitLogger, type GitCommandRecord } from '
 import { makeRepo } from './helpers';
 
 test('isReadOnlyCommand：查詢類為只讀，會改變狀態的不是', () => {
-  for (const a of [['log', '--oneline'], ['status', '--porcelain'], ['-c', 'x=y', 'rev-parse', 'HEAD'], ['config', '--get', 'user.name'], ['config', 'user.name'], ['branch', '--list'], ['remote', 'get-url', 'origin'], ['stash', 'list'], ['tag', '-l']]) {
+  for (const a of [['log', '--oneline'], ['status', '--porcelain'], ['-c', 'x=y', 'rev-parse', 'HEAD'], ['config', '--get', 'user.name'], ['diff-tree', '-r', '--name-status', 'abc'], ['ls-remote', 'origin'], ['config', 'user.name'], ['branch', '--list'], ['remote', 'get-url', 'origin'], ['stash', 'list'], ['tag', '-l']]) {
     assert.equal(isReadOnlyCommand(a), true, a.join(' '));
   }
   for (const a of [['fetch', 'origin'], ['push', 'origin', 'main'], ['commit', '-m', 'x'], ['checkout', 'main'], ['config', 'user.name', 'Bob'], ['branch', '-D', 'x'], ['stash', 'push'], ['tag', 'v1'], ['remote', 'add', 'o', 'u'], ['rebase', '-i']]) {

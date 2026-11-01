@@ -49,7 +49,7 @@ export function setGitLogger(onStart: typeof startLogger, onEnd: typeof commandL
 }
 
 const READ_ONLY = new Set([
-  'log', 'show', 'rev-parse', 'rev-list', 'status', 'for-each-ref', 'diff', 'ls-tree', 'ls-files', 'cat-file', 'shortlog',
+  'log', 'show', 'rev-parse', 'rev-list', 'status', 'for-each-ref', 'diff', 'diff-tree', 'diff-index', 'diff-files', 'ls-tree', 'ls-files', 'ls-remote', 'cat-file', 'shortlog', 'cherry', 'show-branch',
   'merge-base', 'symbolic-ref', 'check-ref-format', 'name-rev', 'describe', 'version', 'blame', 'var', 'grep', 'show-ref', 'count-objects',
 ]);
 
