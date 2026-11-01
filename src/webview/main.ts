@@ -10,7 +10,7 @@ import { showConfirm } from './confirmDialog';
 import { setIssueLinkRules } from './issueLinks';
 import { openPathsDialog, refreshPathsDialog } from './pathsDialog';
 import { closePicker, openPicker, type PickerOption } from './valuePicker';
-import { t } from './l10n';
+import { plural, t } from './l10n';
 import { handleSettings } from './settingsPanel';
 import { loadState, post, saveState } from './vscodeApi';
 
@@ -431,28 +431,33 @@ function renderChips(): void {
 /** Branch 篩選有值、但沒有包含 HEAD 或任一可見 repo 的目前 branch 時，提示並提供一鍵加入 */
 function renderOperations(): void {
   clear(opBar);
-  const active = repos.filter((r) => r.operation);
+  // 進行中的操作，或沒有操作但有衝突（例如套用儲藏時的衝突）
+  const active = repos.filter((r) => r.operation || r.conflicts);
   opBar.classList.toggle('hidden', active.length === 0);
   const names: Record<string, string> = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
   for (const r of active) {
-    const op = r.operation!;
-    const link = (label: string, action: 'continue' | 'skip' | 'abort') => {
+    const op = r.operation;
+    const link = (label: string, onClick: () => void) => {
       const a = el('a', { className: 'link', text: label, attrs: { href: '#' } });
       a.addEventListener('click', (e) => {
         e.preventDefault();
-        post({ type: 'operation', root: r.root, action, expected: op });
+        onClick();
       });
       return a;
     };
+    const opLink = (label: string, action: 'continue' | 'skip' | 'abort') => link(label, () => post({ type: 'operation', root: r.root, action, expected: op }));
+    const count = r.conflicts ? plural(r.conflicts, '{0} conflict', '{0} conflicts') : '';
+    const text = op ? [t('{0}: {1} in progress', r.name, names[op] ?? op), count].filter(Boolean).join(' · ') : `${r.name}: ${count}`;
     opBar.append(
       el(
         'div',
         { className: 'log-op' },
         icon('warning'),
-        el('span', { text: t('{0}: {1} in progress', r.name, names[op] ?? op) }),
-        link(t('Continue'), 'continue'),
-        op === 'rebase' || op === 'cherry-pick' ? link(t('Skip'), 'skip') : null,
-        link(t('Abort'), 'abort'),
+        el('span', { text }),
+        r.conflicts ? link(t('Resolve Conflicts…'), () => post({ type: 'openConflicts', root: r.root })) : null,
+        op ? opLink(t('Continue'), 'continue') : null,
+        op === 'rebase' || op === 'cherry-pick' ? opLink(t('Skip'), 'skip') : null,
+        op ? opLink(t('Abort'), 'abort') : null,
       ),
     );
   }

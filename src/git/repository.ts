@@ -72,7 +72,7 @@ export class GitRepository {
   }
 
   async getState(): Promise<RepoState> {
-    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail, operation, originUrl] = await Promise.all([
+    const [remotesOut, refsOut, headHash, headBranch, userName, userEmail, operation, originUrl, conflicts] = await Promise.all([
       this.tryRun(['remote']),
       this.run(['for-each-ref', `--format=${REF_FORMAT}`, 'refs/heads', 'refs/remotes', 'refs/tags']),
       this.tryRun(['rev-parse', '--verify', '--quiet', 'HEAD']),
@@ -81,6 +81,7 @@ export class GitRepository {
       this.tryRun(['config', 'user.email']),
       this.operationInProgress().catch(() => undefined),
       this.tryRun(['remote', 'get-url', 'origin']),
+      this.conflictedPaths().catch(() => [] as string[]),
     ]);
     const remotes = (remotesOut ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
     return {
@@ -93,6 +94,7 @@ export class GitRepository {
       userEmail: userEmail?.trim() || undefined,
       operation,
       webUrl: remoteWebUrl(originUrl?.trim()),
+      conflicts: conflicts.length || undefined,
     };
   }
 
@@ -328,6 +330,103 @@ export class GitRepository {
   async skipOperation(op: 'cherry-pick' | 'rebase'): Promise<void> {
     await runGit(this.gitPath, [op, '--skip'], { cwd: this.root, env: { GIT_EDITOR: 'true' } });
     await this.cleanupRebaseTemp();
+  }
+
+  // ---------- 衝突 ----------
+
+  /** 尚未解決的衝突檔案 */
+  async conflictedPaths(): Promise<string[]> {
+    const out = await this.tryRun(['diff', '--name-only', '--diff-filter=U', '-z']);
+    return [...new Set((out ?? '').split('\0').filter(Boolean))];
+  }
+
+  /** 衝突檔案在 index 中的版本：stage 1（共同祖先）、2（我的）、3（他們的）的 blob */
+  private async conflictStages(filePath: string): Promise<Map<number, string>> {
+    assertRelPath(filePath);
+    const out = await runGit(this.gitPath, ['ls-files', '-u', '-z', '--', filePath], { cwd: this.root, env: LITERAL });
+    const stages = new Map<number, string>();
+    for (const rec of out.split('\0')) {
+      // <mode> <object> <stage>\t<path>
+      const m = /^\d+ ([0-9a-f]+) ([123])\t(.*)$/s.exec(rec);
+      if (m && m[3] === filePath) stages.set(Number(m[2]), m[1]);
+    }
+    return stages;
+  }
+
+  /** 衝突檔案的三個版本（原始位元組）；沒有該版本（例如一邊刪除）時為 undefined */
+  async conflictVersions(filePath: string): Promise<{ base?: Buffer; ours?: Buffer; theirs?: Buffer }> {
+    const stages = await this.conflictStages(filePath);
+    const blob = async (stage: number) => {
+      const id = stages.get(stage);
+      return id ? runGitBuffer(this.gitPath, ['cat-file', 'blob', id], { cwd: this.root }) : undefined;
+    };
+    const [base, ours, theirs] = await Promise.all([blob(1), blob(2), blob(3)]);
+    return { base, ours, theirs };
+  }
+
+  /** 合併兩邊的名稱（顯示在三方合併分頁的欄位標題） */
+  async conflictLabels(): Promise<{ op?: 'cherry-pick' | 'revert' | 'merge' | 'rebase'; ours: string; theirs: string }> {
+    const op = await this.operationInProgress();
+    const short = async (ref: string) => ((await this.tryRun(['rev-parse', '--short', ref])) ?? '').trim();
+    const name = async (ref: string) => {
+      const n = ((await this.tryRun(['name-rev', '--name-only', '--no-undefined', ref])) ?? '').trim();
+      return n.replace(/^remotes\//, '') || (await short(ref));
+    };
+    const subject = async (ref: string) => ((await this.tryRun(['log', '-1', '--format=%h %s', ref, '--'])) ?? '').trim();
+    const branch = ((await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD'])) ?? '').trim() || (await short('HEAD'));
+    switch (op) {
+      case 'merge':
+        return { op, ours: branch, theirs: await name('MERGE_HEAD') };
+      case 'cherry-pick':
+        return { op, ours: branch, theirs: await subject('CHERRY_PICK_HEAD') };
+      case 'revert':
+        return { op, ours: branch, theirs: await subject('REVERT_HEAD') };
+      case 'rebase': {
+        const { promises: fsp } = await import('node:fs');
+        let onto = '';
+        for (const dir of ['rebase-merge', 'rebase-apply']) {
+          onto = (await fsp.readFile(path.join(this.gitDir, dir, 'onto'), 'utf8').catch(() => '')).trim();
+          if (onto) break;
+        }
+        return { op, ours: onto && isHash(onto) ? await name(onto) : await short('HEAD'), theirs: await subject('REBASE_HEAD') };
+      }
+      default:
+        // 沒有進行中的操作：多半是套用儲藏時的衝突
+        return { op, ours: branch, theirs: 'stash' };
+    }
+  }
+
+  /**
+   * 整個檔案採用某一邊：該邊有內容時取出並標記為已解決；該邊已刪除時刪除檔案。
+   */
+  async acceptConflictSide(paths: string[], side: 'ours' | 'theirs'): Promise<void> {
+    const lit = (args: string[]) => runGit(this.gitPath, args, { cwd: this.root, env: LITERAL });
+    for (const p of paths) {
+      const stages = await this.conflictStages(p);
+      if (stages.size === 0) continue; // 已經解決
+      if (stages.has(side === 'ours' ? 2 : 3)) {
+        await lit(['checkout', `--${side}`, '--', p]);
+        await lit(['add', '--', p]);
+      } else {
+        await lit(['rm', '-q', '-f', '--', p]);
+      }
+    }
+  }
+
+  /** 標記為已解決：以工作區目前的內容為準（檔案已不存在則記為刪除） */
+  async markConflictResolved(paths: string[]): Promise<void> {
+    for (const p of paths) assertRelPath(p);
+    for (let i = 0; i < paths.length; i += 200) {
+      await runGit(this.gitPath, ['add', '-A', '--', ...paths.slice(i, i + 200)], { cwd: this.root, env: LITERAL });
+    }
+  }
+
+  /** 寫入合併結果並標記為已解決 */
+  async saveMergeResult(filePath: string, content: Buffer): Promise<void> {
+    assertRelPath(filePath);
+    const { promises: fsp } = await import('node:fs');
+    await fsp.writeFile(path.join(this.root, filePath), content);
+    await this.markConflictResolved([filePath]);
   }
 
   /**

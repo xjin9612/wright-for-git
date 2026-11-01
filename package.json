@@ -164,6 +164,11 @@
         "category": "Git Workbench"
       },
       {
+        "command": "gitWorkbench.resolveConflicts",
+        "title": "%command.resolveConflicts%",
+        "category": "Git Workbench"
+      },
+      {
         "command": "gitWorkbench.showCommit",
         "title": "%command.showCommit%",
         "category": "Git Workbench"

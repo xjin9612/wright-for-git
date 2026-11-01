@@ -396,38 +396,12 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'openRebase':
           await this.dialogs.openRebase(m.root, m.hash);
           break;
-        case 'operation': {
-          const e = this.find(m.root);
-          const op = await e?.repo.operationInProgress();
-          // 畫面過期（操作已結束或換成別的操作）：只重新整理
-          if (!e || !op || (m.expected && m.expected !== op)) {
-            await this.refresh(true);
-            break;
-          }
-          if (m.action === 'abort') {
-            const names = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
-            const ok = await confirm(t('Abort the {0} in {1}?', names[op], e.name), { detail: t('The repository returns to the state before the {0} started. Conflicts you have already resolved are lost.', names[op]), ok: t('Abort'), kind: 'danger' });
-            if (!ok) break;
-          }
-          try {
-            if (m.action === 'continue') await e.repo.continueOperation(op);
-            else if (m.action === 'skip' && (op === 'rebase' || op === 'cherry-pick')) await e.repo.skipOperation(op);
-            else if (m.action === 'abort') await e.repo.abortOperation(op);
-          } catch (err) {
-            const next = await e.repo.operationInProgress();
-            // 仍在進行中：多半是還有衝突沒解決
-            if (next) {
-              const open = t('Open Source Control');
-              void vscode.window.showWarningMessage(t('{0}: {1} is still in progress. Resolve the remaining conflicts, then continue.', e.name, next), { detail: errorMessage(err) }, open).then((a) => {
-                if (a === open) void vscode.commands.executeCommand('workbench.view.scm');
-              });
-            } else {
-              void showGitError(errorMessage(err));
-            }
-          }
-          await this.refresh(true);
+        case 'operation':
+          await this.runOperation(m.root, m.action, m.expected);
           break;
-        }
+        case 'openConflicts':
+          this.dialogs.conflicts.openList(m.root);
+          break;
         case 'openPushPanel':
           this.dialogs.openPush({ roots: m.roots, branch: m.branch, upTo: m.upTo });
           break;
@@ -869,6 +843,39 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   /** 開在編輯器分頁的對話框用的 HTML（同一份樣式與翻譯） */
+  /** 進行中操作的繼續／略過／中止（Log 上方的操作列、衝突清單分頁） */
+  async runOperation(root: string, action: 'continue' | 'skip' | 'abort', expected?: 'cherry-pick' | 'revert' | 'merge' | 'rebase'): Promise<void> {
+    const e = this.find(root);
+    const op = await e?.repo.operationInProgress();
+    // 畫面過期（操作已結束或換成別的操作）：只重新整理
+    if (!e || !op || (expected && expected !== op)) {
+      await this.refresh(true);
+      return;
+    }
+    if (action === 'abort') {
+      const names = { rebase: t('Rebase'), merge: t('Merge'), 'cherry-pick': t('Cherry-Pick'), revert: t('Revert') };
+      const ok = await confirm(t('Abort the {0} in {1}?', names[op], e.name), { detail: t('The repository returns to the state before the {0} started. Conflicts you have already resolved are lost.', names[op]), ok: t('Abort'), kind: 'danger' });
+      if (!ok) return;
+    }
+    try {
+      if (action === 'continue') await e.repo.continueOperation(op);
+      else if (action === 'skip' && (op === 'rebase' || op === 'cherry-pick')) await e.repo.skipOperation(op);
+      else if (action === 'abort') await e.repo.abortOperation(op);
+    } catch (err) {
+      const next = await e.repo.operationInProgress();
+      // 仍在進行中：多半是還有衝突沒解決
+      if (next) {
+        const resolve = t('Resolve Conflicts…');
+        void vscode.window.showWarningMessage(t('{0}: {1} is still in progress. Resolve the remaining conflicts, then continue.', e.name, next), { detail: errorMessage(err) }, resolve).then((a) => {
+          if (a === resolve) this.dialogs.conflicts.openList(root);
+        });
+      } else {
+        void showGitError(errorMessage(err));
+      }
+    }
+    await this.refresh(true);
+  }
+
   dialogHtml(webview: vscode.Webview, config: unknown): string {
     return this.renderHtml(webview, { script: 'dialog.js', config });
   }

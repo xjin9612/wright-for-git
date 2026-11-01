@@ -214,13 +214,18 @@ function buildWebApp(root, remotes) {
   git(dir, 'checkout', '-q', '-b', 'release/2.4');
   commit(dir, 'carol', 35, 'feat(i18n): add Traditional Chinese locale', { 'src/locales/zh-TW.json': '{ "hello": "你好" }\n' });
   git(dir, 'checkout', '-q', 'main');
-  commit(dir, 'alice', 15, 'feat(ui): dark mode toggle', { 'src/theme.ts': 'export const theme = "light";\n', 'src/App.css': 'body { margin: 0; }\nbutton { display: block; }\n:root { color-scheme: light dark; }\n' });
+  commit(dir, 'alice', 15, 'feat(ui): dark mode toggle', {
+    'src/theme.ts': '// theme settings\nexport const theme = "light";\nexport const contrast = "normal";\n\nexport const fontSize = 14;\nexport const lineHeight = 1.5;\nexport const radius = 4;\n',
+    'src/legacy.ts': 'export const legacy = true;\n',
+    'src/App.css': 'body { margin: 0; }\nbutton { display: block; }\n:root { color-scheme: light dark; }\n',
+  });
 
-  // 會衝突的 branch：與 main 修改同一行（Merge／Rebase／Cherry-Pick 衝突）
+  // 會衝突的 branch（Merge／Rebase／Cherry-Pick 衝突）：
+  // theme.ts 兩邊都改了第 2～3 行（衝突），另外各自改了不同的行（不衝突）；legacy.ts 一邊修改、一邊刪除
   git(dir, 'checkout', '-q', '-b', 'conflict/theme');
-  commit(dir, 'bob', 8, 'feat(ui): default to dark theme', { 'src/theme.ts': 'export const theme = "dark";\n' });
+  commit(dir, 'bob', 8, 'feat(ui): default to dark theme', { 'src/theme.ts': '// theme settings\nexport const theme = "dark";\nexport const accent = "#0af";\n\nexport const fontSize = 14;\nexport const lineHeight = 1.5;\nexport const radius = 6;\n', 'src/legacy.ts': null });
   git(dir, 'checkout', '-q', 'main');
-  commit(dir, 'alice', 7, 'feat(ui): follow system theme', { 'src/theme.ts': 'export const theme = "system";\n' });
+  commit(dir, 'alice', 7, 'feat(ui): follow system theme', { 'src/theme.ts': '// theme settings\nexport const theme = "system";\nexport const contrast = "auto";\n\nexport const fontSize = 13;\nexport const lineHeight = 1.5;\nexport const radius = 4;\n', 'src/legacy.ts': 'export const legacy = false;\n' });
 
   publish(dir, remotes, 'web-app');
 

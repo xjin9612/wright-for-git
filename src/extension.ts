@@ -64,6 +64,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     console.error('[Git Workbench] commit view init failed:', e);
   }
   provider.dialogs.onStashChanged = () => commitView?.stashChanged();
+  provider.dialogs.conflicts.onChanged = () => void commitView?.refresh();
   registerExplorerCommands(context, provider, () => {
     commitView?.stashChanged();
     void commitView?.refresh();
@@ -91,6 +92,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('gitWorkbench.openSettings', () => provider.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.commit.openSettings', () => commitView?.openSettingsPanel()),
     vscode.commands.registerCommand('gitWorkbench.unstashChanges', () => provider.dialogs.openUnstash()),
+    // 衝突清單分頁（指令面板、衝突提示的按鈕）；root 為字串時只是預設選取的 repo
+    vscode.commands.registerCommand('gitWorkbench.resolveConflicts', (root?: unknown) => provider.dialogs.conflicts.openList(typeof root === 'string' ? root : undefined)),
     // Annotate：VS Code 1.96 起內建 git blame，這裡只切換內建的編輯器標註，不重複實作
     vscode.commands.registerCommand('gitWorkbench.toggleBlame', async () => {
       const cfg = vscode.workspace.getConfiguration('git');

@@ -25,7 +25,7 @@ test('parseStatusV2：一般、rename、衝突、未追蹤、忽略', () => {
     { path: 'new.ts', status: 'A', kind: 'changed' },
     { path: 'gone.ts', status: 'D', kind: 'changed' },
     { path: 'docs/new.md', oldPath: 'docs/old.md', status: 'R', kind: 'changed' },
-    { path: 'conflict.txt', status: 'U', kind: 'conflict' },
+    { path: 'conflict.txt', status: 'U', kind: 'conflict', conflict: 'both-modified' },
     { path: 'notes.txt', status: 'A', kind: 'untracked' },
     { path: 'dist/', status: 'X', kind: 'ignored' },
   ]);

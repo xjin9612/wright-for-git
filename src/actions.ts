@@ -45,12 +45,12 @@ async function withConflictCheck(target: RepoTarget, fn: () => Promise<void>): P
 
 /** 提示到原始檔控制解決衝突，或中止這次操作（不等待使用者回應，避免卡住進度通知） */
 function promptConflict(target: RepoTarget, op: Operation): void {
-  const openScm = t('Open Source Control');
+  const resolve = t('Resolve Conflicts…');
   const abort = t('Abort {0}', op);
   void vscode.window
-    .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them in Source Control, then continue or abort.', target.name, op), openScm, abort)
+    .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them, then continue or abort.', target.name, op), resolve, abort)
     .then(async (answer) => {
-      if (answer === openScm) await vscode.commands.executeCommand('workbench.view.scm');
+      if (answer === resolve) await vscode.commands.executeCommand('gitWorkbench.resolveConflicts', target.repo.root);
       else if (answer === abort) {
         try {
           await target.repo.abortOperation(op);

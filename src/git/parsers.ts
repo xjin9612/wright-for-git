@@ -183,6 +183,16 @@ export function parseShortlog(text: string): UserInfo[] {
   return users;
 }
 
+const CONFLICT_TYPES: Record<string, import('../shared/protocol').ConflictType> = {
+  UU: 'both-modified',
+  AA: 'both-added',
+  DU: 'deleted-by-us',
+  UD: 'deleted-by-them',
+  AU: 'added-by-us',
+  UA: 'added-by-them',
+  DD: 'both-deleted',
+};
+
 /** 解析 `git status --porcelain=v2 -z`（含 --untracked-files、--ignored） */
 export function parseStatusV2(text: string): import('../shared/protocol').WorkingChange[] {
   const out: import('../shared/protocol').WorkingChange[] = [];
@@ -211,7 +221,7 @@ export function parseStatusV2(text: string): import('../shared/protocol').Workin
     } else if (type === 'u') {
       // u XY sub m1 m2 m3 mW h1 h2 h3 path
       const f = splitN(rec, 11);
-      out.push({ path: f[10], status: 'U', kind: 'conflict' });
+      out.push({ path: f[10], status: 'U', kind: 'conflict', conflict: CONFLICT_TYPES[f[1]] ?? 'both-modified' });
     } else if (type === '?') {
       out.push({ path: rec.slice(2), status: 'A', kind: 'untracked' });
     } else if (type === '!') {

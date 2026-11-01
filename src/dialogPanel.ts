@@ -1,10 +1,11 @@
 // 開在編輯器分頁的對話框（Push、取消儲藏）：比底部面板大，可拖到其他編輯器群組或用「移到新視窗」變成浮動視窗
 import * as vscode from 'vscode';
 import { ConfirmHost, confirm } from './dialogs';
+import { ConflictResolver } from './conflicts';
 import { t } from './i18n';
 import { showGitError } from './gitConsole';
 import type { WorkbenchViewProvider } from './provider';
-import type { DiffHunk, RebaseCommit, ToExtension, ToWebview } from './shared/protocol';
+import type { DiffHunk, MergeArgs, RebaseCommit, ToExtension, ToWebview } from './shared/protocol';
 import { ModuleResolver } from './modules';
 import { openStashFile } from './stashView';
 
@@ -19,10 +20,12 @@ export type DialogConfig =
   | { kind: 'push'; args: PushDialogArgs }
   | { kind: 'unstash'; args: { root?: string } }
   | { kind: 'hunks'; args: { root: string; path: string; hunks: DiffHunk[]; selected: number[] } }
-  | { kind: 'rebase'; args: { root: string; base: string; branch?: string; commits: RebaseCommit[] } };
+  | { kind: 'rebase'; args: { root: string; base: string; branch?: string; commits: RebaseCommit[] } }
+  | { kind: 'conflicts'; args: { root?: string } }
+  | { kind: 'merge'; args: MergeArgs };
 
-type Reply = (msg: ToWebview) => void;
-type Handler = (m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void) => Promise<void>;
+export type Reply = (msg: ToWebview) => void;
+export type Handler = (m: ToExtension, reply: Reply, host: ConfirmHost, close: () => void) => Promise<void>;
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -34,7 +37,11 @@ export class DialogPanels {
   /** 儲藏清單變動時通知（提交視窗的儲藏分頁） */
   onStashChanged: (() => void) | undefined;
 
-  constructor(private readonly provider: WorkbenchViewProvider) {}
+  readonly conflicts: ConflictResolver;
+
+  constructor(private readonly provider: WorkbenchViewProvider) {
+    this.conflicts = new ConflictResolver(provider, this);
+  }
 
   openPush(args: PushDialogArgs): void {
     const title = args.upTo ? t('Push Commits up to {0}', args.upTo.hash.slice(0, 8)) : args.branch ? t('Push {0}', args.branch) : t('Push Commits');
@@ -150,8 +157,8 @@ export class DialogPanels {
         } catch (e) {
           const msg = errorMessage(e);
           if (/conflict/i.test(msg)) {
-            void vscode.window.showWarningMessage(t('The stash was applied with conflicts. Resolve them in Source Control; the stash was kept.'), t('Open Source Control')).then((a) => {
-              if (a) void vscode.commands.executeCommand('workbench.view.scm');
+            void vscode.window.showWarningMessage(t('The stash was applied with conflicts. Resolve them, then the stash can be dropped; it was kept.'), t('Resolve Conflicts…')).then((a) => {
+              if (a) this.conflicts.openList(m.root);
             });
             close();
           } else {
@@ -185,7 +192,23 @@ export class DialogPanels {
     }
   }
 
-  private open(key: string, title: string, config: DialogConfig, handler: Handler): void {
+  /** 對已開啟的分頁送訊息（例如衝突清單在別處解決衝突後更新） */
+  postTo(key: string, msg: ToWebview): boolean {
+    const entry = this.panels.get(key);
+    if (!entry) return false;
+    void entry.panel.webview.postMessage(msg);
+    return true;
+  }
+
+  isOpen(key: string): boolean {
+    return this.panels.has(key);
+  }
+
+  close(key: string): void {
+    this.panels.get(key)?.panel.dispose();
+  }
+
+  open(key: string, title: string, config: DialogConfig, handler: Handler): void {
     const existing = this.panels.get(key);
     if (existing) {
       // 已開啟：換成新的處理函式（對應新的檔案／repo），以新的內容重新載入並移到前面

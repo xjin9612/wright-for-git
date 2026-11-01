@@ -1,5 +1,7 @@
 // 編輯器分頁對話框的進入點：依 extension 放進 HTML 的設定畫出對應的對話框
-import type { DiffHunk, RebaseCommit, ToWebview } from '../shared/protocol';
+import type { DiffHunk, MergeArgs, RebaseCommit, ToWebview } from '../shared/protocol';
+import { handleConflictsMessage, openConflictsDialog } from './conflictsDialog';
+import { openMergeDialog } from './mergeDialog';
 import { openRebaseDialog } from './rebaseDialog';
 import { openHunksDialog } from './hunksDialog';
 import { showConfirm } from './confirmDialog';
@@ -11,7 +13,9 @@ type DialogConfig =
   | { kind: 'push'; args: { roots: string[]; branch?: string; upTo?: { root: string; hash: string } } }
   | { kind: 'unstash'; args: { root?: string } }
   | { kind: 'hunks'; args: { root: string; path: string; hunks: DiffHunk[]; selected: number[] } }
-  | { kind: 'rebase'; args: { root: string; base: string; branch?: string; commits: RebaseCommit[] } };
+  | { kind: 'rebase'; args: { root: string; base: string; branch?: string; commits: RebaseCommit[] } }
+  | { kind: 'conflicts'; args: { root?: string } }
+  | { kind: 'merge'; args: MergeArgs };
 
 const node = document.getElementById('dialog-config');
 const config = node?.textContent ? (JSON.parse(node.textContent) as DialogConfig | null) : null;
@@ -20,6 +24,8 @@ document.body.classList.add('dialog-page');
 if (config?.kind === 'unstash') openUnstashDialog(config.args.root);
 if (config?.kind === 'hunks') openHunksDialog(config.args);
 if (config?.kind === 'rebase') openRebaseDialog(config.args);
+if (config?.kind === 'conflicts') openConflictsDialog(config.args);
+if (config?.kind === 'merge') openMergeDialog(config.args);
 if (config?.kind === 'push') {
   openPushDialog({
     ...config.args,
@@ -40,6 +46,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'unstashFiles':
     case 'stashChanged':
       handleUnstashMessage(m);
+      break;
+    case 'conflictsData':
+      handleConflictsMessage(m);
       break;
     case 'confirm':
       showConfirm(m);

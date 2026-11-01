@@ -258,6 +258,15 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         case 'openUnstash':
           this.provider.dialogs.openUnstash(m.root);
           break;
+        case 'conflictAction':
+          await this.provider.dialogs.conflicts.act(m.items, m.action, this.confirms);
+          break;
+        case 'openMerge':
+          await this.provider.dialogs.conflicts.openMerge(m.root, m.path);
+          break;
+        case 'openConflicts':
+          this.provider.dialogs.conflicts.openList(m.root);
+          break;
         case 'copy':
           if (m.text) await vscode.env.clipboard.writeText(m.text);
           break;

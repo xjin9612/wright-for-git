@@ -561,3 +561,67 @@ body.dialog-page { overflow: hidden; }
 .settings-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .commit-tabs { align-items: center; }
 :is(.vscode-high-contrast, .vscode-high-contrast-light) .settings-popover { border-color: var(--vscode-contrastBorder); }
+
+/* ---------- 合併衝突：衝突清單 ---------- */
+.commit-resolve { margin-left: 8px; font-weight: normal; }
+.conflicts-body { flex: 1; min-height: 0; display: flex; }
+.conflicts-table { flex: 1; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+.conflicts-head, .conflicts-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 120px; align-items: center; gap: 8px; padding: 0 12px; }
+.conflicts-head { height: 24px; color: var(--muted); border-bottom: 1px solid var(--border); flex: none; }
+.conflicts-list { flex: 1; overflow: auto; outline: none; padding: 4px 0; }
+.conflicts-row { height: 22px; cursor: default; white-space: nowrap; }
+.conflicts-row:hover { background: var(--hover); }
+.conflicts-row.selected { background: var(--sel-bg); color: var(--sel-fg); }
+.conflicts-list:focus-visible .conflicts-row.selected { background: var(--sel-focus-bg); color: var(--sel-focus-fg); }
+.conflicts-name { display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; }
+.conflicts-name .muted { margin-left: 4px; overflow: hidden; text-overflow: ellipsis; }
+.conflicts-side { overflow: hidden; text-overflow: ellipsis; }
+.conflicts-repo { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 12px; }
+.conflicts-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px; width: 168px; flex: none; }
+.conflicts-actions .button { width: 100%; }
+
+/* ---------- 合併衝突：三方合併 ---------- */
+.merge-dialog { --merge-lh: 19px; }
+.merge-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.merge-toolbar { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); flex: none; }
+.merge-counter { margin: 0 8px; white-space: nowrap; }
+.merge-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+.merge-line-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.merge-line-toggle.active { background: var(--vscode-inputOption-activeBackground, rgba(0, 120, 212, 0.25)); border-color: var(--vscode-inputOption-activeBorder, var(--vscode-focusBorder)); color: var(--vscode-inputOption-activeForeground, inherit); }
+.merge-heads, .merge-grid { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr) 44px minmax(0, 1fr); }
+.merge-heads { border-bottom: 1px solid var(--border); flex: none; }
+.merge-heads > div { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.merge-scroll { flex: 1; min-height: 0; overflow: auto; }
+.merge-grid { font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); }
+.merge-cell { min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.merge-line { display: flex; height: var(--merge-lh); line-height: var(--merge-lh); white-space: pre; }
+.merge-no, .merge-nums { color: var(--vscode-editorLineNumber-foreground, var(--muted)); text-align: right; flex: none; width: 40px; padding-right: 10px; user-select: none; }
+.merge-nums > div { height: var(--merge-lh); line-height: var(--merge-lh); }
+.merge-text { flex: 1; }
+.merge-cell.result { display: flex; align-items: stretch; }
+.merge-input {
+  flex: 1; min-width: 0; margin: 0; padding: 0; border: none; outline: none; resize: none; overflow-x: auto; overflow-y: hidden;
+  font: inherit; line-height: var(--merge-lh); white-space: pre; background: transparent; color: inherit; min-height: var(--merge-lh);
+}
+.merge-input.empty { min-height: 4px; }
+.merge-input:focus { box-shadow: inset 2px 0 0 var(--vscode-focusBorder); }
+/* 區塊顏色：衝突紅、不衝突的變更藍、已處理淡綠 */
+.merge-cell.conflict { background: var(--vscode-merge-incomingContentBackground, rgba(229, 83, 75, 0.18)); }
+.merge-cell.change { background: var(--vscode-diffEditor-insertedLineBackground, rgba(80, 140, 230, 0.16)); }
+.merge-cell.result.resolved { background: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.12)); }
+.merge-cell.side.resolved .merge-line { opacity: 0.55; }
+.merge-line.state-applied .merge-text { color: var(--st-added); }
+.merge-line.state-ignored { opacity: 0.45; text-decoration: line-through; }
+.merge-cell.flash { outline: 2px solid var(--vscode-focusBorder); outline-offset: -2px; }
+.merge-gutter { display: flex; flex-direction: column; align-items: center; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+.merge-gutter-line { height: var(--merge-lh); display: flex; align-items: center; gap: 2px; }
+.merge-btn {
+  width: 18px; height: 16px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1;
+  border: 1px solid var(--border); border-radius: 2px; background: var(--vscode-button-secondaryBackground, transparent); color: var(--vscode-button-secondaryForeground, inherit); cursor: pointer;
+}
+.merge-btn.apply { color: var(--vscode-textLink-foreground); }
+.merge-btn.ignore { color: var(--muted); }
+.merge-btn:hover { background: var(--vscode-button-secondaryHoverBackground, var(--hover)); }
+.merge-btn:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.merge-binary { flex: 1; padding: 16px; }
+@media (prefers-reduced-motion: reduce) { .merge-cell.flash { outline-style: dashed; } }

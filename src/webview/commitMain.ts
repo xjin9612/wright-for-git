@@ -1,5 +1,5 @@
 // 提交視窗（側邊欄）：「提交｜儲藏」兩個分頁，對應 IntelliJ 的 Commit 工具視窗
-import type { CommitState, StashInfo, ToWebview, WorkingChange } from '../shared/protocol';
+import { isContentConflict, type CommitState, type StashInfo, type ToWebview, type WorkingChange } from '../shared/protocol';
 import { showConfirm } from './confirmDialog';
 import { clear, el, formatDate, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, type MenuItem } from './dom';
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
@@ -377,7 +377,7 @@ function buildRows(): Row[] {
     const name = p.slice(p.lastIndexOf('/') + 1) + (f.change.path.endsWith('/') ? '/' : '');
     const dir = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
     const repoName = multi && !ui.groupRepository ? state!.repos.find((r) => r.root === f.root)?.name : undefined;
-    const detail = [showDir ? dir : '', f.change.oldPath ? `← ${f.change.oldPath}` : '', repoName ?? ''].filter(Boolean).join('  ');
+    const detail = [showDir ? dir : '', f.change.oldPath ? `← ${f.change.oldPath}` : '', f.change.kind === 'conflict' ? conflictLabel(f.change) : '', repoName ?? ''].filter(Boolean).join('  ');
     return { key: keyOf(f.root, f.change.path), label: name, depth, kind: 'file', section, files: [f], change: f.change, root: f.root, expandable: false, expanded: false, detail };
   };
 
@@ -491,6 +491,7 @@ function renderRow(r: Row): HTMLElement {
     r.detail ? el('span', { className: 'tree-count', text: r.detail }) : null,
     partial ? el('span', { className: 'commit-partial', text: t('{0}/{1} changes', partial.selected, partial.total) }) : null,
     count,
+    r.kind === 'section' && r.section === 'conflicts' ? resolveLink(r) : null,
     r.change ? statusLetter(kindStatus) : null,
   );
   div.style.paddingLeft = `${4 + r.depth * 14}px`;
@@ -511,6 +512,17 @@ function renderRow(r: Row): HTMLElement {
     showRowMenu(r, e.clientX, e.clientY);
   });
   return div;
+}
+
+/** 「合併衝突」標題列上的「解決…」連結（開啟衝突清單分頁） */
+function resolveLink(r: Row): HTMLElement {
+  const a = el('a', { className: 'link commit-resolve', text: t('Resolve…'), attrs: { href: '#' } });
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'openConflicts', root: r.files[0]?.root });
+  });
+  return a;
 }
 
 function toggle(r: Row): void {
@@ -571,7 +583,40 @@ function selectedChanges(): { root: string; change: Change }[] {
 
 function openDiff(r?: Row): void {
   const row = r ?? rows.find((x) => x.key === focusKey && x.kind === 'file');
-  if (row?.change && row.root) post({ type: 'commitDiff', root: row.root, change: row.change });
+  if (!row?.change || !row.root) return;
+  // 衝突檔案：開三方合併（一邊刪除的衝突開衝突清單）
+  if (row.change.kind === 'conflict') resolveConflict(row.root, row.change);
+  else post({ type: 'commitDiff', root: row.root, change: row.change });
+}
+
+function resolveConflict(root: string, c: Change): void {
+  if (isContentConflict(c.conflict)) post({ type: 'openMerge', root, path: c.path });
+  else post({ type: 'openConflicts', root });
+}
+
+/** 衝突時工作區是否還有這個檔案（我的版本已刪除、或兩邊都刪除時沒有） */
+function existsInWorkTree(c: Change): boolean {
+  return c.conflict !== 'deleted-by-us' && c.conflict !== 'both-deleted';
+}
+
+/** 衝突種類的簡短說明（樹狀清單的路徑旁） */
+function conflictLabel(c: Change): string {
+  switch (c.conflict) {
+    case 'both-added':
+      return t('both added');
+    case 'deleted-by-us':
+      return t('deleted by you');
+    case 'deleted-by-them':
+      return t('deleted by them');
+    case 'added-by-us':
+      return t('added by you');
+    case 'added-by-them':
+      return t('added by them');
+    case 'both-deleted':
+      return t('both deleted');
+    default:
+      return t('both modified');
+  }
 }
 
 function rollback(items: { root: string; change: Change }[]): void {
@@ -587,6 +632,24 @@ function showRowMenu(r: Row, x: number, y: number): void {
   const untracked = items.filter((f) => f.change.kind === 'untracked');
   const lists = state?.changelists ?? [];
   const menu: MenuItem[] = [];
+  const conflicts = items.filter((f) => f.change.kind === 'conflict');
+  if (conflicts.length > 0 && conflicts.length === items.length) {
+    // 衝突檔案（對應 IntelliJ 的 Merge Conflicts 節點）
+    const targets = conflicts.map((f) => ({ root: f.root, path: f.change.path }));
+    menu.push(
+      { label: t('Merge…'), keybinding: 'Enter', disabled: !single || !isContentConflict(single.change.conflict), action: () => single && resolveConflict(single.root, single.change) },
+      { label: t('Resolve Conflicts…'), action: () => post({ type: 'openConflicts', root: conflicts[0].root }) },
+      '-',
+      { label: t('Accept Yours'), action: () => post({ type: 'conflictAction', items: targets, action: 'ours' }) },
+      { label: t('Accept Theirs'), action: () => post({ type: 'conflictAction', items: targets, action: 'theirs' }) },
+      { label: t('Mark as Resolved'), action: () => post({ type: 'conflictAction', items: targets, action: 'resolved' }) },
+      '-',
+      { label: t('Open File'), disabled: !single || !existsInWorkTree(single.change), action: () => single && post({ type: 'commitOpenFile', root: single.root, path: single.change.path }) },
+      { label: t('Copy Path'), action: () => post({ type: 'copy', text: items.map((f) => f.change.path).join('\n') }) },
+    );
+    showMenu(x, y, menu);
+    return;
+  }
   if (r.kind === 'section' && r.listId) {
     const id = r.listId;
     menu.push(

@@ -59,6 +59,8 @@ export interface RepoState {
   webUrl?: string;
   /** 進行中的 rebase／merge／cherry-pick／revert（等待解決衝突或 edit） */
   operation?: 'cherry-pick' | 'revert' | 'merge' | 'rebase';
+  /** 尚未解決的衝突檔案數 */
+  conflicts?: number;
 }
 
 export interface LogFilter {
@@ -115,6 +117,48 @@ export interface CommitDetails {
 /** 工作區變更（提交視窗） */
 export type ChangeKind = 'changed' | 'untracked' | 'ignored' | 'conflict';
 
+/**
+ * 衝突的種類（git status 的 XY）：both-modified（UU）、both-added（AA）、deleted-by-us（DU）、deleted-by-them（UD）、
+ * added-by-us（AU）、added-by-them（UA）、both-deleted（DD）
+ */
+export type ConflictType = 'both-modified' | 'both-added' | 'deleted-by-us' | 'deleted-by-them' | 'added-by-us' | 'added-by-them' | 'both-deleted';
+
+/** 兩邊都有內容、可以逐段合併的衝突；其他種類只能整個採用某一邊 */
+export const isContentConflict = (c: ConflictType | undefined): boolean => c === 'both-modified' || c === 'both-added';
+
+/** 衝突清單分頁的一列 */
+export interface ConflictFile {
+  path: string;
+  conflict: ConflictType;
+}
+
+/** 三方合併的段落：不變的行，或變更區塊（base／我的／他們的） */
+export type MergeSegment =
+  | { kind: 'stable'; lines: string[] }
+  | {
+      kind: 'chunk';
+      base: string[];
+      ours: string[];
+      theirs: string[];
+      oursChanged: boolean;
+      theirsChanged: boolean;
+      /** 兩邊都改、且改得不一樣 */
+      conflict: boolean;
+    };
+
+/** 三方合併分頁的資料 */
+export interface MergeArgs {
+  root: string;
+  path: string;
+  oursLabel: string;
+  theirsLabel: string;
+  /** 不是 UTF-8 文字（二進位或其他編碼）：只能整個採用某一邊或改用 VS Code 合併編輯器 */
+  binary?: boolean;
+  eol: '\n' | '\r\n';
+  finalNewline: boolean;
+  segments: MergeSegment[];
+}
+
 export interface WorkingChange {
   /** 相對 repo 根目錄，'/' 分隔；已忽略的資料夾以 '/' 結尾 */
   path: string;
@@ -123,6 +167,8 @@ export interface WorkingChange {
   /** 相對 HEAD 的狀態（A／M／D／R／C／T／U） */
   status: FileStatus;
   kind: ChangeKind;
+  /** kind 為 conflict 時的衝突種類 */
+  conflict?: ConflictType;
 }
 
 /** Commit 訊息中的 issue 編號轉連結：pattern 為正規表示式，url 可用 $0、$1… 與 {repo}（遠端網頁網址） */
@@ -205,6 +251,16 @@ export interface SettingsValues {
 
 export type ToExtension =
   | { type: 'getSettings' }
+  /** 衝突：整個檔案採用我的／他們的版本，或標記為已解決 */
+  | { type: 'conflictAction'; items: { root: string; path: string }[]; action: 'ours' | 'theirs' | 'resolved' }
+  /** 開啟三方合併分頁 */
+  | { type: 'openMerge'; root: string; path: string }
+  /** 開啟衝突清單分頁 */
+  | { type: 'openConflicts'; root?: string }
+  | { type: 'conflictsLoad' }
+  /** 三方合併分頁：寫入結果並標記為已解決；unresolved 為還沒處理的衝突區塊數 */
+  | { type: 'mergeApply'; root: string; path: string; text: string; unresolved: number }
+  | { type: 'mergeOpenEditor'; root: string; path: string }
   | { type: 'setSetting'; key: string; value: unknown }
   | { type: 'openSettingsPage' }
   | { type: 'editIssueLinks' }
@@ -334,6 +390,7 @@ export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'ne
 
 /** Extension → Webview */
 export type ToWebview =
+  | { type: 'conflictsData'; repos: { root: string; name: string; operation?: RepoState['operation']; files: ConflictFile[] }[] }
   | { type: 'settings'; values: SettingsValues; open?: boolean }
   /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */
   | { type: 'repos'; states: RepoState[]; generation: number; message?: string; issueLinks?: IssueLinkRule[] }
