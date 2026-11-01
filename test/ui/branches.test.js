@@ -199,9 +199,14 @@ test('確認框：破壞性操作預設焦點在取消、Tab 切換、Esc 取消
   // 建一個未合併、也沒有 upstream 的分支：刪除時以紅色按鈕確認
   const sha = h.git(api, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'unmerged work');
   h.git(api, 'update-ref', 'refs/heads/tmp/unmerged', sha);
-  await refresh();
-  await tool('Expand all').click();
-  await page.locator('.branch-tree .tree-row', { hasText: /^\s*unmerged\b/ }).first().click();
+  // 新分支要等重新整理後才出現（Windows 上較慢）：持續觸發重新整理直到出現
+  const row = page.locator('.branch-tree .tree-row', { hasText: /^\s*unmerged\b/ }).first();
+  await h.until(async () => {
+    await refresh();
+    await tool('Expand all').click();
+    return (await row.count()) > 0;
+  }, 40000, 0);
+  await row.click();
   await tool('Delete').click();
   await page.waitForSelector('.confirm-dialog');
   assert.ok(await page.locator('.confirm-dialog .button.danger').count(), '紅色按鈕');
