@@ -59,6 +59,20 @@ webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴
 | `test/vscode/suite/repos.test.ts` | 儲存庫勾選與記錄的 repo 篩選同步 |
 | `test/vscode/suite/merge.test.ts` | 合併衝突的種類；「在 VS Code 合併編輯器開啟」打開內建合併編輯器；採用一邊後繼續合併 |
 
+## 大型 repo 效能量測
+
+```
+npm run bench:vscode
+```
+
+- 先用 `scripts/make-large-repo.mjs` 產生 10 萬筆 commit 的 repo（約 15 秒；固定亂數種子，每次內容相同，作者與訊息都是虛構的），再開真實 VS Code 量測。`GWB_BENCH_COMMITS=200000` 可改 commit 數。
+- 量測 Log 各種篩選的載入時間：無篩選、文字、作者、單一檔案、資料夾、hash、單一分支。時間從 extension 收到 webview 的載入請求起算，「首屏」是第一批送出、「全部載入」是全部送完；每項 3 次取中位數。
+- 先量沒有 commit-graph 的情況，再執行 `git commit-graph write --reachable --changed-paths` 後重量一次，比較差異。
+- 結果印在終端機，並寫入 `out/bench/results.md` 與 `results.json`。
+- 數字會隨電腦而不同，不放進 CI；改動 Log 載入相關的程式時，前後各跑一次比較。
+
+產生大型 repo 也可以單獨用：`node scripts/make-large-repo.mjs <資料夾> [commit 數]`。
+
 ---
 
 # 手動測試清單
