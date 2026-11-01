@@ -409,5 +409,8 @@
   "{0} changed while committing. Try again.": "{0} 在提交時被修改，請再試一次。",
   "Untracked files": "未追蹤的檔案",
   "Untracked": "未追蹤",
-  "Ignored": "已忽略"
+  "Ignored": "已忽略",
+  "Show Git Console": "顯示 Git 主控台",
+  "cancelled": "已取消",
+  "exit code {0}": "結束代碼 {0}"
 }

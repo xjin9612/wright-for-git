@@ -29,6 +29,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
 - **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path. The Explorer's Git Workbench submenu also has Compare with Branch or Tag…, Stash Changes… and Unstash Changes…
+- **Git console** — every git command, its output and the reason it failed, in the Output panel's *Git Workbench* channel (button in the log panel's title bar)
 - **Toggle Git Blame** in the editor context menu switches VS Code's built-in blame annotations
 - English and Traditional Chinese UI, switchable on its own with `gitWorkbench.language`
 - Refreshes automatically when branches, tags or HEAD change

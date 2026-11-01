@@ -7,10 +7,12 @@ import { registerLaunchers } from './sidebar';
 import { registerCommitView, type CommitViewProvider } from './commitView';
 import { stashChanges } from './stashView';
 import { initI18n, resetI18n, t } from './i18n';
+import { registerGitConsole } from './gitConsole';
 import { registerExplorerCommands } from './explorerCommands';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   initI18n(context);
+  registerGitConsole(context);
   const gitPath = await resolveGitPath();
   let commitView: CommitViewProvider | undefined;
   const provider = new WorkbenchViewProvider(context, gitPath);

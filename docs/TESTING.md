@@ -91,14 +91,20 @@ node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一�
 - [ ] Push…、取消儲藏…、選取要提交的區段…、互動式重訂基底… 都開在編輯器分頁；可拖到其他編輯器群組，或右鍵分頁「移到新視窗」
 - [ ] 確認框（刪除分支、強制推送、捨棄變更、中止合併…）顯示在面板或分頁內：破壞性操作的按鈕為紅色、預設焦點在「取消」；`Esc` 取消、`Tab` 切換按鈕
 
-## 7. 合併衝突的實際解決
+## 7. Git 主控台
+- [ ] Log 面板標題列的「顯示 Git 主控台」按鈕：開啟「輸出」面板並切到 Git Workbench 頻道
+- [ ] 按 Fetch、Push、提交後，主控台出現 `[repo] git …` 與 `✓ … (毫秒)`，push 顯示 `To … main -> main`
+- [ ] 讓 Push 被拒（`node scripts/make-playground.mjs remote-push web-app` 後直接推送）：主控台以紅色 error 顯示指令、結束代碼與 git 的錯誤；錯誤通知上的「顯示 Git 主控台」按鈕可直接跳過去
+- [ ] 「開發人員: 設定記錄層級」→ Git Workbench → 追蹤：log、status 等只讀取的指令也會出現
+
+## 8. 合併衝突的實際解決
 - [ ] web-app：分支右鍵 `conflict/theme` →「合併到目前的分支」→ 衝突提示選「開啟原始檔控制」→ 在 VS Code 的衝突編輯器解決並暫存 → 記錄面板上方「web-app：合併進行中」按「繼續」完成合併
 
-## 8. 語言
+## 9. 語言
 - [ ] `gitWorkbench.language` 為 `auto` 時跟隨 VS Code 的顯示語言（繁中／英文各切一次，需重新啟動 VS Code）
 - [ ] 指令名稱、設定說明跟隨 VS Code 的顯示語言，不受 `gitWorkbench.language` 影響（VS Code 的限制，預期行為）
 
-## 9. 真實環境
+## 10. 真實環境
 - [ ] 用你自己的 GitHub／GitLab repo（SSH 遠端）各 Fetch、Pull、Push 一次；有密碼的 SSH key 在沒有 ssh-agent 時可能失敗，請回報訊息
 - [ ] 上述 repo 的提交訊息含 `#123` 時，在詳情中變成連結並開啟該 repo 的 issue 頁（未設定 `gitWorkbench.issueLinks` 時）
 - [ ] 數萬筆 commit 的 repo：開啟、捲動、篩選都順暢

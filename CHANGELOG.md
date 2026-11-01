@@ -50,6 +50,12 @@
 - Group by directory, repository or module from the 👁 menu; switch between tree and flat list; file-type icons
 - In a diff opened from the log, step to the previous / next changed file from the editor title bar or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`
 
+### Git console
+- Every git command Git Workbench runs is written to the Output panel's **Git Workbench** channel, like IntelliJ's Git Console: the repository, the full command line, how long it took, and git's own output (for example `To origin … main -> main`)
+- Failed commands are logged as errors with the exit code and git's error text; error notifications have a **Show Git Console** button
+- Read-only queries (log, status, …) are logged at the Trace level, so they stay out of the way until you set the channel's log level to Trace
+- Open it from the log panel's title bar or with **Git Workbench: Show Git Console**
+
 ### Explorer and editor
 - Explorer context menu → Git Workbench: Show History, Compare with Branch or Tag…, Stash Changes…, Unstash Changes…
 - Unstash Changes opens a dialog in an editor tab: pick a stash, see its files, Apply / Pop / Drop / Clear, or unstash as a branch
@@ -61,7 +67,7 @@
 - Gear button in the Git log, Commit and Repositories title bars opens Git Workbench's settings (language, issue links, …)
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
 - UI end-to-end tests (`npm run test:ui`, Playwright) run in CI on Windows and Linux
-- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Previous Changed File / Next Changed File
+- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Previous Changed File / Next Changed File
 
 ## 1.0.0
 

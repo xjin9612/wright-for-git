@@ -34,5 +34,6 @@
   "config.issueLinks.pattern": "要比對的正規表示式",
   "config.issueLinks.url": "連結網址；$0 為整段比對結果，$1… 為群組，{repo} 為 origin 的網頁網址",
   "command.toggleBlame": "切換 Git Blame 標註",
-  "command.openSettings": "開啟設定"
+  "command.openSettings": "開啟設定",
+  "command.showConsole": "顯示 Git 主控台"
 }

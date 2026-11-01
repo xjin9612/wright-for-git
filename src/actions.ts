@@ -6,6 +6,7 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { CommitAction, PushPlan, PushTarget, RefAction, RefInfo, RepoState, SyncAction } from './shared/protocol';
 import { t } from './i18n';
+import { showGitError } from './gitConsole';
 import { confirm, type ConfirmHost } from './dialogs';
 
 export interface RepoTarget {
@@ -54,7 +55,7 @@ function promptConflict(target: RepoTarget, op: Operation): void {
         try {
           await target.repo.abortOperation(op);
         } catch (e) {
-          void vscode.window.showErrorMessage(errorMessage(e));
+          void showGitError(errorMessage(e));
         }
       }
     });
@@ -126,8 +127,8 @@ export async function runSync(action: SyncAction, targets: RepoTarget[]): Promis
     const parts = [summary];
     if (failed.length > 0) parts.push(t('{0} failed', failed.length));
     if (skipped.length > 0) parts.push(t('skipped: {0}', skipped.join(', ')));
-    const show = (failed.length > 0 ? vscode.window.showErrorMessage : vscode.window.showWarningMessage).bind(vscode.window);
-    void show(parts.join(' · '), { detail: failed.join('\n') });
+    if (failed.length > 0) void showGitError(parts.join(' · '), { detail: failed.join('\n') });
+    else void vscode.window.showWarningMessage(parts.join(' · '));
   }
 }
 
@@ -205,7 +206,7 @@ export async function runPush(entries: { target: RepoTarget; push: PushTarget }[
 
   const summary = t('Push: {0} succeeded', succeeded);
   if (failed.length === 0) vscode.window.setStatusBarMessage(`$(check) ${summary}`, 4000);
-  else void vscode.window.showErrorMessage(`${summary} · ${t('{0} failed', failed.length)}`, { detail: failed.join('\n') });
+  else void showGitError(`${summary} · ${t('{0} failed', failed.length)}`, { detail: failed.join('\n') });
   return true;
 }
 
@@ -311,7 +312,7 @@ export async function runCommitAction(action: CommitAction, target: RepoTarget, 
       }
     }
   } catch (e) {
-    void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
+    void showGitError(`${target.name}: ${errorMessage(e)}`);
   }
 }
 
@@ -333,7 +334,7 @@ export async function runCommitsAction(action: 'cherryPick' | 'revert', target: 
     if (op) promptConflict(target, op);
     else vscode.window.setStatusBarMessage(`$(check) ${action === 'cherryPick' ? t('Cherry-picked {0} commits', commits.length) : t('Reverted {0} commits', commits.length)}`, 4000);
   } catch (e) {
-    void vscode.window.showErrorMessage(`${target.name}: ${errorMessage(e)}`);
+    void showGitError(`${target.name}: ${errorMessage(e)}`);
   }
 }
 
@@ -410,7 +411,7 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
   const done = (msg: string) => {
     for (const c of conflicts) promptConflict(c.target, c.op);
     if (conflicts.length > 0 && failures.length === 0) return;
-    if (failures.length > 0) void vscode.window.showErrorMessage(failures.join('\n'));
+    if (failures.length > 0) void showGitError(failures.join('\n'));
     else vscode.window.setStatusBarMessage(`$(check) ${msg}`, 4000);
   };
 
@@ -461,7 +462,7 @@ export async function runRefAction(action: RefAction, refName: string, targets: 
       if (first.type === 'local') {
         const current = targets.filter((x) => x.state?.head.branch === name);
         if (current.length > 0) {
-          void vscode.window.showErrorMessage(t('Cannot delete the current branch {0}. Check out another branch first.', name));
+          void showGitError(t('Cannot delete the current branch {0}. Check out another branch first.', name));
           return;
         }
         if (!(await confirmMulti(targets, t('Delete branch {0} in {1} repositories?', name, targets.length), t('Delete'), false, 'danger'))) return;

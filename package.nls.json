@@ -34,5 +34,6 @@
   "config.issueLinks.pattern": "Regular expression to match",
   "config.issueLinks.url": "Link URL; $0 is the whole match, $1… are groups, {repo} is the web URL of origin",
   "command.toggleBlame": "Annotate with Git Blame (toggle)",
-  "command.openSettings": "Open Settings"
+  "command.openSettings": "Open Settings",
+  "command.showConsole": "Show Git Console"
 }

@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import { ConfirmHost, confirm } from './dialogs';
 import { t } from './i18n';
+import { showGitError } from './gitConsole';
 import type { WorkbenchViewProvider } from './provider';
 import type { DiffHunk, RebaseCommit, ToExtension, ToWebview } from './shared/protocol';
 import { ModuleResolver } from './modules';
@@ -59,7 +60,7 @@ export class DialogPanels {
     try {
       info = await repo.rebaseCommits(hash);
     } catch (e) {
-      void vscode.window.showErrorMessage(errorMessage(e));
+      void showGitError(errorMessage(e));
       return;
     }
     if (!info.onBranch) {
@@ -91,7 +92,7 @@ export class DialogPanels {
           vscode.window.setStatusBarMessage(`$(check) ${t('Rebase finished')}`, 4000);
         }
       } catch (e) {
-        void vscode.window.showErrorMessage(errorMessage(e));
+        void showGitError(errorMessage(e));
       }
       await this.provider.refresh(true);
     });
@@ -135,7 +136,7 @@ export class DialogPanels {
         try {
           if (m.branch) {
             if (!(await repo.isValidRefName(m.branch, 'branch'))) {
-              void vscode.window.showErrorMessage(t('Not a valid branch name.'));
+              void showGitError(t('Not a valid branch name.'));
               return;
             }
             await repo.stashBranch(m.branch, stash.ref);
@@ -154,7 +155,7 @@ export class DialogPanels {
             });
             close();
           } else {
-            void vscode.window.showErrorMessage(msg);
+            void showGitError(msg);
           }
         }
         await this.provider.refresh(true);
@@ -211,7 +212,7 @@ export class DialogPanels {
         else if (m.type === 'closeDialog') panel.dispose();
         else await entry.handler(m, reply, host, () => panel.dispose());
       } catch (e) {
-        void vscode.window.showErrorMessage(errorMessage(e));
+        void showGitError(errorMessage(e));
       }
     });
     panel.onDidDispose(() => {

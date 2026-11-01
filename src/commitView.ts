@@ -8,6 +8,7 @@ import { buildPatch, parseFileDiff } from './git/parsers';
 import type { GitRepository } from './git/repository';
 import { onRepositoryChange } from './gitExtension';
 import { t } from './i18n';
+import { showGitError } from './gitConsole';
 import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
@@ -263,7 +264,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
           break;
       }
     } catch (e) {
-      void vscode.window.showErrorMessage(errorMessage(e));
+      void showGitError(errorMessage(e));
     }
   }
 
@@ -302,7 +303,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         const changes = (await this.current(repo, requested)).filter((c) => c.kind === 'changed' || c.kind === 'conflict');
         await repo.rollback(changes);
       } catch (e) {
-        void vscode.window.showErrorMessage(errorMessage(e));
+        void showGitError(errorMessage(e));
       }
       for (const c of requested) this.partial.delete(keyOf(root, c.path));
     }
@@ -369,7 +370,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         }
       }
     });
-    if (failed.length > 0) void vscode.window.showErrorMessage(t('Commit failed: {0}', failed.join('\n')));
+    if (failed.length > 0) void showGitError(t('Commit failed: {0}', failed.join('\n')));
     else vscode.window.setStatusBarMessage(`$(check) ${t('Committed to {0} repositories', committed.length)}`, 4000);
     done(failed.length === 0);
     await this.refresh();

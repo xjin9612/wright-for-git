@@ -37,6 +37,7 @@ function resetCalls() {
     watchers: [],
     config: {},
     configListeners: [],
+    console: [],
     clipboard: undefined,
   });
 }
@@ -224,6 +225,11 @@ const vscode = {
       };
     },
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
+    /** Git 主控台：記錄到 calls.console（[層級, 文字]） */
+    createOutputChannel: (name) => {
+      const line = (level) => (text) => calls.console.push([level, text]);
+      return { name, info: line('info'), trace: line('trace'), debug: line('debug'), warn: line('warn'), error: line('error'), append() {}, appendLine: line('info'), show: () => (calls.consoleShown = true), clear() {}, dispose() {} };
+    },
     get activeTextEditor() {
       return calls.activeEditor;
     },

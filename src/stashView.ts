@@ -5,6 +5,7 @@ import { revisionUri } from './diffProvider';
 import type { GitRepository } from './git/repository';
 import type { ChangedFile, StashInfo } from './shared/protocol';
 import { t } from './i18n';
+import { showGitError } from './gitConsole';
 
 
 function errorMessage(e: unknown): string {
@@ -41,7 +42,7 @@ export async function stashChanges(repo: GitRepository): Promise<boolean> {
     vscode.window.setStatusBarMessage(`$(check) ${t('Changes stashed')}`, 4000);
     return true;
   } catch (e) {
-    void vscode.window.showErrorMessage(errorMessage(e));
+    void showGitError(errorMessage(e));
     return false;
   }
 }

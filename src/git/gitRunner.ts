@@ -25,6 +25,50 @@ export interface RunOptions {
 // i18n.logOutputEncoding 固定 UTF-8：使用者若設定 big5 等編碼，log／詳情的中文才不會變亂碼
 const BASE_ARGS = ['-c', 'core.quotepath=false', '-c', 'color.ui=false', '-c', 'i18n.logOutputEncoding=UTF-8', '--no-pager'];
 
+/** 每個 git 指令結束時的紀錄（給 Git 主控台） */
+export interface GitCommandRecord {
+  cwd: string;
+  /** 不含固定的 -c 參數 */
+  args: string[];
+  /** 是否為只讀取的指令（log、status 等）；主控台預設只顯示會改變狀態的指令 */
+  readOnly: boolean;
+  exitCode: number | null;
+  durationMs: number;
+  stderr: string;
+  /** 被取消（例如切換篩選時中止上一個 log） */
+  cancelled: boolean;
+}
+
+let commandLogger: ((r: GitCommandRecord) => void) | undefined;
+let startLogger: ((r: Pick<GitCommandRecord, 'cwd' | 'args' | 'readOnly'>) => void) | undefined;
+
+/** 由 extension 註冊：指令開始與結束時呼叫（git 層不依賴 vscode） */
+export function setGitLogger(onStart: typeof startLogger, onEnd: typeof commandLogger): void {
+  startLogger = onStart;
+  commandLogger = onEnd;
+}
+
+const READ_ONLY = new Set([
+  'log', 'show', 'rev-parse', 'rev-list', 'status', 'for-each-ref', 'diff', 'ls-tree', 'ls-files', 'cat-file', 'shortlog',
+  'merge-base', 'symbolic-ref', 'check-ref-format', 'name-rev', 'describe', 'version', 'blame', 'var', 'grep', 'show-ref', 'count-objects',
+]);
+
+/** 指令是否只讀取：子指令在清單中，或 config／branch／remote／stash／tag 的查詢形式 */
+export function isReadOnlyCommand(args: readonly string[]): boolean {
+  let i = 0;
+  while (i < args.length && args[i].startsWith('-')) i += args[i] === '-c' || args[i] === '-C' ? 2 : 1;
+  const sub = args[i];
+  const rest = args.slice(i + 1);
+  if (!sub) return true;
+  if (READ_ONLY.has(sub)) return true;
+  if (sub === 'config') return rest.some((a) => a === '--get' || a === '--get-all' || a === '--list' || a === '-l' || a === '--get-regexp') || rest.filter((a) => !a.startsWith('-')).length === 1;
+  if (sub === 'branch') return rest.length === 0 || rest.some((a) => a === '--list' || a === '-l' || a.startsWith('--contains') || a.startsWith('--merged') || a.startsWith('--format') || a === '-a' || a === '-r' || a === '-v' || a === '-vv');
+  if (sub === 'remote') return rest.length === 0 || rest[0] === '-v' || rest[0] === 'get-url' || rest[0] === 'show';
+  if (sub === 'stash') return rest[0] === 'list' || rest[0] === 'show';
+  if (sub === 'tag') return rest.length === 0 || rest.some((a) => a === '-l' || a === '--list' || a.startsWith('--contains') || a.startsWith('--points-at'));
+  return false;
+}
+
 function spawnGit(gitPath: string, args: string[], opts: RunOptions) {
   const child = spawn(gitPath, [...BASE_ARGS, ...args], {
     cwd: opts.cwd,
@@ -37,6 +81,23 @@ function spawnGit(gitPath: string, args: string[], opts: RunOptions) {
     child.stdin.on('error', () => undefined);
     if (typeof opts.input === 'string') child.stdin.end(opts.input, 'utf8');
     else child.stdin.end(opts.input);
+  }
+  if (startLogger || commandLogger) {
+    const readOnly = isReadOnlyCommand(args);
+    const started = Date.now();
+    let stderr = '';
+    let logged = false;
+    startLogger?.({ cwd: opts.cwd, args, readOnly });
+    const done = (exitCode: number | null, extra = '') => {
+      if (logged) return;
+      logged = true;
+      commandLogger?.({ cwd: opts.cwd, args, readOnly, exitCode, durationMs: Date.now() - started, stderr: stderr + extra, cancelled: !!opts.signal?.aborted });
+    };
+    child.stderr?.on('data', (b: Buffer) => {
+      if (stderr.length < 20000) stderr += b.toString('utf8');
+    });
+    child.on('error', (e) => done(null, e.message));
+    child.on('close', (code) => done(code));
   }
   return child;
 }

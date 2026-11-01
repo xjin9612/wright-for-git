@@ -29,6 +29,7 @@
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
 - 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」
+- **Git 主控台**：在「輸出」面板的 *Git Workbench* 頻道記錄每個 git 指令、輸出與失敗原因（Log 面板標題列有按鈕）
 - 編輯器右鍵切換 Git Blame 標註（沿用 VS Code 內建 blame）
 - 英文／繁體中文介面，可用 `gitWorkbench.language` 獨立切換
 - branch、tag、HEAD 變動時自動重新整理

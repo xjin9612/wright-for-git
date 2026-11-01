@@ -14,6 +14,7 @@ import { ModuleResolver } from './modules';
 import { promises as fsp, statSync } from 'node:fs';
 import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type IssueLinkRule, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
+import { showGitError } from './gitConsole';
 import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { DialogPanels } from './dialogPanel';
 
@@ -411,7 +412,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
                 if (a === open) void vscode.commands.executeCommand('workbench.view.scm');
               });
             } else {
-              void vscode.window.showErrorMessage(errorMessage(err));
+              void showGitError(errorMessage(err));
             }
           }
           await this.refresh(true);
@@ -442,7 +443,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         }
       }
     } catch (e) {
-      void vscode.window.showErrorMessage(t('Git command failed: {0}', errorMessage(e)));
+      void showGitError(t('Git command failed: {0}', errorMessage(e)));
     }
   }
 
@@ -712,7 +713,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       }
       if (!abort.signal.aborted) this.post({ type: 'multiDetails', requestId, groups });
     } catch (err) {
-      if (!abort.signal.aborted) void vscode.window.showErrorMessage(errorMessage(err));
+      if (!abort.signal.aborted) void showGitError(errorMessage(err));
     }
   }
 
@@ -812,7 +813,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         }
       },
     );
-    if (failures.length > 0) void vscode.window.showErrorMessage(t('Checkout failed: {0}', failures.join('\n')));
+    if (failures.length > 0) void showGitError(t('Checkout failed: {0}', failures.join('\n')));
     await this.refresh(true);
   }
 

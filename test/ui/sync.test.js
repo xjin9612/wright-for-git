@@ -150,6 +150,20 @@ test('Fetch：取得遠端新 commit', async () => {
   await h.until(() => h.git(web, 'rev-parse', 'origin/main') === remote, 40000);
 });
 
+test('Git 主控台：記錄會改變狀態的指令與失敗原因；錯誤通知可開啟主控台', async () => {
+  const lines = app.calls.console.filter(([level]) => level === 'info' || level === 'error').map(([level, text]) => `${level} ${text}`);
+  const all = lines.join('\n');
+  assert.match(all, /info \[api-server\] git push/);
+  assert.match(all, /info \[web-app\] git fetch/);
+  // web-app 被拒的 push：error，含 git 的錯誤輸出
+  assert.match(all, /error \[web-app\] git push[\s\S]*rejected/);
+  // 只讀取的指令不出現在一般層級
+  assert.doesNotMatch(all, /git log /);
+  assert.ok(app.calls.console.some(([level, text]) => level === 'trace' && /git (log|status|for-each-ref)/.test(text)));
+  await app.run('gitWorkbench.showConsole');
+  assert.ok(app.calls.consoleShown);
+});
+
 test('沒有 webview 錯誤', () => {
   assert.deepEqual(h.pageErrors(app.log), []);
 });
