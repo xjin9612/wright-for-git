@@ -134,6 +134,13 @@ button { font: inherit; color: inherit; }
 }
 .branches-main { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 4px 0 0; }
 .branches-main .search-box { margin: 0 6px 4px; }
+/* 側邊欄的 Branches：工具列橫放在上方 */
+.branches-app { display: flex; flex-direction: column; height: 100vh; }
+.branches-app .branches-pane { flex: 1; min-height: 0; }
+.branches-pane.sidebar { flex-direction: column; }
+.branches-pane.sidebar .vertical-toolbar { flex-direction: row; flex-wrap: wrap; width: auto; padding: 4px 6px 2px; border-right: none; }
+.branches-pane.sidebar .toolbar-sep { width: 1px; height: 14px; margin: 0 4px; }
+.branches-pane.sidebar .branches-main { min-height: 0; }
 .branch-tree .icon.favorite { color: var(--vscode-charts-yellow, #e2c08d); }
 .branch-tree .icon.current { color: var(--label-current); }
 .branch-tree .tree-row.current .tree-label { font-weight: 600; }
@@ -291,6 +298,11 @@ button { font: inherit; color: inherit; }
 .menu-item { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 16px 0 6px; cursor: pointer; white-space: nowrap; }
 .menu-item:hover, .menu-item.active { background: var(--vscode-menu-selectionBackground, var(--sel-focus-bg)); color: var(--vscode-menu-selectionForeground, inherit); }
 .menu-check { width: 16px; display: inline-flex; }
+.menu-search {
+  position: sticky; top: -4px; z-index: 1; margin-top: -4px; padding: 4px 6px;
+  background: var(--vscode-quickInput-background, var(--vscode-editorWidget-background));
+}
+.menu-empty { color: var(--muted); padding: 4px 12px; }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--vscode-menu-separatorBackground, var(--border)); }
 
 /* ---------- 選單停用項目 ---------- */

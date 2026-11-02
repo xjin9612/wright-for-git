@@ -1,9 +1,10 @@
 // Webview 進入點：組合三欄、管理篩選與資料流
 import { applyCollapse, findLinearRuns, type LinearRun } from '../shared/collapse';
 import { MultiGraph } from '../shared/multiGraph';
-import { EMPTY_FILTER, type CommitAction, type CommitInfo, type LogFilter, type RefAction, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
+import { EMPTY_FILTER, type BranchesEvent, type BranchesSync, type BranchPrefs, type CommitAction, type CommitInfo, type LogFilter, type RepoState, type SyncAction, type ToWebview, type UserInfo } from '../shared/protocol';
 import { mergeRefs, type MergedRef } from '../shared/refs';
-import { BranchesPane, type BranchOptions, type BranchToolbarAction } from './branchesPane';
+import { refMenuItems, runBranchToolbar, type BranchHost } from './branchActions';
+import { BranchesPane, type BranchOptions } from './branchesPane';
 import { DetailsPane, type FileGrouping } from './detailsPane';
 import { clear, closeMenus, debounce, el, icon, iconButton, makeSplitter, MOD_KEY, showMenu, type MenuItem } from './dom';
 import { LogTable, type ColumnWidths, type Columns, type Highlights, type LogRow } from './logTable';
@@ -108,6 +109,11 @@ let users: UserInfo[] | undefined;
 let usersPicker: { refresh: () => void } | undefined;
 const dirsByRoot = new Map<string, string[]>();
 const dirsRequested = new Set<string>();
+/** 最近一次送給側邊欄 Branches 的內容（相同就不重送） */
+let lastBranchesSync = '';
+let branchesSyncTimer: ReturnType<typeof setTimeout> | undefined;
+/** 沒有 repository 時的說明（側邊欄也顯示） */
+let noRepoMessage: string | undefined;
 
 /** 目前 Paths（repo）篩選下要顯示的 repository */
 function visibleRepos(): RepoState[] {
@@ -122,26 +128,39 @@ function selectionKey(c: CommitInfo): string {
 }
 
 // ---------- 元件 ----------
+/** Branches 的操作：Log 左欄直接處理；側邊欄的 Branches 也轉到這裡 */
+const branchHost: BranchHost = {
+  showInLog: (ref) => setFilter({ branches: [ref.name] }),
+  showInNewTab: (ref) => openTab({ branches: [ref.name], roots: ui.filter.roots }),
+  navigate: (ref) => navigateToRef(ref),
+  isFavorite: (ref) => branches.isFavorite(ref),
+  toggleFavorite: (ref) => branches.toggleFavorite(ref),
+  visibleRepos: () => visibleRepos(),
+};
+
 const branches = new BranchesPane(
   {
     onSelect: (ref) => setFilter({ branches: [ref] }),
     onCheckout: (ref, roots) => post({ type: 'checkout', ref, roots }),
-    onToolbarAction: (action, ref) => onBranchToolbar(action, ref),
+    onToolbarAction: (action, ref) => runBranchToolbar(action, ref, branchHost),
     onOptionsChange: (options) => {
       ui.branchOptions = options;
       persist();
+      syncBranches();
     },
     onFetch: () => sync('fetch'),
-    onContextMenu: (ref, x, y) => showRefMenu(ref, x, y),
+    onContextMenu: (ref, x, y) => showMenu(x, y, refMenuItems(ref, branchHost)),
     onCollapsePane: () => setPaneVisible('left', false),
     onExpandedChange: (expanded) => {
       ui.expanded = expanded;
       persist();
+      syncBranches();
     },
     onFavoritesChange: (favorites, onlyFavorites) => {
       ui.favorites = favorites;
       ui.onlyFavorites = onlyFavorites;
       persist();
+      syncBranches();
     },
   },
   ui.expanded,
@@ -227,8 +246,7 @@ const viewButton = iconButton('eye', t('View options'), () => showViewMenu());
 /** 同步：作用於目前 Paths 篩選下可見的 repository */
 const sync = (action: SyncAction) => post({ type: 'sync', action, roots: visibleRepos().map((r) => r.root) });
 /** Push 一律先開對話框確認；upTo 為「Push All up to Here」 */
-const openPush = (upTo?: { root: string; hash: string }, branch?: { name: string; roots: string[] }) =>
-  post({ type: 'openPushPanel', roots: upTo ? [upTo.root] : (branch?.roots ?? visibleRepos().map((r) => r.root)), branch: branch?.name, upTo });
+const openPush = (upTo?: { root: string; hash: string }) => post({ type: 'openPushPanel', roots: upTo ? [upTo.root] : visibleRepos().map((r) => r.root), upTo });
 const syncGroup = el(
   'div',
   { className: 'toolbar-group' },
@@ -361,6 +379,9 @@ const rightSplitter = makeSplitter(
 let dragStart = 0;
 const leftRestore = el('div', { className: 'pane-restore' }, iconButton('chevron-right', t('Show Branches'), () => setPaneVisible('left', true)));
 
+/** 側邊欄的 Branches 顯示中：Log 收起自己的 Branches 欄（連同展開按鈕） */
+let branchesDocked = false;
+
 const app = document.getElementById('app')!;
 app.className = 'workbench';
 app.append(leftRestore, branches.element, leftSplitter, logPane, rightSplitter, details.element);
@@ -371,22 +392,25 @@ window.addEventListener('resize', () => applyLayout());
 
 function applyLayout(): void {
   const cols: string[] = [];
-  leftRestore.style.display = ui.leftVisible ? 'none' : '';
-  branches.element.style.display = ui.leftVisible ? '' : 'none';
-  leftSplitter.style.display = ui.leftVisible ? '' : 'none';
+  const leftVisible = ui.leftVisible && !branchesDocked;
+  leftRestore.style.display = ui.leftVisible || branchesDocked ? 'none' : '';
+  branches.element.style.display = leftVisible ? '' : 'none';
+  leftSplitter.style.display = leftVisible ? '' : 'none';
   rightSplitter.style.display = ui.rightVisible ? '' : 'none';
   details.element.style.display = ui.rightVisible ? '' : 'none';
   // 視窗太窄時依比例縮小兩側欄，保留中欄至少 MIN_MIDDLE
   const MIN_MIDDLE = 420;
-  let left = ui.leftVisible ? ui.leftWidth : 0;
+  let left = leftVisible ? ui.leftWidth : 0;
   let right = ui.rightVisible ? ui.rightWidth : 0;
-  const avail = window.innerWidth - MIN_MIDDLE - (ui.leftVisible ? 4 : 22) - (ui.rightVisible ? 4 : 0);
+  const leftChrome = leftVisible ? 4 : branchesDocked ? 0 : 22;
+  const avail = window.innerWidth - MIN_MIDDLE - leftChrome - (ui.rightVisible ? 4 : 0);
   if (left + right > avail && left + right > 0) {
     const scale = Math.max(0, avail) / (left + right);
-    left = ui.leftVisible ? Math.max(140, Math.floor(left * scale)) : 0;
+    left = leftVisible ? Math.max(140, Math.floor(left * scale)) : 0;
     right = ui.rightVisible ? Math.max(180, Math.floor(right * scale)) : 0;
   }
-  cols.push(ui.leftVisible ? `${left}px 4px` : '22px');
+  if (leftVisible) cols.push(`${left}px 4px`);
+  else if (!branchesDocked) cols.push('22px');
   cols.push('minmax(160px, 1fr)');
   if (ui.rightVisible) cols.push(`4px ${right}px`);
   app.style.gridTemplateColumns = cols.join(' ');
@@ -397,6 +421,58 @@ function setPaneVisible(which: 'left' | 'right', visible: boolean): void {
   else ui.rightVisible = visible;
   applyLayout();
   persist();
+}
+
+/**
+ * 把 Branches 狀態送給側邊欄（同一輪的多次變更合併成一次）。
+ * 側邊欄沒顯示時不送：大型 repo 的 refs 序列化成本不小；顯示時（branchesDocked）再補送一次完整狀態。
+ */
+function syncBranches(): void {
+  clearTimeout(branchesSyncTimer);
+  if (!branchesDocked) return;
+  branchesSyncTimer = setTimeout(() => {
+    const f = ui.filter;
+    const sync: BranchesSync = {
+      states: repos.length > 0 ? visibleRepos() : [],
+      message: repos.length > 0 ? undefined : noRepoMessage,
+      selected: f.branches.length === 1 ? f.branches[0] : undefined,
+      prefs: branches.prefs(),
+    };
+    const json = JSON.stringify(sync);
+    if (json === lastBranchesSync) return;
+    lastBranchesSync = json;
+    post({ type: 'branchesSync', sync });
+  });
+}
+
+/** 側邊欄 Branches 的操作 */
+function onBranchesEvent(ev: BranchesEvent): void {
+  switch (ev.kind) {
+    case 'select':
+      setFilter({ branches: [ev.ref] });
+      break;
+    case 'newTab':
+      openTab({ branches: [ev.ref], roots: ui.filter.roots });
+      break;
+    case 'navigate': {
+      const ref = mergeRefs(visibleRepos()).find((r) => r.name === ev.ref);
+      if (ref) navigateToRef(ref);
+      break;
+    }
+    case 'prefs':
+      applyBranchPrefs(ev.prefs);
+      break;
+  }
+}
+
+function applyBranchPrefs(p: BranchPrefs): void {
+  ui.favorites = p.favorites;
+  ui.onlyFavorites = p.onlyFavorites;
+  ui.branchOptions = p.options;
+  ui.expanded = p.expanded;
+  persist();
+  branches.setPrefs(p);
+  syncBranches();
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -453,6 +529,7 @@ function renderChips(): void {
   regexToggle.sync();
   caseToggle.sync();
   branches.setSelectedRef(f.branches.length === 1 ? f.branches[0] : undefined);
+  syncBranches();
   renderHeadHint();
   renderOperations();
 }
@@ -595,7 +672,7 @@ function showBranchMenu(): void {
   const r = branchChip.element.getBoundingClientRect();
   const merged = mergeRefs(visibleRepos()).sort((a, b) => a.short.localeCompare(b.short, undefined, { numeric: true }));
   const current = new Set(ui.filter.branches);
-  const item = (ref: MergedRef, label = ref.short): MenuItem => ({
+  const item = (ref: MergedRef, label = ref.short): Exclude<MenuItem, '-'> => ({
     label,
     checked: current.has(ref.name),
     star: ref.type === 'tag' ? undefined : { on: branches.isFavorite(ref), toggle: () => (branches.toggleFavorite(ref), branches.isFavorite(ref)) },
@@ -605,11 +682,12 @@ function showBranchMenu(): void {
   const locals = merged.filter((x) => x.type === 'local');
   const remotes = [...new Set(merged.filter((x) => x.type === 'remote').map((x) => x.remote ?? ''))];
   const tags = merged.filter((x) => x.type === 'tag');
+  const head: MenuItem = { label: 'HEAD', checked: current.has('HEAD'), star: { on: true, toggle: () => true }, action: () => setFilter({ branches: ['HEAD'] }) };
   const items: MenuItem[] = [
     { label: t('Select…'), action: () => openBranchPicker() },
     { label: t('Favorites'), disabled: favorites.length === 0, action: () => setFilter({ branches: favorites.map((x) => x.name) }) },
     '-',
-    { label: 'HEAD', checked: current.has('HEAD'), star: { on: true, toggle: () => true }, action: () => setFilter({ branches: ['HEAD'] }) },
+    head,
     ...favorites.map((x) => item(x)),
     '-',
   ];
@@ -619,7 +697,12 @@ function showBranchMenu(): void {
     items.push({ label: `${name}/…`, submenu: list.map((x) => item(x, x.remoteBranch ?? x.short)) });
   }
   if (tags.length > 0) items.push({ label: t('Tags'), submenu: tags.map((x) => item(x)) });
-  showMenu(r.left, r.bottom + 2, items);
+  // 搜尋時攤平成一張清單：遠端分支顯示完整名稱，右側標示類型
+  const search = (q: string): MenuItem[] => [
+    ...('head'.includes(q) ? [head] : []),
+    ...merged.filter((x) => x.short.toLowerCase().includes(q)).map((x) => ({ ...item(x), detail: t(x.type) })),
+  ];
+  showMenu(r.left, r.bottom + 2, items, { search: { placeholder: t('Search branches and tags'), items: search } });
 }
 
 function openBranchPicker(): void {
@@ -701,34 +784,36 @@ function showPathsMenu(): void {
     const allShown = roots.length === all.length;
     setFilter({ roots: allShown ? [] : roots, paths: [], pathsByRoot: Object.keys(next).length > 0 ? next : undefined });
   };
+  // 每次都重新產生（搜尋重建清單時勾選狀態才會是最新的）
+  const repoItem = (repo: RepoState): MenuItem => ({
+    label: repo.name,
+    detail: repo.head.branch ?? t('detached'),
+    checked: shown().has(repo.root),
+    keepOpen: true,
+    action: (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        applyRoots([repo.root]);
+        closeMenus();
+        return true;
+      }
+      const set = shown();
+      if (set.has(repo.root)) {
+        if (set.size === 1) return true; // 至少保留一個
+        set.delete(repo.root);
+      } else set.add(repo.root);
+      applyRoots(all.filter((x) => set.has(x)));
+      return set.has(repo.root);
+    },
+  });
   const items: MenuItem[] = [
     { label: t('Select…'), action: () => openFoldersDialog() },
+    { label: t('Show All Repositories'), action: () => applyRoots(all) },
     '-',
     { label: t('Roots'), disabled: true },
-    ...repos.map(
-      (repo): MenuItem => ({
-        label: repo.name,
-        detail: repo.head.branch ?? t('detached'),
-        checked: shown().has(repo.root),
-        keepOpen: true,
-        action: (e) => {
-          if (e.ctrlKey || e.metaKey) {
-            applyRoots([repo.root]);
-            closeMenus();
-            return true;
-          }
-          const set = shown();
-          if (set.has(repo.root)) {
-            if (set.size === 1) return true; // 至少保留一個
-            set.delete(repo.root);
-          } else set.add(repo.root);
-          applyRoots(all.filter((x) => set.has(x)));
-          return set.has(repo.root);
-        },
-      }),
-    ),
+    ...repos.map(repoItem),
   ];
-  showMenu(r.left, r.bottom + 2, items);
+  const search = (q: string) => repos.filter((x) => `${x.name}\n${x.head.branch ?? ''}`.toLowerCase().includes(q)).map(repoItem);
+  showMenu(r.left, r.bottom + 2, items, { search: { placeholder: t('Search repositories'), items: search } });
   const hint = el('div', { className: 'menu-hint', text: t('Ctrl+Click to show only that repository') });
   document.querySelector('.context-menu[data-level="0"]')?.append(hint);
 }
@@ -804,6 +889,7 @@ function loadLog(keepScroll = false): void {
   table.clearSelection();
   table.setData(commits, graph);
   branches.setRepos(visibleRepos());
+  syncBranches();
   table.setMessage(undefined);
   setLoading(true);
   post({ type: 'loadLog', requestId, generation, filter: ui.filter });
@@ -1036,28 +1122,6 @@ function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
   ]);
 }
 
-/** Branches 直式工具列的操作 */
-function onBranchToolbar(action: BranchToolbarAction, ref: MergedRef | undefined): void {
-  if (action === 'newBranch' && !ref) {
-    // 沒有選取：從目前分支（或 detached HEAD）建立
-    const vis = visibleRepos();
-    const branch = vis.find((r) => r.head.branch)?.head.branch;
-    if (branch) {
-      post({ type: 'refAction', action: 'newBranch', ref: `refs/heads/${branch}`, roots: vis.filter((r) => r.head.branch === branch).map((r) => r.root) });
-    } else {
-      const st = vis.find((r) => r.head.hash);
-      if (st?.head.hash) post({ type: 'commitAction', action: 'newBranch', root: st.root, hash: st.head.hash, parents: [], subject: 'HEAD' });
-    }
-    return;
-  }
-  if (!ref) return;
-  if (action === 'navigate') {
-    navigateToRef(ref);
-    return;
-  }
-  post({ type: 'refAction', action, ref: ref.name, roots: ref.roots });
-}
-
 /** 在記錄中選取分支的最新 commit（不改變篩選）；目前篩選下看不到時提示 */
 function navigateToRef(ref: MergedRef): void {
   for (const root of ref.roots) {
@@ -1071,45 +1135,6 @@ function navigateToRef(ref: MergedRef): void {
     }
   }
   setWarnings([t('{0} is not in the current log (check the filters).', ref.short)]);
-}
-
-/** Branches 右鍵選單（對應 IntelliJ 的 branch 選單；同名 branch 跨 repo 一次處理） */
-function showRefMenu(ref: MergedRef, x: number, y: number): void {
-  const act = (action: RefAction) => () => post({ type: 'refAction', action, ref: ref.name, roots: ref.roots });
-  const name = ref.short;
-  const q = `'${name.length > 40 ? `${name.slice(0, 39)}…` : name}'`;
-  const isLocal = ref.type === 'local';
-  const current = isLocal && ref.current;
-  const items: MenuItem[] = [
-    { label: t('Checkout'), disabled: current, action: () => post({ type: 'checkout', ref: ref.name, roots: ref.roots }) },
-    { label: t('New Branch from {0}…', q), action: act('newBranch') },
-    { label: t('Compare with Current'), disabled: current, action: act('compare') },
-    { label: t('Show Diff with Working Tree'), action: act('compareWorkingTree') },
-    { label: t('Show in Log'), action: () => setFilter({ branches: [ref.name] }) },
-    { label: t('Show in New Tab'), action: () => openTab({ branches: [ref.name], roots: ui.filter.roots }) },
-    '-',
-    { label: t('Merge {0} into Current', q), disabled: current, action: act('merge') },
-  ];
-  if (ref.type !== 'tag') items.push({ label: t('Rebase Current onto {0}', q), disabled: current, action: act('rebase') });
-  if (ref.type !== 'tag') {
-    const fav = branches.isFavorite(ref);
-    items.push('-', { label: fav ? t('Remove from Favorites') : t('Add to Favorites'), action: () => branches.toggleFavorite(ref) });
-  }
-  if (isLocal) {
-    items.push(
-      '-',
-      { label: t('Update'), disabled: !ref.upstream, action: act('update') },
-      { label: t('Push…'), action: () => openPush(undefined, { name: ref.short, roots: ref.roots }) },
-      '-',
-      { label: t('Rename…'), action: act('rename') },
-      { label: t('Delete'), disabled: current, action: act('delete') },
-    );
-  } else if (ref.type === 'remote') {
-    items.push('-', { label: t('Delete'), action: act('delete') });
-  } else {
-    items.push('-', { label: t('Push Tag…'), action: act('pushTag') }, { label: t('Delete'), action: act('delete') });
-  }
-  showMenu(x, y, items);
 }
 
 function showViewMenu(): void {
@@ -1141,7 +1166,8 @@ function showViewMenu(): void {
     '-',
     { label: t('New Log Tab'), action: () => openTab({}) },
     '-',
-    { label: t('Show Branches'), checked: ui.leftVisible, action: () => setPaneVisible('left', !ui.leftVisible) },
+    // 側邊欄顯示 Branches 時，Log 的 Branches 欄固定收起
+    { label: t('Show Branches'), checked: ui.leftVisible && !branchesDocked, disabled: branchesDocked, action: () => setPaneVisible('left', !ui.leftVisible) },
     { label: t('Show Details'), checked: ui.rightVisible, action: () => setPaneVisible('right', !ui.rightVisible) },
   ]);
 }
@@ -1173,6 +1199,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       repos = m.states;
       generation = m.generation;
       setIssueLinkRules(m.issueLinks);
+      noRepoMessage = m.message ?? t('No repository');
       if (repos.length === 0) {
         // 讓還在路上的 logBatch 失效（它的 repo 索引已不存在）
         requestId++;
@@ -1187,6 +1214,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
         table.setData([], new MultiGraph(true));
         table.setMessage(m.message ?? t('No repository'));
         branches.setRepos([]);
+        syncBranches();
         details.renderEmpty('');
         setLoading(false);
         return;
@@ -1265,6 +1293,18 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'confirm':
       showConfirm(m);
+      break;
+    case 'branchesEvent':
+      onBranchesEvent(m.event);
+      break;
+    case 'branchesDocked':
+      branchesDocked = m.docked;
+      applyLayout();
+      if (m.docked) {
+        // 沒顯示期間的變更都沒送：清掉比對基準，強制補送一次
+        lastBranchesSync = '';
+        syncBranches();
+      }
       break;
     case 'applyFilter':
       if (m.filter.text !== undefined) searchInput.value = m.filter.text;

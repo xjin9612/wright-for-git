@@ -219,19 +219,6 @@ const vscode = {
       calls.panels.push(panel);
       return panel;
     },
-    createTreeView: (id) => {
-      calls.trees = calls.trees || {};
-      calls.trees[id] = true;
-      return {
-        selection: [],
-        onDidChangeVisibility: () => ({ dispose() {} }),
-        onDidChangeCheckboxState: (h) => {
-          calls.treeCheckbox = h;
-          return { dispose() {} };
-        },
-        dispose() {},
-      };
-    },
     createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
     /** Git 主控台：記錄到 calls.console（[層級, 文字]） */
     createOutputChannel: (name) => {
@@ -399,7 +386,12 @@ async function attachWebviewView(browser, provider, script, viewport) {
   await page.exposeFunction('__host', (m) => onMsg(m));
   const l10n = jsonTag(view.webview.html, 'l10n-bundle') ?? '{}';
   await page.setContent(pageHtml(script, `<script type="application/json" id="l10n-bundle">${l10n}</script>`));
-  return { page, log, view, posted };
+  /** 模擬 view 顯示／隱藏（例如側邊欄切到別的畫面） */
+  const setVisible = (v) => {
+    view.visible = v;
+    for (const h of visibility) h();
+  };
+  return { page, log, view, posted, setVisible };
 }
 
 /**
@@ -460,6 +452,14 @@ async function launch(workspace, opts = {}) {
       extraPages.push(['提交視窗', v.page]);
       pageLogs.push(['提交視窗', v.log]);
       await v.page.waitForSelector('.commit-tree .tree-row, .commit-tree .empty-text');
+      return v;
+    },
+    /** 開啟側邊欄 Branches（活動列「Git 歷程」） */
+    async branchesView(viewport = { width: 360, height: 760 }) {
+      const v = await attachWebviewView(browser, calls.providers['gitWorkbench.branches'], 'branches.js', viewport);
+      extraPages.push(['側邊欄 Branches', v.page]);
+      pageLogs.push(['側邊欄 Branches', v.log]);
+      await v.page.waitForSelector('.branch-tree .tree-row');
       return v;
     },
     /** 最新開啟的編輯器分頁對話框（Push、取消儲藏、逐段選取、rebase） */

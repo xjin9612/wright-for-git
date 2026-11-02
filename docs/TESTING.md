@@ -33,6 +33,7 @@ npm run test:ui
 | `test/ui/rebase.test.js` | 滑鼠拖曳調整順序；reword（保留 `#` 開頭的行）、squash、調整順序、drop、自動儲藏；edit 停下後「繼續」；分支變動時拒絕；detached HEAD 拒絕 |
 | `test/ui/conflicts.test.js` | 合併後 Log 操作列的衝突數與「解決衝突…」；提交視窗衝突群組的種類說明、「解決…」連結、右鍵選單（標記已解決時的衝突標記確認、採用他們的刪除檔案）；衝突清單分頁（我的／他們的狀態、採用我的、全部解決後「繼續合併」）；三方合併分頁（不衝突的變更、整段 ≫ ✕、逐行、手動編輯後 ≫ 蓋掉、復原與重做、套用）；cherry-pick 衝突 |
 | `test/ui/collapse.test.js` | 長線性分支折疊：全部收合（頭尾保留、中間收成「⋯ 3 commits」）；點收合列展開並選取；右鍵收合／展開、Enter 展開、右欄說明；點分支線收合；全部展開；文字篩選時停用 |
+| `test/ui/sidebar.test.js` | Branch、Paths 選單的搜尋（類型標示、Enter 套用、Paths 不關閉選單、Esc 先清除）；顯示全部儲存庫；側邊欄 Branches：Log 收起自己的 Branches 欄、點分支篩選、Log 篩選反映到側邊欄、右鍵在新分頁顯示、選項同步、隱藏後 Log 的 Branches 欄回來、隱藏期間不同步且再顯示時補送 |
 | `test/ui/misc.test.js` | 繁中介面與即時切換語言；面板內設定框；顯示 Git 歷史；與分支或標籤比較；取消儲藏分頁（以新分支取消儲藏）；沒有變更時的儲藏提示；切換 Git Blame；開啟設定；Fetch 指令 |
 
 ## 執行真實 VS Code 測試
@@ -53,11 +54,11 @@ webview 內部的狀態（篩選、提交視窗的清單）測試讀不到，擴
 
 | 檔案 | 內容 |
 |---|---|
-| `test/vscode/suite/activation.test.ts` | 指令都已註冊；`Alt+9`、`Alt+0` 的指令打開記錄與提交視窗；偵測 repo（含巢狀、排除一般資料夾） |
+| `test/vscode/suite/activation.test.ts` | 指令都已註冊；`Alt+9`、`Alt+0` 的指令打開記錄與提交視窗；「Git 歷程」的側邊欄 Branches 收到分支資料並打開記錄；偵測 repo（含巢狀、排除一般資料夾） |
 | `test/vscode/suite/diff.test.ts` | 從記錄開 diff：新增的左邊空、刪除的右邊空、中文檔名內容正確、標題的「1/2」；← → 切換檔案；提交視窗的 diff 右邊是可編輯的實際檔案 |
 | `test/vscode/suite/commands.test.ts` | 顯示 Git 歷史（切 repo 並篩選路徑）；切換 Git Blame（1.96 以前只提示）；顯示 Git 主控台；最佳化儲存庫 |
 | `test/vscode/suite/watch.test.ts` | 在 VS Code 外面建立分支、commit，記錄自動更新；存檔後提交視窗出現檔案、還原後消失；外部 stash 後提交視窗更新 |
-| `test/vscode/suite/repos.test.ts` | 儲存庫勾選與記錄的 repo 篩選同步 |
+| `test/vscode/suite/repos.test.ts` | 只顯示部分儲存庫時，記錄的 repo 篩選跟著改變 |
 | `test/vscode/suite/merge.test.ts` | 合併衝突的種類；「在 VS Code 合併編輯器開啟」打開內建合併編輯器；採用一邊後繼續合併 |
 
 ## 大型 repo 效能量測
@@ -120,7 +121,8 @@ node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 r
 - 名稱以畫面上的文字為準。面板內的文字依 `gitWorkbench.language` 設定，可能是英文或中文，下面兩種都會寫出來。
 - VS Code 自己的選單（右鍵、指令面板）跟著 VS Code 的顯示語言，下面以中文為準。
 - 「Git 記錄面板」指底部面板的 Git 分頁，左邊是 Branches 樹、中間是 commit 清單、右邊是檔案與詳情。
-- 「提交視窗」指左側 Git Workbench 側邊欄裡的「提交」。
+- 「提交視窗」指左側活動列「提交」圖示打開的側邊欄。
+- 「側邊欄 Branches」指左側活動列「Git 歷程」圖示打開的側邊欄。
 
 ## 1. 版面與主題
 
@@ -147,6 +149,15 @@ node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 r
 
 ## 2. 按鈕位置與選單
 
+- [ ] **活動列的兩個圖示**
+  - **做**：
+    1. 點活動列的「提交」圖示。
+    2. 點活動列的「Git 歷程」圖示。
+    3. 點活動列的「檔案總管」。
+  - **應該看到**：
+    1. 側邊欄只有提交視窗；底部面板不會自動打開。
+    2. 側邊欄顯示 Branches 樹（工具列在上方），底部同時打開 Git 記錄，焦點留在側邊欄；記錄左邊沒有 Branches 欄，也沒有「›」展開條；👁 選單的「Show Branches」是灰的。
+    3. Git 記錄左邊的 Branches 欄回來了。
 - [ ] **diff 標題列的按鈕**
   - **做**：在 Git 記錄面板點 `docs: API reference for orders`（api-server），在右欄雙擊 `中文說明.md`。
   - **應該看到**：標題列的 ← → 緊接在 VS Code 自己的 ↑↓ 後面。

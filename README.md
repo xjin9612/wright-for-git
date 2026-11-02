@@ -4,7 +4,7 @@
 
 English | [繁體中文](README.zh-TW.md)
 
-IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel — Branches tree | Commit log with graph | Changed files + commit details, three linked panes — and a **Commit window** in the side bar, with first-class support for workspaces that contain many repositories.
+IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel — Branches tree | Commit log with graph | Changed files + commit details, three linked panes — a **Commit window** and a **Branches** tree in the side bar, with first-class support for workspaces that contain many repositories.
 
 ![Git Workbench](docs/images/screenshot.png)
 
@@ -14,7 +14,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Commit log**
   - Commit graph with colored lanes and a HEAD marker
   - Ref labels: matching local and remote branches are merged into one label (`origin & main`), plus tags and detached HEAD
-  - Filters: text or hash (regex and match-case toggles), Branch (cascading menu with favorites), User (supports `me`), Paths (repositories and folders), Date. Multiple values are separated by `|` or new lines; `Enter` completes, `Ctrl+Enter` applies. Text and User filters still draw a simplified graph
+  - Filters: text or hash (regex and match-case toggles), Branch (cascading menu with favorites), User (supports `me`), Paths (repositories and folders), Date. The Branch and Paths menus have a search box: type to narrow the list, `↑` `↓` and `Enter` to pick. Multiple values are separated by `|` or new lines; `Enter` completes, `Ctrl+Enter` applies. Text and User filters still draw a simplified graph
   - Several log tabs, each with its own filters
   - Highlights: Conventional Commits type coloring (`feat`, `fix`, `docs`…), bold for your own commits, dimmed merge commits
   - Columns: Author (`*` when author ≠ committer), Date, Hash — toggle them from the 👁 menu, drag their edge to resize
@@ -28,7 +28,8 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Sync** — Fetch in the Branches toolbar, Pull and Push in the log toolbar. Push always opens a Push Commits dialog (in an editor tab) listing what will be pushed; Force Push (`--force-with-lease`) is in the dialog's drop-down. Push All up to Here… pushes only up to a chosen commit. Local branches show ↑ahead ↓behind in the Branches tree
 - **Changed files** — tree (or flat list), grouped by directory, repository or module, with file-type icons and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff; step to the previous / next file with ← → in the diff's title bar.
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
-- **Open it your way** — Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
+- **Two Activity Bar icons** — *Commit* opens the Commit window; *Git History* shows the Branches tree in the side bar and opens the log below it (the log then hides its own Branches pane, so the commit list gets the full width; switch the side bar to something else and the pane comes back)
+- **Open the log your way** — the *Git History* icon, "Git Log" in the status bar, or `Alt+9`
 - **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path. The Explorer's Git Workbench submenu also has Compare with Branch or Tag…, Stash Changes… and Unstash Changes…
 - **Git console** — every git command, its output and the reason it failed, in the Output panel's *Git Workbench* channel (button in the log panel's title bar)
 - **Annotate with Git Blame (toggle)** in the editor context menu switches VS Code's built-in blame annotations
@@ -39,9 +40,8 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 
 - Scans each workspace folder for repositories (`gitWorkbench.scanDepth`, `gitWorkbench.scanExclude`), including folders that are not repositories and repositories nested inside other repositories
 - Commits from all repositories are merged by time into one log; each repository gets its own graph lanes and a color strip on the left (hover to see its name)
-- **Paths** filter: check repositories under Roots (`Ctrl+click` for just one), or Select Folders… to pick folders across repositories (like IntelliJ's multi-root Paths filter)
+- **Paths** filter: check repositories under Roots (`Ctrl+click` or `Ctrl+Enter` for just one), search them by name or branch, Show All Repositories, or Select Folders… to pick folders across repositories (like IntelliJ's multi-root Paths filter)
 - Click the color strip to show a repository-name column
-- The **Repositories** view in the side bar stays in sync with the Paths filter
 - Branches with the same name across repositories are merged into a single entry — double-click to check it out in all of them at once
 - Fetch / Pull / Push run on every repository visible under the Paths filter, with one combined summary
 
@@ -114,6 +114,7 @@ src/
   extension.ts        entry point: registers the webview views, read-only file system and commands
   provider.ts         Git log webview view: repository management, messaging, auto refresh, checkout
   commitView.ts       Commit window webview view: working-tree changes, changelists, commit
+  branchesView.ts     side-bar Branches webview view: relays the log's branch state and actions
   dialogPanel.ts      dialogs opened as editor tabs: Push, Unstash, hunk selection, interactive rebase, conflicts, three-way merge
   conflicts.ts        merge conflicts: conflict list, three-way merge, accept a side, mark as resolved
   actions.ts          branch, commit and push actions shared by the panel and the dialogs
@@ -125,13 +126,13 @@ src/
   settingsBridge.ts   in-panel settings popup
   modules.ts          "module" grouping (nearest folder with a project file)
   i18n.ts             UI language (follows VS Code or gitWorkbench.language)
-  sidebar.ts          Repositories view in the Activity Bar and the status bar item
+  sidebar.ts          status bar item and the Show All Repositories command
   diffProvider.ts     git-workbench: read-only file system serving file contents at a revision for vscode.diff
   gitExtension.ts     git path and state events from the built-in Git extension
   testApi.ts          state and actions exposed to the real VS Code tests only
   git/                runs the git CLI, parses its output, three-way merge (no vscode dependency, directly testable)
   shared/             shared by extension and webview: message protocol, graph layout, linear-branch collapsing, ref labels, trees
-  webview/            the log panel, Commit window and dialog UIs (plain TypeScript + Canvas, no framework)
+  webview/            the log panel, side-bar Branches, Commit window and dialog UIs (plain TypeScript + Canvas, no framework)
 media/webview.css     styles; every color comes from VS Code theme variables
 ```
 

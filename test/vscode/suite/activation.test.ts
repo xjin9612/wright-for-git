@@ -25,7 +25,18 @@ test('快捷鍵：Alt+9、Alt+0 對應的指令可以執行，並打開記錄與
   await until(() => a.logStats()?.doneMs !== undefined, '記錄載入完成');
   await vscode.commands.executeCommand('gitWorkbench.showCommit');
   await until(() => a.commitState(), '提交視窗載入變更');
-  await vscode.commands.executeCommand('gitWorkbench.repositories.focus');
+});
+
+test('活動列「Git 歷程」：側邊欄 Branches 打開後收到 Log 的分支資料', async () => {
+  const a = await api();
+  await vscode.commands.executeCommand('gitWorkbench.branches.focus');
+  const sync = await until(() => {
+    const s = a.branchesState();
+    return s && s.states.length > 0 ? s : undefined;
+  }, '側邊欄 Branches 收到分支資料');
+  assert.ok(sync.states.every((st) => st.refs.length > 0));
+  // 記錄面板跟著打開並完成載入
+  await until(() => a.logStats()?.doneMs !== undefined, '記錄載入完成');
 });
 
 test('偵測 repo：api-server、巢狀的 api-server/libs/shared、web-app，不含一般資料夾 notes', async () => {

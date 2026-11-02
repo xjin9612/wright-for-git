@@ -4,6 +4,7 @@ import { resolveGitPath } from './gitExtension';
 import { WorkbenchViewProvider } from './provider';
 import { RevisionFileSystem, SCHEME } from './diffProvider';
 import { registerLaunchers } from './sidebar';
+import { BranchesViewProvider } from './branchesView';
 import { registerCommitView, type CommitViewProvider } from './commitView';
 import { stashChanges } from './stashView';
 import { initI18n, resetI18n, t } from './i18n';
@@ -18,6 +19,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
   const gitPath = await resolveGitPath();
   let commitView: CommitViewProvider | undefined;
   const provider = new WorkbenchViewProvider(context, gitPath);
+  const branchesView = new BranchesViewProvider(context, provider);
 
   context.subscriptions.push(
     provider,
@@ -25,6 +27,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
       // 切換 panel 分頁時保留 webview 狀態，避免重新載入大量 commit
       webviewOptions: { retainContextWhenHidden: true },
     }),
+    branchesView,
+    vscode.window.registerWebviewViewProvider(BranchesViewProvider.viewId, branchesView),
     vscode.workspace.registerFileSystemProvider(SCHEME, new RevisionFileSystem((root) => provider.getRepository(root)), {
       isReadonly: true,
       isCaseSensitive: true,
@@ -43,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
       if (e.affectsConfiguration('gitWorkbench.language')) {
         resetI18n();
         provider.reloadWebview();
+        branchesView.reload();
         commitView?.reload();
       } else if (e.affectsConfiguration('gitWorkbench.scanDepth') || e.affectsConfiguration('gitWorkbench.scanExclude')) {
         void provider.rediscover(true);
@@ -54,12 +59,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => void provider.rediscover(true)),
   );
-  try {
-    registerLaunchers(context, provider);
-  } catch (e) {
-    // 側邊欄入口失敗（例如更新後尚未重新載入視窗）不應影響 Log 面板本身
-    console.error('[Git Workbench] sidebar init failed:', e);
-  }
+  registerLaunchers(context, provider);
   try {
     commitView = registerCommitView(context, provider);
   } catch (e) {

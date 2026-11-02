@@ -167,18 +167,66 @@ function currentLevel(): number {
   return level;
 }
 
+export interface MenuOptions {
+  /** 選單最上方的搜尋框：輸入時只列出符合的項目（預設攤平子選單後比對名稱與說明） */
+  search?: {
+    placeholder: string;
+    /** 自訂搜尋結果（q 已轉小寫、去頭尾空白） */
+    items?: (q: string) => MenuItem[];
+  };
+}
+
+/** 攤平子選單，留下名稱或說明包含 q 的項目 */
+function filterMenuItems(items: MenuItem[], q: string): MenuItem[] {
+  const out: MenuItem[] = [];
+  for (const it of items) {
+    if (it === '-') continue;
+    if (it.submenu) out.push(...filterMenuItems(it.submenu, q));
+    else if (!it.disabled && `${it.label}\n${it.detail ?? ''}`.toLowerCase().includes(q)) out.push(it);
+  }
+  return out;
+}
+
 /**
  * 彈出選單（右鍵選單、下拉選單共用）；支援子選單、星號與不關閉的勾選項。
  * 鍵盤：↑↓ Home End 移動、→ 開子選單、← 回上層、Enter／空白鍵執行、Esc 關閉；點外面關閉。
+ * 有搜尋框時焦點在搜尋框：直接輸入關鍵字，↑↓ 移動、Enter 執行（Ctrl+Enter 等同 Ctrl+點選），Esc 先清除關鍵字。
  */
-export function showMenu(x: number, y: number, items: MenuItem[]): void {
+export function showMenu(x: number, y: number, items: MenuItem[], opts: MenuOptions = {}): void {
   menuCleanup?.();
   closeMenus();
   const previousFocus = document.activeElement as HTMLElement | null;
   const root = openLevel(x, y, items, 0);
   if (!root) return;
   if (keyboardOpen) setActive(root, enabledItems(root)[0]);
-  const press = (item: HTMLElement) => item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const press = (item: HTMLElement, e?: KeyboardEvent) =>
+    item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, ctrlKey: !!e?.ctrlKey, metaKey: !!e?.metaKey }));
+  let search: HTMLInputElement | undefined;
+  if (opts.search) {
+    const cfg = opts.search;
+    const input = el('input', { className: 'text-input', attrs: { type: 'text', placeholder: cfg.placeholder, spellcheck: 'false', 'aria-label': cfg.placeholder } });
+    search = input;
+    const box = el('div', { className: 'menu-search' }, el('div', { className: 'search-box' }, icon('search'), input));
+    // 固定寬度：篩選後選單不因內容變短而跳動
+    root.style.minWidth = `${root.offsetWidth}px`;
+    root.prepend(box);
+    root.style.top = `${Math.max(4, Math.min(y, window.innerHeight - root.offsetHeight - 4))}px`;
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      const list = q ? (cfg.items ? cfg.items(q) : filterMenuItems(items, q)) : items;
+      document.querySelectorAll<HTMLElement>('.context-menu').forEach((m) => {
+        if (Number(m.dataset.level) > 0) m.remove();
+      });
+      root.querySelectorAll(':scope > .menu-item, :scope > .menu-sep, :scope > .menu-empty').forEach((n) => n.remove());
+      const rows = buildItems(root, list, 0);
+      if (list.length === 0) rows.append(el('div', { className: 'menu-empty', text: t('No matches') }));
+      box.after(rows);
+      root.scrollTop = 0;
+      // 有關鍵字時預設選中第一個，Enter 直接套用
+      setActive(root, q ? enabledItems(root)[0] : undefined);
+    });
+    input.focus();
+  }
   const onMouse = (e: Event) => {
     if (!(e.target as Element | null)?.closest?.('.context-menu')) cleanup();
   };
@@ -194,6 +242,19 @@ export function showMenu(x: number, y: number, items: MenuItem[]): void {
       const sub = levelMenu(level + 1);
       if (sub) setActive(sub, enabledItems(sub)[0]);
     };
+    // 焦點在搜尋框：空白鍵、Home／End 與左右移動游標交給輸入框；Esc 先清除關鍵字
+    if (search && document.activeElement === search) {
+      const caret = e.key === ' ' || e.key === 'Home' || e.key === 'End';
+      const horizontal = (e.key === 'ArrowLeft' && level === 0) || (e.key === 'ArrowRight' && !active?.classList.contains('has-submenu'));
+      if (caret || horizontal) return;
+      if (e.key === 'Escape' && level === 0 && search.value !== '') {
+        e.preventDefault();
+        e.stopPropagation();
+        search.value = '';
+        search.dispatchEvent(new Event('input'));
+        return;
+      }
+    }
     switch (e.key) {
       case 'ArrowDown':
         setActive(menu, list[(idx + 1) % list.length]);
@@ -225,7 +286,7 @@ export function showMenu(x: number, y: number, items: MenuItem[]): void {
       case ' ':
         if (!active) break;
         if (active.classList.contains('has-submenu')) openSub(active);
-        else press(active);
+        else press(active, e);
         break;
       case 'Escape':
         if (level > 0) {
@@ -248,6 +309,8 @@ export function showMenu(x: number, y: number, items: MenuItem[]): void {
   };
   const cleanup = () => {
     if (menuCleanup === cleanup) menuCleanup = undefined;
+    // 焦點在搜尋框時，關閉後還給開啟選單前的元素
+    if (search && document.activeElement === search) previousFocus?.focus?.();
     document.querySelectorAll('.context-menu').forEach((m) => m.remove());
     document.removeEventListener('mousedown', onMouse, true);
     document.removeEventListener('keydown', onKey, true);
@@ -266,9 +329,26 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
     if (Number(m.dataset.level) >= level) m.remove();
   });
   const menu = el('div', { className: 'context-menu', attrs: { role: 'menu', 'data-level': String(level) } });
+  menu.append(buildItems(menu, items, level));
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  // 子選單放不下右側時改到父選單左側
+  let left = x;
+  if (level > 0 && x + r.width > window.innerWidth - 4) {
+    const parent = document.querySelector<HTMLElement>(`.context-menu[data-level="${level - 1}"]`);
+    left = parent ? parent.getBoundingClientRect().left - r.width + 2 : window.innerWidth - r.width - 4;
+  }
+  menu.style.left = `${Math.max(4, Math.min(left, window.innerWidth - r.width - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+  return menu;
+}
+
+/** 建立選單項目（加入 menu 前先放在 fragment；搜尋時重建） */
+function buildItems(menu: HTMLElement, items: MenuItem[], level: number): DocumentFragment {
+  const frag = document.createDocumentFragment();
   for (const it of items) {
     if (it === '-') {
-      menu.append(el('div', { className: 'menu-sep' }));
+      frag.append(el('div', { className: 'menu-sep' }));
       continue;
     }
     const check = el('span', { className: 'menu-check' });
@@ -350,19 +430,9 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
         it.action?.(e);
       });
     }
-    menu.append(row);
+    frag.append(row);
   }
-  document.body.append(menu);
-  const r = menu.getBoundingClientRect();
-  // 子選單放不下右側時改到父選單左側
-  let left = x;
-  if (level > 0 && x + r.width > window.innerWidth - 4) {
-    const parent = document.querySelector<HTMLElement>(`.context-menu[data-level="${level - 1}"]`);
-    left = parent ? parent.getBoundingClientRect().left - r.width + 2 : window.innerWidth - r.width - 4;
-  }
-  menu.style.left = `${Math.max(4, Math.min(left, window.innerWidth - r.width - 4))}px`;
-  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-  return menu;
+  return frag;
 }
 
 /** 可拖曳分隔線：onDrag 收到相對按下時的位移 */

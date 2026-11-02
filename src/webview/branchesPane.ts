@@ -1,5 +1,5 @@
 // 左欄：Branches 樹（HEAD／Local／Remote／Tags，依 '/' 分資料夾）
-import type { RepoState } from '../shared/protocol';
+import type { BranchPrefs, BranchViewOptions, RepoState } from '../shared/protocol';
 import { mergeRefs, naturalCompare, type MergedRef } from '../shared/refs';
 import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, treeItemAttrs, type IconName } from './dom';
@@ -22,15 +22,7 @@ interface Row {
   favorite: boolean;
 }
 
-export interface BranchOptions {
-  /** 依 '/' 分資料夾 */
-  groupByDirectory: boolean;
-  /** 多 repo 時依儲存庫分組（不合併同名分支） */
-  groupByRepository: boolean;
-  showTags: boolean;
-  /** 點選分支時：false 依分支篩選記錄；true 只在記錄中跳到該分支的最新 commit */
-  navigateOnSelect: boolean;
-}
+export type BranchOptions = BranchViewOptions;
 
 const DEFAULT_BRANCH_OPTIONS: BranchOptions = { groupByDirectory: true, groupByRepository: false, showTags: true, navigateOnSelect: false };
 
@@ -84,6 +76,8 @@ export class BranchesPane {
     favorites?: string[],
     onlyFavorites = false,
     options?: Partial<BranchOptions>,
+    /** sidebar：放在側邊欄（工具列橫放在上方，沒有「隱藏」按鈕） */
+    variant: 'panel' | 'sidebar' = 'panel',
   ) {
     this.expanded = new Set(expanded ?? ['local', 'remote', 'remote:origin']);
     this.favorites = favorites ? new Set(favorites) : undefined;
@@ -107,8 +101,8 @@ export class BranchesPane {
     const toolbar = el(
       'div',
       { className: 'vertical-toolbar' },
-      iconButton('chevron-left', t('Hide branches'), () => cb.onCollapsePane()),
-      el('div', { className: 'toolbar-sep' }),
+      variant === 'panel' ? iconButton('chevron-left', t('Hide branches'), () => cb.onCollapsePane()) : null,
+      variant === 'panel' ? el('div', { className: 'toolbar-sep' }) : null,
       iconButton('add', t('New Branch…'), () => cb.onToolbarAction('newBranch', this.selectedRef)),
       refButton('update', t('Update Selected'), 'update'),
       refButton('trash', t('Delete'), 'delete'),
@@ -140,7 +134,21 @@ export class BranchesPane {
     this.list.addEventListener('keydown', (e) => this.onKey(e));
 
     const main = el('div', { className: 'branches-main' }, el('div', { className: 'search-box' }, icon('search'), this.search), this.list);
-    this.element = el('div', { className: 'branches-pane' }, toolbar, main);
+    this.element = el('div', { className: `branches-pane${variant === 'sidebar' ? ' sidebar' : ''}` }, toolbar, main);
+  }
+
+  /** 目前的偏好（我的最愛、分組選項、展開狀態） */
+  prefs(): BranchPrefs {
+    return { favorites: this.favorites ? [...this.favorites] : undefined, onlyFavorites: this.onlyFavorites, options: { ...this.options }, expanded: [...this.expanded] };
+  }
+
+  /** 套用另一個 Branches 樹（側邊欄／Log）改過的偏好 */
+  setPrefs(p: BranchPrefs): void {
+    this.favorites = p.favorites ? new Set(p.favorites) : undefined;
+    this.onlyFavorites = p.onlyFavorites;
+    this.options = { ...DEFAULT_BRANCH_OPTIONS, ...p.options };
+    this.expanded = new Set(p.expanded);
+    this.render();
   }
 
   /** 目前選取的 ref（HEAD 列對應目前分支） */

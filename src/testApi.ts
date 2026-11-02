@@ -3,7 +3,7 @@
 import type { CommitViewProvider } from './commitView';
 import { recentGitLog } from './gitConsole';
 import type { LogStats, RepositorySummary, WorkbenchViewProvider } from './provider';
-import type { CommitState, ConflictFile, LogFilter, WorkingChange } from './shared/protocol';
+import type { BranchesSync, CommitState, ConflictFile, LogFilter, WorkingChange } from './shared/protocol';
 
 export interface TestApi {
   repositories(): Promise<RepositorySummary[]>;
@@ -16,12 +16,14 @@ export interface TestApi {
   openWorkingDiff(root: string, path: string): Promise<void>;
   /** 提交視窗最近一次的狀態（視窗可見時才會更新） */
   commitState(): CommitState | undefined;
-  /** 等同 Repositories 側邊欄的勾選 */
+  /** 等同 Paths 篩選勾選儲存庫 */
   setRepositoriesVisible(roots: string[]): Promise<void>;
   conflicts(): Promise<{ root: string; name: string; files: ConflictFile[] }[]>;
   resolveConflicts(items: { root: string; path: string }[], action: 'ours' | 'theirs' | 'resolved'): Promise<void>;
   openInMergeEditor(root: string, path: string): Promise<void>;
   runOperation(root: string, action: 'continue' | 'skip' | 'abort'): Promise<void>;
+  /** Log 最近一次送給側邊欄 Branches 的內容 */
+  branchesState(): BranchesSync | undefined;
   /** 最近一次載入 Log 的耗時（效能量測） */
   logStats(): LogStats | undefined;
   /** 等同在 Log 上方改篩選（經過 webview，與使用者操作相同） */
@@ -51,6 +53,7 @@ export function createTestApi(provider: WorkbenchViewProvider, commitView: () =>
       await commitView()?.openDiff(root, change);
     },
     commitState: () => commitView()?.lastState,
+    branchesState: () => provider.branchesState,
     setRepositoriesVisible: (roots) => provider.showRepositories(roots, false),
     async conflicts() {
       return (await provider.dialogs.conflicts.data()).map(({ root, name, files }) => ({ root, name, files }));

@@ -248,8 +248,49 @@ export interface SettingsValues {
   issueLinks: number;
 }
 
+/** Branches 樹的顯示選項 */
+export interface BranchViewOptions {
+  /** 依 '/' 分資料夾 */
+  groupByDirectory: boolean;
+  /** 多 repo 時依儲存庫分組（不合併同名分支） */
+  groupByRepository: boolean;
+  showTags: boolean;
+  /** 點選分支時：false 依分支篩選記錄；true 只在記錄中跳到該分支的最新 commit */
+  navigateOnSelect: boolean;
+}
+
+/** Branches 樹的偏好（Log 與側邊欄共用，存在 Log 的 webview 狀態） */
+export interface BranchPrefs {
+  /** 我的最愛（完整 ref 名稱）；未設定時預設為 main／master */
+  favorites?: string[];
+  onlyFavorites: boolean;
+  options: BranchViewOptions;
+  expanded: string[];
+}
+
+/** Log → 側邊欄 Branches：要顯示的 repository、目前篩選的分支與偏好 */
+export interface BranchesSync {
+  states: RepoState[];
+  /** 沒有 repository 時的說明 */
+  message?: string;
+  /** Branch 篩選只有一個值時的 ref 名稱（或 'HEAD'） */
+  selected?: string;
+  prefs: BranchPrefs;
+}
+
+/** 側邊欄 Branches → Log：需要 Log 處理的操作（ref 為完整名稱） */
+export type BranchesEvent =
+  | { kind: 'select'; ref: string }
+  | { kind: 'newTab'; ref: string }
+  | { kind: 'navigate'; ref: string }
+  | { kind: 'prefs'; prefs: BranchPrefs };
+
 /** Webview → Extension */
 export type ToExtension =
+  /** Log 的 Branches 狀態（轉給側邊欄） */
+  | { type: 'branchesSync'; sync: BranchesSync }
+  /** 側邊欄 Branches 的操作（轉給 Log） */
+  | { type: 'branchesEvent'; event: BranchesEvent }
   | { type: 'getSettings' }
   /** 編輯器分頁對話框的偏好（例如變更檔案的分組方式），存在 globalState，下次開啟沿用 */
   | { type: 'dialogPref'; key: string; value: unknown }
@@ -391,6 +432,10 @@ export type CommitAction = 'cherryPick' | 'revert' | 'reset' | 'newBranch' | 'ne
 
 /** Extension → Webview */
 export type ToWebview =
+  | { type: 'branchesSync'; sync: BranchesSync }
+  | { type: 'branchesEvent'; event: BranchesEvent }
+  /** 側邊欄的 Branches 是否顯示中（顯示時 Log 收起自己的 Branches 欄） */
+  | { type: 'branchesDocked'; docked: boolean }
   | { type: 'conflictsData'; repos: { root: string; name: string; operation?: RepoState['operation']; files: ConflictFile[] }[] }
   | { type: 'settings'; values: SettingsValues; open?: boolean }
   /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */

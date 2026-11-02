@@ -491,5 +491,8 @@
   "Your git is older than 2.27, so path filters are not sped up.": "你的 git 版本早於 2.27，路徑篩選不會變快。",
   "detached {0}": "分離 {0}",
   "The remote branch has {0} commit you don't have. Push will be rejected — pull first, or use Force Push to overwrite.": "遠端分支有 {0} 個本機沒有的提交，推送會被拒絕；請先提取，或用強制推送覆蓋。",
-  "The remote branch has {0} commits you don't have. Push will be rejected — pull first, or use Force Push to overwrite.": "遠端分支有 {0} 個本機沒有的提交，推送會被拒絕；請先提取，或用強制推送覆蓋。"
+  "The remote branch has {0} commits you don't have. Push will be rejected — pull first, or use Force Push to overwrite.": "遠端分支有 {0} 個本機沒有的提交，推送會被拒絕；請先提取，或用強制推送覆蓋。",
+  "Show All Repositories": "顯示全部儲存庫",
+  "Search branches and tags": "搜尋分支或標籤",
+  "Search repositories": "搜尋儲存庫"
 }

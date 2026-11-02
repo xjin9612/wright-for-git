@@ -4,7 +4,7 @@
 
 [English](README.md) | 繁體中文
 
-在 VS Code 重現 IntelliJ 的 Git 工具視窗：底部 Panel 的 **Git Log**（Branches 樹｜Commit Log（含 graph）｜變更檔案＋Commit 詳情，三欄連動），以及側邊欄的 **Commit 視窗**；完整支援含多個 repo 的工作區。
+在 VS Code 重現 IntelliJ 的 Git 工具視窗：底部 Panel 的 **Git Log**（Branches 樹｜Commit Log（含 graph）｜變更檔案＋Commit 詳情，三欄連動），以及側邊欄的 **Commit 視窗**與 **Branches 樹**；完整支援含多個 repo 的工作區。
 
 ![Git Workbench](docs/images/screenshot.png)
 
@@ -14,7 +14,7 @@
 - **Commit Log**
   - Commit graph（lane 分配與著色、HEAD 標記）
   - Ref 標籤：同名 local／remote 合併顯示（`origin & main`）、tag、detached HEAD
-  - 篩選：文字或 hash（支援 regex、大小寫）、Branch（含我的最愛的串接選單）、User（支援 `me`）、Paths（repo 與資料夾）、日期；多值以 `|` 或換行分隔，`Enter` 補完、`Ctrl+Enter` 完成；文字／User 篩選時仍會畫出簡化的 graph
+  - 篩選：文字或 hash（支援 regex、大小寫）、Branch（含我的最愛的串接選單）、User（支援 `me`）、Paths（repo 與資料夾）、日期；Branch、Paths 選單上方有搜尋框，輸入關鍵字縮小清單，`↑` `↓` 移動、`Enter` 選取；多值以 `|` 或換行分隔，`Enter` 補完、`Ctrl+Enter` 完成；文字／User 篩選時仍會畫出簡化的 graph
   - 多個 Log 分頁，各自保留篩選條件
   - Highlight：Conventional Commits 類型上色、我的 commit 粗體、merge commit 淡化
   - 欄位：Author（author ≠ committer 時標 `*`）、Date、Hash，可在 👁 選單切換，拖曳欄位左緣調整寬度
@@ -28,7 +28,8 @@
 - **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框（編輯器分頁），列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後
 - **變更檔案**：樹狀或平鋪清單，可依目錄／repo／模組分組，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列的 ← → 可切換上一個／下一個檔案
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
-- 開啟方式：左側活動列 Git Workbench 圖示、狀態列「Git Log」按鈕、`Alt+9`
+- **活動列兩個圖示**：「提交」打開 Commit 視窗；「Git 歷程」在側邊欄顯示 Branches 樹，同時打開底部的 Log（Log 會收起自己的 Branches 欄，commit 清單變寬；側邊欄切到別的畫面時，Log 的 Branches 欄自動回來）
+- 開啟 Log：活動列「Git 歷程」圖示、狀態列「Git Log」按鈕、`Alt+9`
 - 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」
 - **Git 主控台**：在「輸出」面板的 *Git Workbench* 頻道記錄每個 git 指令、輸出與失敗原因（Log 面板標題列有按鈕）
 - 編輯器右鍵「切換 Git Blame 標註」（沿用 VS Code 內建 blame）
@@ -39,9 +40,8 @@
 
 - 自動掃描每個工作區資料夾底下的 repo（`gitWorkbench.scanDepth`、`gitWorkbench.scanExclude`），工作區資料夾本身不是 repo 也可以，包含 repo 內的巢狀 repo
 - 多個 repo 的 commit 依時間合併顯示，每個 repo 有各自的 graph lane，每列左側色條標示所屬 repo（滑鼠移上去顯示名稱）
-- **Paths** 篩選：在 Roots 勾選 repo（`Ctrl+點選` 只看一個），或「選擇資料夾…」跨 repo 勾選資料夾（等同 IntelliJ 多 root 的 Paths）
+- **Paths** 篩選：在 Roots 勾選 repo（`Ctrl+點選` 或 `Ctrl+Enter` 只看一個），可依名稱或分支搜尋、「顯示全部儲存庫」，或「選擇資料夾…」跨 repo 勾選資料夾（等同 IntelliJ 多 root 的 Paths）
 - 點左側色條切換 repo 名稱欄
-- 側邊欄 **Repositories** 的勾選與 Paths 篩選同步
 - 多個 repo 都有的同名 branch 在 Branches 樹中合併為一筆，雙擊一次 checkout 全部
 - Fetch／Pull／Push 會對 Paths 篩選下可見的所有 repo 執行，結果彙整成一則通知
 
@@ -114,6 +114,7 @@ src/
   extension.ts        進入點：註冊 WebviewView、唯讀檔案系統、指令
   provider.ts         Git Log WebviewView：repo 管理、訊息處理、自動重新整理、checkout
   commitView.ts       Commit 視窗 WebviewView：工作區變更、Changelist、提交
+  branchesView.ts     側邊欄 Branches WebviewView：轉送 Log 的分支狀態與操作
   dialogPanel.ts      開在編輯器分頁的對話框：Push、取消儲藏、選擇 hunk、互動式 rebase、衝突清單、三方合併
   conflicts.ts        合併衝突：衝突清單、三方合併、整個檔案採用某一邊、標記已解決
   actions.ts          面板與對話框共用的 branch、commit、push 操作
@@ -126,12 +127,12 @@ src/
   modules.ts          「模組」分組（最近一個含專案檔的資料夾）
   i18n.ts             介面語言（跟隨 VS Code 或 gitWorkbench.language）
   diffProvider.ts     git-workbench: 唯讀檔案系統，提供某 revision 的檔案內容給 vscode.diff
-  sidebar.ts          活動列 Repositories 清單與狀態列按鈕
+  sidebar.ts          狀態列按鈕與「顯示全部儲存庫」指令
   gitExtension.ts     取得內建 Git 擴充套件的 git 路徑與狀態事件
   testApi.ts          只給真實 VS Code 測試用的狀態與操作介面
   git/                git CLI 執行、輸出解析、三方合併（不依賴 vscode，可直接測試）
   shared/             extension 與 webview 共用：訊息協定、graph 佈局、長線性分支折疊、ref 標籤、樹
-  webview/            Log 面板、提交視窗與對話框的 UI（原生 TypeScript + Canvas，無前端框架）
+  webview/            Log 面板、側邊欄 Branches、提交視窗與對話框的 UI（原生 TypeScript + Canvas，無前端框架）
 media/webview.css     樣式，顏色全部取自 VS Code 主題變數
 ```
 

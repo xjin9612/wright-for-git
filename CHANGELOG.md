@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Side bar
+- Two Activity Bar icons instead of one: **Commit** (the Commit window) and **Git History**, which shows the Branches tree in the side bar and opens the log below it. While the side-bar Branches is showing, the log hides its own Branches pane so the commit list gets the full width; switch the side bar to something else and the pane comes back. Selecting a branch, the context menu, the toolbar, favorites and options all work as in the log's pane
+- The Commit icon no longer opens the log panel
+- The Repositories view is gone; its checkboxes duplicated the Paths filter, which now has Show All Repositories and a search box
+
+### Commit log
+- Branch and Paths menus have a search box: type to narrow the list (remote branches and tags show their type), `↑` `↓` to move, `Enter` to pick (`Ctrl+Enter` in Paths shows only that repository), `Esc` clears the search first
+
 ## 1.2.0
 
 ### Commit log

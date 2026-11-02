@@ -12,7 +12,7 @@ import { mapLimit } from './util';
 import { combineChanges } from './shared/combine';
 import { ModuleResolver } from './modules';
 import { promises as fsp, statSync } from 'node:fs';
-import { EMPTY_FILTER, type ChangedFile, type CommitInfo, type IssueLinkRule, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
+import { EMPTY_FILTER, type BranchesEvent, type BranchesSync, type ChangedFile, type CommitInfo, type IssueLinkRule, type LogFilter, type RepoState, type SyncAction, type ToExtension, type ToWebview, type UserInfo } from './shared/protocol';
 import { currentBundle, currentLanguage, t } from './i18n';
 import { showGitError } from './gitConsole';
 import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
@@ -82,8 +82,15 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   private diffNav: { root: string; hash: string; parent?: string; files: ChangedFile[]; index: number; right?: string } | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly changeEmitter = new vscode.EventEmitter<void>();
-  /** repository 清單、HEAD／refs 或 repo 篩選變動時觸發（供側邊欄 Repositories 更新） */
+  /** repository 清單、HEAD／refs 或 repo 篩選變動時觸發（供提交視窗重新掛上監聽） */
   readonly onDidChange = this.changeEmitter.event;
+  private readonly branchesEmitter = new vscode.EventEmitter<BranchesSync>();
+  /** Log 的 Branches 狀態變動（轉給側邊欄 Branches） */
+  readonly onBranchesSync = this.branchesEmitter.event;
+  /** 最近一次 Log 送來的 Branches 狀態（側邊欄晚建立時補送） */
+  branchesState: BranchesSync | undefined;
+  /** 側邊欄 Branches 顯示中：Log 收起自己的 Branches 欄 */
+  private branchesDocked = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -344,6 +351,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'ready':
           settingsAfterReady('log', (msg) => this.post(msg));
+          if (this.branchesDocked) this.post({ type: 'branchesDocked', docked: true });
           // webview 重新載入時，尚未回覆的確認框視為取消
           this.confirms.cancelAll();
           if (this.pendingFilter) {
@@ -354,6 +362,10 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'loadLog':
           await this.loadLog(m.requestId, m.generation, m.filter);
+          break;
+        case 'branchesSync':
+          this.branchesState = m.sync;
+          this.branchesEmitter.fire(m.sync);
           break;
         case 'selectCommit':
           await this.sendDetails(m.root, m.hash);
@@ -435,6 +447,35 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     } catch (e) {
       void showGitError(t('Git command failed: {0}', errorMessage(e)));
     }
+  }
+
+  // ---------- 側邊欄 Branches ----------
+
+  /** Log 面板是否已建立 */
+  get logResolved(): boolean {
+    return !!this.view;
+  }
+
+  /** 顯示 Log 面板（已建立時不搶走焦點） */
+  async revealLog(): Promise<void> {
+    if (this.view) this.view.show(true);
+    else await vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`);
+  }
+
+  setBranchesDocked(docked: boolean): void {
+    if (docked === this.branchesDocked) return;
+    this.branchesDocked = docked;
+    this.post({ type: 'branchesDocked', docked });
+  }
+
+  /** 側邊欄 Branches 的操作：篩選、偏好等轉給 Log */
+  forwardBranchesEvent(event: BranchesEvent): void {
+    this.post({ type: 'branchesEvent', event });
+  }
+
+  /** 側邊欄 Branches 的 git 操作（與 Log 左欄相同的處理） */
+  async handleBranchAction(m: ToExtension): Promise<void> {
+    if (m.type === 'checkout' || m.type === 'refAction' || m.type === 'commitAction' || m.type === 'sync' || m.type === 'openPushPanel') await this.onMessage(m);
   }
 
   /** 由 extension 端套用篩選（側邊欄、檔案總管）；webview 尚未建立時先暫存 */
@@ -992,6 +1033,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   dispose(): void {
     this.changeEmitter.dispose();
+    this.branchesEmitter.dispose();
     this.repoWatchers.forEach((d) => d.dispose());
     clearTimeout(this.refreshTimer);
     this.logAbort?.abort();

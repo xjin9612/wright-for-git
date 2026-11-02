@@ -45,7 +45,12 @@
       "activitybar": [
         {
           "id": "gitWorkbenchBar",
-          "title": "%container.activity%",
+          "title": "%container.commit%",
+          "icon": "media/commit.svg"
+        },
+        {
+          "id": "gitWorkbenchHistory",
+          "title": "%container.history%",
           "icon": "media/activity.svg"
         }
       ]
@@ -63,11 +68,14 @@
           "type": "webview",
           "id": "gitWorkbench.commit",
           "name": "%view.commit%",
-          "icon": "media/activity.svg"
-        },
+          "icon": "media/commit.svg"
+        }
+      ],
+      "gitWorkbenchHistory": [
         {
-          "id": "gitWorkbench.repositories",
-          "name": "%view.repositories%",
+          "type": "webview",
+          "id": "gitWorkbench.branches",
+          "name": "%view.branches%",
           "icon": "media/activity.svg"
         }
       ]
@@ -96,21 +104,9 @@
         "category": "Git Workbench"
       },
       {
-        "command": "gitWorkbench.openRepository",
-        "title": "%command.openRepository%",
-        "category": "Git Workbench"
-      },
-      {
-        "command": "gitWorkbench.refreshRepositories",
-        "title": "%command.refresh%",
-        "category": "Git Workbench",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "gitWorkbench.showAllRepositories",
         "title": "%command.showAllRepositories%",
-        "category": "Git Workbench",
-        "icon": "$(check-all)"
+        "category": "Git Workbench"
       },
       {
         "command": "gitWorkbench.fetch",
@@ -210,8 +206,8 @@
     "menus": {
       "view/title": [
         {
-          "command": "gitWorkbench.showAllRepositories",
-          "when": "view == gitWorkbench.repositories",
+          "command": "gitWorkbench.refresh",
+          "when": "view == gitWorkbench.branches",
           "group": "navigation@1"
         },
         {
@@ -223,11 +219,6 @@
           "command": "gitWorkbench.refresh",
           "when": "view == gitWorkbench.log",
           "group": "navigation@2"
-        },
-        {
-          "command": "gitWorkbench.refreshRepositories",
-          "when": "view == gitWorkbench.repositories",
-          "group": "navigation"
         },
         {
           "command": "gitWorkbench.openSettings",
@@ -274,14 +265,6 @@
         {
           "command": "gitWorkbench.showHistory",
           "when": "resourceScheme == file"
-        },
-        {
-          "command": "gitWorkbench.openRepository",
-          "when": "false"
-        },
-        {
-          "command": "gitWorkbench.refreshRepositories",
-          "when": "false"
         },
         {
           "command": "gitWorkbench.diff.previousFile",
@@ -422,12 +405,6 @@
         }
       }
     },
-    "viewsWelcome": [
-      {
-        "view": "gitWorkbench.repositories",
-        "contents": "%welcome.repositories%"
-      }
-    ],
     "keybindings": [
       {
         "command": "gitWorkbench.show",
