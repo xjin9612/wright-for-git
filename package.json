@@ -32,6 +32,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "%capabilities.untrustedWorkspaces%"
+    }
+  },
   "l10n": "./l10n",
   "contributes": {
     "viewsContainers": {

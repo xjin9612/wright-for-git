@@ -1,6 +1,7 @@
 {
   "displayName": "Git Workbench",
   "description": "IntelliJ-style Git tool windows: a log panel with branches tree, commit graph, filters and commit details, plus a Commit window and Branches tree in the side bar.",
+  "capabilities.untrustedWorkspaces": "Git Workbench runs git in the workspace's repositories, and a repository's Git configuration and hooks can execute arbitrary commands, so it needs a trusted workspace.",
   "container.title": "Git",
   "view.log": "Log",
   "command.refresh": "Refresh",
