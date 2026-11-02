@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.0
 
 ### Side bar
 - Two Activity Bar icons instead of one: **Commit** (the Commit window) and **Git History**, which shows the Branches tree in the side bar and opens the log below it. While the side-bar Branches is showing, the log hides its own Branches pane so the commit list gets the full width; switch the side bar to something else and the pane comes back. Selecting a branch, the context menu, the toolbar, favorites and options all work as in the log's pane
