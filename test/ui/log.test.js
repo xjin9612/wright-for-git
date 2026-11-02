@@ -178,7 +178,7 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
   await h.until(() => app.calls.opened?.includes('https://tracker.example.com/browse/PROJ-42'));
 });
 
-test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', async () => {
+test('多選：Shift+點選顯示合併變更；Ctrl+C 與右鍵都複製全部選取的 hash', async () => {
   await (await row('feat(auth): rotate API keys')).click();
   await (await row('docs: describe key rotation')).click({ modifiers: ['Shift'] });
   await h.eventually(async () => {
@@ -186,10 +186,14 @@ test('多選：Shift+點選顯示合併變更；右鍵可複製多個 hash', asy
     assert.match(files, /rotate\.ts/);
     assert.match(files, /auth\.md/);
   });
+  const expected = h.git(`${pg}/api-server`, 'log', '--format=%H', '-2', 'main').split('\n').join('\n');
+  // Ctrl+C 與右鍵選單一樣複製全部選取的 hash
+  app.calls.clipboard = undefined;
+  await page.keyboard.press('Control+c');
+  await h.until(() => app.calls.clipboard === expected);
   await (await row('docs: describe key rotation')).click({ button: 'right' });
   app.calls.clipboard = undefined;
   await h.menu(page, 'Copy 2 Revision Numbers');
-  const expected = h.git(`${pg}/api-server`, 'log', '--format=%H', '-2', 'main').split('\n').join('\n');
   await h.until(() => app.calls.clipboard === expected);
 });
 

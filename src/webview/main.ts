@@ -1114,7 +1114,7 @@ function showMultiMenu(selected: CommitInfo[], x: number, y: number): void {
   // 依列順序為新到舊；cherry-pick 由舊到新套用，revert 由新到舊
   const items = (order: CommitInfo[]) => order.map((c) => ({ hash: c.hash, parents: c.parents, subject: c.subject }));
   showMenu(x, y, [
-    { label: t('Copy {0} Revision Numbers', selected.length), action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
+    { label: t('Copy {0} Revision Numbers', selected.length), keybinding: `${MOD_KEY}C`, action: () => post({ type: 'copy', text: selected.map((c) => c.hash).join('\n') }) },
     { label: t('Copy Subjects'), action: () => post({ type: 'copy', text: selected.map((c) => c.subject).join('\n') }) },
     '-',
     { label: t('Cherry-Pick {0} Commits', selected.length), disabled: !sameRepo, action: () => void (root && post({ type: 'commitsAction', action: 'cherryPick', root, commits: items([...selected].reverse()) })) },
@@ -1175,8 +1175,9 @@ function showViewMenu(): void {
 // ---------- 全域鍵盤 ----------
 table.element.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-    const c = commits[table.selectedIndex];
-    if (c && !c.collapsed) post({ type: 'copy', text: c.hash });
+    // 多選時複製全部選取列的 hash（依列順序，與右鍵「Copy N Revision Numbers」相同）
+    const hashes = table.selectedIndices.map((i) => commits[i]).filter((c): c is LogRow => !!c && !c.collapsed).map((c) => c.hash);
+    if (hashes.length > 0) post({ type: 'copy', text: hashes.join('\n') });
   }
 });
 document.addEventListener('keydown', (e) => {

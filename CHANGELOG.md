@@ -9,6 +9,7 @@
 
 ### Commit log
 - Branch and Paths menus have a search box: type to narrow the list (remote branches and tags show their type), `↑` `↓` to move, `Enter` to pick (`Ctrl+Enter` in Paths shows only that repository), `Esc` clears the search first
+- `Ctrl+C` with several commits selected copies all of their hashes (it used to copy only one), like Copy N Revision Numbers in the context menu
 
 ## 1.2.0
 
