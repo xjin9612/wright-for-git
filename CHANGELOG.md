@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
 
 ### Commit log
 - Collapse Linear Branches / Expand Linear Branches in the 👁 menu, like IntelliJ's Graph Options: long runs of branch commits fold into one `⋯ N commits` row drawn with a dotted line. The branch's newest and oldest commits stay visible, the main line (HEAD's first-parent history) and commits with a branch or tag are never folded, and only runs of at least 3 commits are folded. Click the row (or press `Enter`) to expand it; click a branch line, or use Collapse Linear Branch in the context menu, to fold one run. Jumping to a folded commit expands its run
