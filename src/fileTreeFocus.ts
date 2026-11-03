@@ -34,12 +34,12 @@ export async function openFocusedFile(): Promise<void> {
   if (file) await openWorkingFile(file.root, file.path);
 }
 
-/** 開啟工作目錄中的檔案；已刪除或改名時只在狀態列提示 */
+/** 開啟工作目錄中的檔案（一般分頁，不用預覽：接連開啟時不會互相取代）；已刪除或改名時只在狀態列提示 */
 export async function openWorkingFile(root: string, relPath: string): Promise<void> {
   const full = path.join(root, relPath);
   if (!fs.existsSync(full)) {
     vscode.window.setStatusBarMessage(t('File does not exist in the working tree: {0}', relPath), 3000);
     return;
   }
-  await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(full));
+  await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(full), { preview: false });
 }

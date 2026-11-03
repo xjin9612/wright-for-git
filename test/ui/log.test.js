@@ -205,6 +205,8 @@ test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔�
   await openSelected();
   await h.until(() => opened().length > before);
   assert.match(opened().at(-1), /\/api-server\/src\/auth\/keys\.ts$/);
+  const openArgs = app.calls.executed.filter(([c]) => c === 'vscode.open').at(-1);
+  assert.equal(openArgs[2]?.preview, false, '一般分頁：接連開啟不會互相取代');
 
   // 已刪除的檔案：工作目錄沒有，不開啟，只在狀態列提示
   await (await row('chore: drop legacy script')).click();

@@ -14,7 +14,7 @@ import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
 import { stashChanges } from './stashView';
-import { setFileTreeFocus } from './fileTreeFocus';
+import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
 
@@ -216,7 +216,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
           await this.openDiff(m.root, m.change);
           break;
         case 'commitOpenFile':
-          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(path.join(m.root, m.path)));
+          await openWorkingFile(m.root, m.path);
           break;
         case 'commitRollback':
           await this.rollback(m.items);
