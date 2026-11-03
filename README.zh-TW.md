@@ -101,11 +101,11 @@ npm run package     # 打包 .vsix
 
 ### 發佈新版本
 
-1. 修改 `package.json` 的 `version`，並在 `CHANGELOG.md`（英文，作為 Release 說明）最上方新增同版本的段落（`## 1.2.0`；開發中的變更先記在 `## Unreleased`，發佈時改成版本號）
+1. 修改 `package.json` 的 `version`（**版號規則**：只用 `major.minor.patch`；minor 偶數＝正式版、奇數＝預發布版，例如正式版 `1.4.0`、預發布 `1.5.0`），並在 `CHANGELOG.md`（英文，作為 Release 說明）最上方新增同版本的段落（`## 1.2.0`；開發中的變更先記在 `## Unreleased`，發佈時改成版本號）
 2. commit 後打 tag 並推送：`git tag v1.2.0 && git push origin v1.2.0`
 3. GitHub Actions（`.github/workflows/release.yml`）會檢查版本、跑測試、打包 `.vsix`，並以 CHANGELOG 該段落建立 Release
 
-tag 版本與 `package.json` 不一致、或 CHANGELOG 沒有對應段落時，發佈會失敗。版本含 `-`（如 `v1.2.0-beta.1`）會標為 pre-release。
+tag 版本與 `package.json` 不一致、或 CHANGELOG 沒有對應段落時，發佈會失敗。版號規則由 `scripts/check-version.mjs` 檢查（CI 與發佈都會跑）：含 `-`（如 `1.4.0-beta.1`）直接失敗，因為 VS Code Marketplace 不支援；minor 為奇數會標為 pre-release。
 
 ### 架構
 

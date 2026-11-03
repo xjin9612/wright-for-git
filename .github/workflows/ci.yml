@@ -22,6 +22,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 版號規則（major.minor.patch；minor 奇數＝預發布）：不符合就失敗，符合時提示這個版本會以哪種類型發佈
+      - run: node scripts/check-version.mjs
       - run: npm run typecheck
       - run: npm test
       # UI 端對端測試（Playwright + Chromium；webview 與 git 都是真的，VS Code API 為模擬）

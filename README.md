@@ -101,11 +101,11 @@ Open this folder in VS Code and press `F5` to launch an Extension Development Ho
 
 ### Releasing
 
-1. Bump `version` in `package.json` and add a matching section at the top of `CHANGELOG.md` (`## 1.2.0`; changes in progress go under `## Unreleased` — rename it when releasing) — it becomes the release notes
+1. Bump `version` in `package.json` (**version rule**: `major.minor.patch` only; an even minor is a regular release, an odd minor is a pre-release — e.g. `1.4.0` regular, `1.5.0` pre-release) and add a matching section at the top of `CHANGELOG.md` (`## 1.2.0`; changes in progress go under `## Unreleased` — rename it when releasing) — it becomes the release notes
 2. Commit, then tag and push: `git tag v1.2.0 && git push origin v1.2.0`
 3. GitHub Actions (`.github/workflows/release.yml`) checks the version, runs the tests, packages the `.vsix`, and publishes a GitHub Release using that CHANGELOG section as the notes
 
-The release fails if the tag does not match `package.json` or the CHANGELOG has no section for the version. Versions containing `-` (e.g. `v1.2.0-beta.1`) are published as pre-releases.
+The release fails if the tag does not match `package.json` or the CHANGELOG has no section for the version. The version rule is checked by `scripts/check-version.mjs` (in CI and on release): versions containing `-` (e.g. `1.4.0-beta.1`) fail because the VS Code Marketplace does not support them; an odd minor is published as a pre-release.
 
 ### Architecture
 

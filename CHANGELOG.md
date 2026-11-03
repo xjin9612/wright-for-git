@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Releasing
+- Versions follow the VS Code Marketplace rule: `major.minor.patch` only, an even minor is a regular release and an odd minor a pre-release. CI and the release workflow check it (`scripts/check-version.mjs`)
+
 ## 1.3.0
 
 ### Side bar

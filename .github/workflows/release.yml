@@ -1,5 +1,5 @@
 # 推送版本 tag（例如 v1.0.0）時自動發佈：
-# 檢查版本 → 型別檢查與測試 → 打包 .vsix → 以 CHANGELOG 對應段落建立 GitHub Release 並附上 .vsix
+# 檢查版本（版號規則見 scripts/check-version.mjs）→ 型別檢查與測試 → 打包 .vsix → 以 CHANGELOG 對應段落建立 GitHub Release 並附上 .vsix
 name: Release
 
 on:
@@ -23,6 +23,11 @@ jobs:
 
       - run: npm ci
 
+      # 版號規則見 scripts/check-version.mjs：只收 major.minor.patch，minor 奇數＝預發布、偶數＝正式
+      - name: 檢查版號規則
+        id: version
+        run: node scripts/check-version.mjs
+
       - name: 檢查版本並取出 Release 說明
         run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" > release-notes.md
 
@@ -34,9 +39,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 版本含 '-'（例如 v1.1.0-beta.1）時標為 pre-release
+          # minor 為奇數（例如 v1.5.0）時標為 pre-release
           flags=()
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          if [[ "${{ steps.version.outputs.prerelease }}" == "true" ]]; then flags+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" ./*.vsix \
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md \
