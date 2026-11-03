@@ -576,12 +576,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     const list = items.filter((x) => x.change.kind === 'changed' || x.change.kind === 'untracked');
     if (list.length === 0) return;
     const roots = new Set(list.map((x) => x.root));
-    // 提交時只選了部分段落的檔案：擱置的是整個檔案，先說清楚
-    const partial = list.filter((x) => this.partial.has(keyOf(x.root, x.change.path))).length;
+    // 提交分頁只勾了部分段落的檔案：只擱置那些段落（與提交相同），先說清楚
+    const partial = list.filter((x) => this.partial.has(keyOf(x.root, x.change.path)) && x.change.kind === 'changed' && x.change.status === 'M').length;
     const count = roots.size > 1 ? t('Shelve {0} file(s) from {1} repositories', list.length, roots.size) : t('Shelve {0} file(s)', list.length);
     const name = await vscode.window.showInputBox({
       title: keep ? t('Shelve Changes, Keep in Working Tree') : t('Shelve Changes'),
-      prompt: partial > 0 ? `${count}. ${t('{0} file(s) have only some changes selected for commit; the whole file is shelved.', partial)}` : count,
+      prompt: partial > 0 ? `${count}. ${t('Only the selected changes of {0} file(s) are shelved; the rest stays in the working tree.', partial)}` : count,
       placeHolder: t('Shelf name'),
       value: suggested,
       validateInput: (v) => (v.trim() ? undefined : t('Enter a name for the shelf')),
@@ -589,16 +589,18 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     if (name === undefined) return;
     const byRoot = new Map<string, WorkingChange[]>();
     for (const x of list) byRoot.set(x.root, [...(byRoot.get(x.root) ?? []), x.change]);
-    const targets: { repo: GitRepository; paths: string[] }[] = [];
-    for (const [root, requested] of byRoot) {
-      const repo = this.provider.getRepository(root);
-      if (!repo) continue;
-      // 以目前實際的狀態為準（webview 的清單可能已過期）；rename 要連同原路徑一起擱置
-      const changes = (await this.current(repo, requested)).filter((c) => c.kind === 'changed' || c.kind === 'untracked');
-      const paths = [...new Set(changes.flatMap((c) => (c.oldPath ? [c.path, c.oldPath] : [c.path])))];
-      if (paths.length > 0) targets.push({ repo, paths });
-    }
+    const targets: { repo: GitRepository; paths: string[]; partials: { path: string; patch: Buffer }[] }[] = [];
     try {
+      for (const [root, requested] of byRoot) {
+        const repo = this.provider.getRepository(root);
+        if (!repo) continue;
+        // 以目前實際的狀態為準（webview 的清單可能已過期）；整個檔案與部分段落的分法與提交相同（rename 連同原路徑）
+        const changes = (await this.current(repo, requested)).filter((c) => c.kind === 'changed' || c.kind === 'untracked');
+        const { full, patches } = await this.collect(repo, root, changes);
+        const paths = [...new Set(full)];
+        if (paths.length > 0 || patches.length > 0) targets.push({ repo, paths, partials: patches });
+      }
+
       const result = await shelveAcross(targets, name.trim(), { keepChanges: keep });
       if (result.roots.length === 0) void vscode.window.showInformationMessage(t('Nothing to shelve: the selected files have no changes.'));
       else vscode.window.setStatusBarMessage(t('Shelved to "{0}"', name.trim()), 3000);

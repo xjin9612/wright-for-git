@@ -804,28 +804,99 @@ export class GitRepository {
 
   /**
    * 把指定路徑的變更（含未追蹤檔案）擱置成一筆 shelf，並從工作區移除；keepChanges 時工作區保留原樣。
-   * 用 git stash push 產生 commit 後搬到自己的 ref，再從 stash 清單移除。沒有可擱置的變更時回傳 undefined。
+   * partials 是只擱置部分段落的檔案（相對 HEAD 的 patch）：只有這些段落進入擱置、也只從工作區移除這些段落。
+   * 整個檔案的部分用 git stash push 產生 commit，再搬到自己的 ref、從 stash 清單移除。沒有可擱置的變更時回傳 undefined。
+   * 任何一步失敗都不留下一半：工作區還原、不建立擱置。
    */
-  async shelve(id: string, name: string, paths: string[], keepChanges = false): Promise<string | undefined> {
+  async shelve(id: string, name: string, paths: string[], keepChanges = false, partials: { path: string; patch: Buffer }[] = []): Promise<string | undefined> {
     assertShelfId(id);
-    for (const p of paths) assertRelPath(p);
-    if (paths.length === 0) return undefined;
-    const top = async () => (await this.tryRun(['rev-parse', '-q', '--verify', 'refs/stash']))?.trim() || undefined;
-    const before = await top();
-    // 路徑從 stdin 傳入（NUL 分隔），不受命令列長度限制
-    await runGit(this.gitPath, ['stash', 'push', '--include-untracked', '-m', `shelf:${id} ${name.trim()}`.trim(), '--pathspec-from-file=-', '--pathspec-file-nul'], {
-      cwd: this.root,
-      env: LITERAL,
-      input: paths.join('\0'),
-    });
-    const stashed = await top();
-    if (!stashed || stashed === before) return undefined;
-    // stash push 會把整個暫存區記進去：只留下選取的路徑，沒選的已暫存檔案（仍在工作區）不算擱置
-    const hash = await this.rewriteShelfCommit(stashed, paths, 'only');
-    if (hash) await this.run(['update-ref', '-m', 'shelve', SHELF_REF + id, hash]);
-    await this.run(['stash', 'drop', '--quiet', 'stash@{0}']);
-    if (hash && keepChanges) await this.run(['stash', 'apply', '--index', hash]);
+    for (const p of [...paths, ...partials.map((x) => x.path)]) assertRelPath(p);
+    if (paths.length === 0 && partials.length === 0) return undefined;
+    const message = `shelf:${id} ${name.trim()}`.trim();
+    const reverse = (args: string[], patch: Buffer) => runGit(this.gitPath, ['apply', '-R', ...args, '--whitespace=nowarn', '-'], { cwd: this.root, input: patch });
+    // 只擱置部分段落：先確認這些段落能從工作區反向移除，不行就什麼都不做
+    if (!keepChanges) for (const p of partials) await reverse(['--check'], p.patch);
+
+    let full: string | undefined;
+    if (paths.length > 0) {
+      const top = async () => (await this.tryRun(['rev-parse', '-q', '--verify', 'refs/stash']))?.trim() || undefined;
+      const before = await top();
+      // 路徑從 stdin 傳入（NUL 分隔），不受命令列長度限制
+      await runGit(this.gitPath, ['stash', 'push', '--include-untracked', '-m', message, '--pathspec-from-file=-', '--pathspec-file-nul'], {
+        cwd: this.root,
+        env: LITERAL,
+        input: paths.join('\0'),
+      });
+      const stashed = await top();
+      if (stashed && stashed !== before) {
+        // stash push 會把整個暫存區記進去：只留下選取的路徑，沒選的已暫存檔案（仍在工作區）不算擱置
+        full = await this.rewriteShelfCommit(stashed, paths, 'only');
+        await this.run(['stash', 'drop', '--quiet', 'stash@{0}']);
+      }
+    }
+    const hash = partials.length > 0 ? await this.addPatchesToShelfCommit(full, partials, message) : full;
+    if (!hash) return undefined;
+    await this.run(['update-ref', '-m', 'shelve', SHELF_REF + id, hash]);
+    if (keepChanges) {
+      // 部分段落的檔案本來就沒動；整個檔案的部分套回去
+      if (full) await this.run(['stash', 'apply', '--index', full]);
+      return hash;
+    }
+    if (partials.length > 0) {
+      const { promises: fsp } = await import('node:fs');
+      const backup = await Promise.all(partials.map(async (p) => ({ file: path.join(this.root, p.path), data: await fsp.readFile(path.join(this.root, p.path)) })));
+      try {
+        for (const p of partials) await reverse([], p.patch);
+      } catch (e) {
+        for (const b of backup) await fsp.writeFile(b.file, b.data);
+        if (full) await this.run(['stash', 'apply', full]).catch(() => undefined);
+        await this.run(['update-ref', '-d', SHELF_REF + id]);
+        throw e;
+      }
+    }
     return hash;
+  }
+
+  /**
+   * 把部分段落的 patch 加進擱置的內容：以 full（整個檔案部分的擱置 commit）為基礎；沒有時從 HEAD 建立 stash 結構。
+   * 套用後沒有任何變更時回傳 full。
+   */
+  private async addPatchesToShelfCommit(full: string | undefined, partials: { path: string; patch: Buffer }[], message: string): Promise<string | undefined> {
+    const head = await this.headHash();
+    if (!head) throw new GitError('Cannot shelve part of a file before the first commit', null, '');
+    const { existsSync, promises: fsp } = await import('node:fs');
+    const tmpIndex = path.join(this.gitDir, `gitworkbench-shelf-patch-${process.pid}-${Date.now()}`);
+    const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env: { GIT_INDEX_FILE: tmpIndex }, input });
+    try {
+      let base = head;
+      let parents: string[];
+      let subject: string;
+      let env: Record<string, string> = {};
+      if (full) {
+        const [parentList, s, authorDate, committerDate] = (await this.run(['log', '-1', '--format=%P%x1f%s%x1f%aI%x1f%cI', full])).trim().split('\x1f');
+        parents = parentList.split(' ');
+        base = parents[0];
+        subject = s;
+        env = { GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: committerDate };
+        await git(['read-tree', full]);
+      } else {
+        // 與 git stash 相同的結構：index commit（與 HEAD 相同）＋工作區 commit
+        const branch = ((await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD'])) ?? '').trim() || '(no branch)';
+        const headSubject = (await this.run(['log', '-1', '--format=%h %s', head])).trim();
+        const headTree = (await this.run(['rev-parse', `${head}^{tree}`])).trim();
+        const index = (await runGit(this.gitPath, ['commit-tree', headTree, '-p', head, '-m', `index on ${branch}: ${headSubject}`], { cwd: this.root })).trim();
+        parents = [head, index];
+        subject = `On ${branch}: ${message}`;
+        await git(['read-tree', head]);
+      }
+      for (const p of partials) await git(['apply', '--cached', '--whitespace=nowarn', '-'], p.patch);
+      const tree = (await git(['write-tree'])).trim();
+      const baseTree = (await this.run(['rev-parse', `${base}^{tree}`])).trim();
+      if (!full && tree === baseTree) return undefined;
+      return (await runGit(this.gitPath, ['commit-tree', tree, ...parents.flatMap((p) => ['-p', p]), '-m', subject], { cwd: this.root, env })).trim();
+    } finally {
+      for (const f of [tmpIndex, `${tmpIndex}.lock`]) if (existsSync(f)) await fsp.rm(f, { force: true });
+    }
   }
 
   async listShelves(): Promise<ShelfInfo[]> {

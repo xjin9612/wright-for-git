@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import * as path from 'node:path';
 import { GitRepository } from '../src/git/repository';
+import { buildPatch, parseFileDiff } from '../src/git/parsers';
 import { makeRepo } from './helpers';
 
 /** 建立有一個 commit 的 repo，並在工作區留下三種變更：修改、刪除、未追蹤；另有一個不擱置的修改 */
@@ -152,6 +153,61 @@ test('從擱置移除部分檔案：重建後只剩其餘檔案、時間不變�
   await repo.unshelve(after, ['gone.txt']);
   assert.equal(await repo.removeFromShelf('s1', ['gone.txt']), 'dropped');
   assert.deepEqual(await repo.listShelves(), []);
+});
+
+/** 有兩段相隔很遠修改的檔案，回傳只含第一段的 patch（與提交視窗逐段選取相同的組法） */
+async function twoHunks() {
+  const r = await setup();
+  const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
+  // 只提交 m.txt（setup 留下的其他修改要保留在工作區）
+  writeFileSync(path.join(r.dir, 'm.txt'), `${lines.join('\n')}\n`);
+  r.git('add', 'm.txt');
+  r.git('commit', '-q', '-m', 'add m');
+  const changed = [...lines];
+  changed[1] = 'line 2 CHANGED';
+  changed[17] = 'line 18 CHANGED';
+  writeFileSync(path.join(r.dir, 'm.txt'), `${changed.join('\n')}\n`);
+  const raw = await r.repo.rawFileDiff('m.txt');
+  const d = parseFileDiff(raw.toString('latin1'));
+  assert.equal(d.hunks.length, 2);
+  const first = Buffer.from(buildPatch(d.header, d.hunks, new Set([d.hunks[0].index]))!, 'latin1');
+  return { ...r, first };
+}
+
+test('只擱置部分段落：只有選的段落進擱置並從工作區移除，另一段留著；取回後兩段都在', async () => {
+  const { repo, read, first } = await twoHunks();
+  assert.ok(await repo.shelve('p1', 'part', ['a.txt'], false, [{ path: 'm.txt', patch: first }]));
+  assert.doesNotMatch(read('m.txt'), /line 2 CHANGED/, '選的段落移除');
+  assert.match(read('m.txt'), /line 18 CHANGED/, '沒選的段落留著');
+  assert.equal(read('a.txt'), 'a1\n', '整個檔案的部分也擱置');
+  const [shelf] = await repo.listShelves();
+  assert.deepEqual((await repo.getStashFiles(shelf)).map((f) => f.path).sort(), ['a.txt', 'm.txt']);
+  const patch = (await repo.shelfPatch(shelf)).toString('utf8');
+  assert.match(patch, /line 2 CHANGED/);
+  assert.doesNotMatch(patch, /line 18 CHANGED/, '擱置只有選的段落');
+  await repo.unshelve(shelf, ['a.txt', 'm.txt']);
+  assert.match(read('m.txt'), /line 2 CHANGED/);
+  assert.match(read('m.txt'), /line 18 CHANGED/);
+  assert.equal(read('a.txt'), 'a2\n');
+});
+
+test('只擱置部分段落（沒有整個檔案）；keepChanges 時工作區不動', async () => {
+  const { repo, read, first } = await twoHunks();
+  assert.ok(await repo.shelve('p1', 'only part', [], true, [{ path: 'm.txt', patch: first }]));
+  assert.match(read('m.txt'), /line 2 CHANGED/, 'keepChanges：工作區不動');
+  const [shelf] = await repo.listShelves();
+  assert.equal(shelf.name, 'only part');
+  assert.deepEqual((await repo.getStashFiles(shelf)).map((f) => f.path), ['m.txt']);
+});
+
+test('部分段落無法從工作區移除時什麼都不做：沒有擱置、工作區不變（整個檔案的部分也不動）', async () => {
+  const { repo, read, first, dir } = await twoHunks();
+  // 選段落之後檔案又改了那一段
+  writeFileSync(path.join(dir, 'm.txt'), read('m.txt').replace('line 2 CHANGED', 'line 2 AGAIN'));
+  await assert.rejects(repo.shelve('p1', 'x', ['a.txt'], false, [{ path: 'm.txt', patch: first }]));
+  assert.deepEqual(await repo.listShelves(), []);
+  assert.match(read('m.txt'), /line 2 AGAIN/);
+  assert.equal(read('a.txt'), 'a2\n');
 });
 
 test('拒絕不合法的 id 與路徑', async () => {

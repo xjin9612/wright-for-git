@@ -59,15 +59,15 @@ export class ShelveError extends Error {
  * 任何一個 repo 失敗：已擱置的 repo 依相反順序還原（keepChanges 時只刪除 ref），再丟出 ShelveError。
  */
 export async function shelveAcross(
-  items: readonly { repo: GitRepository; paths: string[] }[],
+  items: readonly { repo: GitRepository; paths: string[]; partials?: { path: string; patch: Buffer }[] }[],
   name: string,
   opts: { keepChanges?: boolean; id?: string } = {},
 ): Promise<{ id: string; roots: string[] }> {
   const id = opts.id ?? newShelfId();
   const done: { repo: GitRepository; hash: string }[] = [];
-  for (const { repo, paths } of items) {
+  for (const { repo, paths, partials } of items) {
     try {
-      const hash = await repo.shelve(id, name, paths, opts.keepChanges);
+      const hash = await repo.shelve(id, name, paths, opts.keepChanges, partials);
       if (hash) done.push({ repo, hash });
     } catch (e) {
       const rollbackErrors: { root: string; error: string }[] = [];
