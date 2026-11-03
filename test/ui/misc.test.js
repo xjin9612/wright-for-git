@@ -82,6 +82,29 @@ test('標題列齒輪指令：打開面板內設定框', async () => {
   await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openGlobalKeybindings' && c[1] === '@ext:xjin9612.vscode-git-workbench'));
 });
 
+test('設定框：焦點真的離開 webview（點到編輯器等）才關閉；下拉選單展開時不關閉', async () => {
+  const blur = () => page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await app.run('gitWorkbench.openSettings');
+  await page.waitForSelector('.settings-popover');
+  // 焦點仍在頁面（例如 select 展開）：不關閉
+  await blur();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.settings-popover').count(), 1);
+  await page.evaluate(() => {
+    window.__hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+  });
+  try {
+    await blur();
+    await h.until(async () => (await page.locator('.settings-popover').count()) === 0, '設定框關閉');
+  } finally {
+    await page.evaluate(() => {
+      document.hasFocus = window.__hasFocus;
+      window.dispatchEvent(new Event('focus'));
+    });
+  }
+});
+
 test('顯示 Git 歷史：切到檔案所屬 repo 並以路徑篩選', async () => {
   await app.run('gitWorkbench.showHistory', fileUri(path.join(api, 'src/orders/pricing.ts')));
   await page.waitForTimeout(1200);

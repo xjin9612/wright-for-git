@@ -349,6 +349,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   /** 標題列齒輪：顯示 Log 面板並打開面板內的設定框 */
   async openSettingsPanel(): Promise<void> {
+    // 先讓 webview 取得焦點：設定框才收得到「焦點離開」而在點到別處時關閉
     await vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`);
     openSettingsIn((msg) => this.post(msg));
   }

@@ -29,6 +29,7 @@ function open(): void {
     document.addEventListener('mousedown', onOutside, true);
     document.addEventListener('keydown', onKey, true);
   });
+  window.addEventListener('blur', onBlur);
   popover.querySelector<HTMLElement>('select, input')?.focus();
 }
 
@@ -37,6 +38,17 @@ function close(): void {
   popover = undefined;
   document.removeEventListener('mousedown', onOutside, true);
   document.removeEventListener('keydown', onKey, true);
+  window.removeEventListener('blur', onBlur);
+}
+
+/**
+ * 點到 webview 外（編輯器、其他 view）時收不到 mousedown：焦點真的離開 webview 才關閉。
+ * 下一輪再確認 document.hasFocus()：下拉選單（select）展開時若也觸發 blur，焦點仍在這個頁面，不關閉
+ */
+function onBlur(): void {
+  setTimeout(() => {
+    if (!document.hasFocus()) close();
+  });
 }
 
 function onOutside(e: Event): void {

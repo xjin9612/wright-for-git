@@ -197,7 +197,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   }
 
   /** 標題列齒輪：打開提交視窗內的設定框 */
-  openSettingsPanel(): void {
+  async openSettingsPanel(): Promise<void> {
+    // 齒輪在 webview 外（view 標題列）：先讓 webview 取得焦點，設定框才收得到「焦點離開」而在點到別處時關閉
+    await vscode.commands.executeCommand(`${CommitViewProvider.viewId}.focus`);
     openSettingsIn((msg) => this.post(msg));
   }
 
