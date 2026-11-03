@@ -91,7 +91,7 @@ npm install
 npm run build       # build dist/
 npm run typecheck   # type-check the extension and the webview
 npm test            # unit and integration tests (requires git)
-npm run test:ui     # UI end-to-end tests in Chromium (first run: npx playwright install chromium)
+npm run test:ui     # UI end-to-end tests in Chromium (downloads Chromium on the first run)
 npm run test:vscode # tests inside a real VS Code (downloads VS Code on the first run)
 npm run bench:vscode # log loading benchmark on a large repository (see docs/TESTING.md)
 npm run package     # create the .vsix

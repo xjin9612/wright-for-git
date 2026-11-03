@@ -13,12 +13,11 @@ CI（GitHub Actions）在 Windows 與 Linux 上跑前三層；真實 VS Code 測
 
 ## 執行 UI 測試
 
-第一次需要下載 Chromium（約 150 MB，之後不必再下載）：
-
 ```
-npx playwright install chromium
 npm run test:ui
 ```
+
+執行前會先跑 `pretest:ui`（`playwright install chromium`）：第一次下載 Chromium（約 150 MB），之後已安裝就直接略過。
 
 每個測試檔會在系統暫存資料夾建立一份新的 playground，不會動到手動測試用的範例 repo。失敗時訊息會指出哪一個步驟、預期與實際的內容；等待逾時還會附上診斷：各 repo 的 `git status`、錯誤與警告通知、Git 主控台最後幾行、當下開著的選單與確認框。回報失敗時請連同這段一起貼上。
 

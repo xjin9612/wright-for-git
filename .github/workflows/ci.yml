@@ -34,7 +34,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - if: runner.os == 'Linux'
         run: npx playwright install-deps chromium
-      - run: npx playwright install chromium
+      # Chromium 由 pretest:ui 安裝（已在快取中就略過）
       - run: npm run test:ui
       # 下載的 VS Code（每個約 350 MB）依作業系統與週次快取，同一週內不重複下載
       - id: week
