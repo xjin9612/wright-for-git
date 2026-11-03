@@ -360,6 +360,24 @@ test('鍵盤：Shift+F10 開右鍵選單，方向鍵移動、Enter 執行、Esc 
   assert.equal(await page.locator('.context-menu').count(), 0);
 });
 
+test('webview 已處理的按鍵不轉給 VS Code（避免 Shift+F10 同時觸發使用者的快速鍵）；未處理的照常轉送', async () => {
+  // VS Code 在 webview 的 window 上（冒泡階段）監聽 keydown 並比對快速鍵：這裡模擬那個監聽
+  await page.evaluate(() => {
+    window.__forwarded = [];
+    window.addEventListener('keydown', (e) => window.__forwarded.push(`${e.shiftKey ? 'Shift+' : ''}${e.key}`));
+  });
+  const forwarded = () => page.evaluate(() => window.__forwarded);
+  await (await row('feat(auth): add API keys')).click();
+  await page.keyboard.press('Shift+F10');
+  await page.waitForSelector('.context-menu');
+  await page.keyboard.press('Escape');
+  await page.locator('.details-pane .file-tree .tree-row', { hasText: 'keys.ts' }).click();
+  await page.keyboard.press('F4');
+  const keys = await forwarded();
+  assert.ok(!keys.includes('Shift+F10'), `Shift+F10 不應轉送：${keys.join(', ')}`);
+  assert.ok(keys.includes('F4'), `F4 要轉送（自訂快速鍵）：${keys.join(', ')}`);
+});
+
 test('沒有符合的 commit：提示並可一鍵清除篩選', async () => {
   await search('no-such-commit-xyz');
   assert.match(await page.locator('.log-overlay').innerText(), /No commits matching filters/);

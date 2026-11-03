@@ -7,6 +7,9 @@
 - `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Git Workbench: Open Selected File in Changed Files*
 - Context menu on files in the log's commit details (also with the Menu key or `Shift+F10`): Show Diff, Open File, Open Repository Version (the file as of that commit, read-only), Copy File Name, Copy Path
 
+### Keyboard
+- Keys a Git Workbench panel handles itself (such as `Shift+F10` for the context menu, arrows, `Enter`) no longer also run a VS Code shortcut bound to the same key — e.g. with an IntelliJ keymap, `Shift+F10` used to open the menu and the Run Task list at once
+
 ### Releasing
 - Versions follow the VS Code Marketplace rule: `major.minor.patch` only, an even minor is a regular release and an odd minor a pre-release. CI and the release workflow check it (`scripts/check-version.mjs`)
 
