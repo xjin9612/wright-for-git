@@ -312,6 +312,8 @@ export type ToExtension =
   | { type: 'mergeOpenEditor'; root: string; path: string }
   | { type: 'setSetting'; key: string; value: unknown }
   | { type: 'openSettingsPage' }
+  /** 開啟 VS Code 的鍵盤快速鍵頁，只列出這個擴充功能的快速鍵 */
+  | { type: 'openKeybindingsPage' }
   | { type: 'editIssueLinks' }
   | { type: 'ready' }
   /** generation：送出時 webview 持有的 repos 版本；與 extension 不一致時忽略（新的 repos 訊息已在路上） */

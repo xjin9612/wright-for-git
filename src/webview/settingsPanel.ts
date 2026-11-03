@@ -114,6 +114,10 @@ function render(): void {
     el('div', { className: 'settings-sep' }),
     el('div', { className: 'settings-links' },
       link(v.issueLinks > 0 ? t('Issue link rules ({0})…', v.issueLinks) : t('Issue link rules…'), () => post({ type: 'editIssueLinks' })),
+      link(t('Keyboard shortcuts…'), () => {
+        close();
+        post({ type: 'openKeybindingsPage' });
+      }),
       link(t('All settings…'), () => {
         close();
         post({ type: 'openSettingsPage' });

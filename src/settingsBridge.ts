@@ -45,6 +45,9 @@ export async function handleSettingsMessage(m: { type: string; key?: string; val
     case 'openSettingsPage':
       await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:xjin9612.vscode-git-workbench');
       return true;
+    case 'openKeybindingsPage':
+      await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', '@ext:xjin9612.vscode-git-workbench');
+      return true;
     case 'editIssueLinks':
       await vscode.commands.executeCommand('workbench.action.openSettingsJson', { revealSetting: { key: 'gitWorkbench.issueLinks', edit: true } });
       return true;

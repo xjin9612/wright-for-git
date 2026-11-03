@@ -424,6 +424,7 @@
   "Issue link rules ({0})…": "Issue 連結規則（{0}）…",
   "Issue link rules…": "Issue 連結規則…",
   "All settings…": "所有設定…",
+  "Keyboard shortcuts…": "鍵盤快速鍵…",
   "Resolve Conflicts…": "解決衝突…",
   "{0}: {1} stopped because of conflicts. Resolve them, then continue or abort.": "{0}：{1} 因衝突而暫停，解決衝突後繼續，或中止。",
   "Conflicts": "衝突",

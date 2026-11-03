@@ -13,6 +13,7 @@
 ### Commit log
 - Opening the log starts at the top of the list, like IntelliJ: the last selected commit (or HEAD) is still selected and shown in the details, but the list no longer scrolls to it
 - *Go to HEAD* button in the toolbar selects HEAD and scrolls to it
+- The settings (gear) has a *Keyboard shortcuts…* link that opens Keyboard Shortcuts filtered to Git Workbench, e.g. to rebind `F4`
 
 ### Loading
 - Opening the log in a large workspace no longer shows a blank panel while repositories are found and read: the log shows *Loading repositories…*, VS Code's progress bar runs at the top of the panel and on its tab, and the side-bar Branches shows *Loading…*. The Commit window shows VS Code's progress bar on its first load
