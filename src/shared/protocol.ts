@@ -331,6 +331,10 @@ export type ToExtension =
   | { type: 'copy'; text: string }
   /** 變更檔案樹的焦點與選取檔案（失去焦點時 focused 為 false） */
   | { type: 'fileTreeFocus'; focused: boolean; file?: FocusedFile }
+  /** 開啟工作目錄中的檔案 */
+  | { type: 'openWorkingFile'; root: string; path: string }
+  /** 以唯讀方式開啟檔案在某個 revision 的內容 */
+  | { type: 'openRevisionFile'; root: string; ref: string; path: string }
   /** 開啟外部連結（只接受 http／https） */
   | { type: 'openExternal'; url: string }
   /** 同步：對 roots 中的 repository 執行 */

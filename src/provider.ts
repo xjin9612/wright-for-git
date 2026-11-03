@@ -19,7 +19,7 @@ import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { DialogPanels } from './dialogPanel';
 import { opName } from './conflicts';
-import { setFileTreeFocus } from './fileTreeFocus';
+import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -405,6 +405,14 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         case 'fileTreeFocus':
           setFileTreeFocus('log', m.focused, m.file);
           break;
+        case 'openWorkingFile':
+          await openWorkingFile(m.root, m.path);
+          break;
+        case 'openRevisionFile': {
+          const e = this.find(m.root);
+          if (e) await vscode.commands.executeCommand('vscode.open', revisionUri(e.repo.root, m.ref, m.path), { preview: true });
+          break;
+        }
         case 'copy':
           await vscode.env.clipboard.writeText(m.text);
           vscode.window.setStatusBarMessage(t('Copied: {0}', m.text), 2000);

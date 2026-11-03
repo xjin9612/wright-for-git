@@ -1,11 +1,12 @@
 // 右欄：變更檔案樹 + Commit 詳情
 import type { ChangedFile, CommitDetails, HeadInfo, RefInfo, RepoState } from '../shared/protocol';
 import { buildLabels } from '../shared/refs';
-import { clear, el, formatDate, iconButton, makeSplitter } from './dom';
-import { FileTree, type FileGrouping } from './fileTree';
+import { clear, el, formatDate, iconButton, makeSplitter, MOD_KEY, type MenuItem } from './dom';
+import { FileTree, fileName, type FileGroup, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
 import { linkify } from './issueLinks';
 import { renderLabel } from './logTable';
+import { post } from './vscodeApi';
 
 export type { FileGrouping };
 
@@ -53,6 +54,7 @@ export class DetailsPane {
     this.tree = new FileTree({
       grouping,
       reportFocus: true,
+      fileMenu: (g, file) => this.fileMenu(g, file),
       onGroupChange: cb.onGroupChange,
       repoName: (root) => this.states.get(root)?.name ?? '',
       onOpen: (g, file, files) => {
@@ -87,6 +89,20 @@ export class DetailsPane {
     this.element = el('div', { className: 'details-pane' }, this.filesSection, splitter, this.info);
     this.applySplit();
     this.renderEmpty(t('Select a commit to view changes'));
+  }
+
+  /** 檔案右鍵選單（選單開啟前已選取該檔案） */
+  private fileMenu(g: FileGroup, file: ChangedFile): MenuItem[] {
+    // 該 commit 的版本：多選合併變更自帶右側 revision；刪除的檔案在該 commit 不存在
+    const ref = file.right !== undefined ? file.right : file.status === 'D' ? '' : (this.details?.hash ?? '');
+    return [
+      { label: t('Show Diff'), keybinding: 'Enter', action: () => this.tree.openSelected() },
+      { label: t('Open File'), disabled: file.status === 'D', action: () => post({ type: 'openWorkingFile', root: g.root, path: file.path }) },
+      { label: t('Open Repository Version'), disabled: !ref, action: () => post({ type: 'openRevisionFile', root: g.root, ref, path: file.path }) },
+      '-',
+      { label: t('Copy File Name'), keybinding: `${MOD_KEY}C`, action: () => post({ type: 'copy', text: fileName(file.path) }) },
+      { label: t('Copy Path'), action: () => post({ type: 'copy', text: file.path }) },
+    ];
   }
 
   private applySplit(): void {

@@ -359,6 +359,8 @@
   "Rename Changelist": "重新命名 Changelist",
   "{0} has no changes against HEAD.": "{0} 與 HEAD 沒有差異。",
   "Copy Path": "複製路徑",
+  "Copy File Name": "複製檔名",
+  "Open Repository Version": "開啟儲存庫版本",
   "Unstash as Branch…": "從儲藏建立分支…",
   "New Changelist…": "新增 Changelist…",
   "Rename Changelist…": "重新命名 Changelist…",

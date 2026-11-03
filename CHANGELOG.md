@@ -5,6 +5,7 @@
 ### Changed files
 - `Ctrl+C` in a changed-files tree (commit details, stashes, push and unstash dialogs) copies the selected file's name
 - `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Git Workbench: Open Selected File in Changed Files*
+- Context menu on files in the log's commit details (also with the Menu key or `Shift+F10`): Show Diff, Open File, Open Repository Version (the file as of that commit, read-only), Copy File Name, Copy Path
 
 ### Releasing
 - Versions follow the VS Code Marketplace rule: `major.minor.patch` only, an even minor is a regular release and an odd minor a pre-release. CI and the release workflow check it (`scripts/check-version.mjs`)

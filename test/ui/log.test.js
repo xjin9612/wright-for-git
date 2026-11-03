@@ -222,6 +222,61 @@ test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔�
   assert.equal(opened().length, n);
 });
 
+test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版本、複製檔名與路徑；刪除的檔案停用開啟', async () => {
+  const opened = () => app.calls.executed.filter(([c]) => c === 'vscode.open').map((a) => a[1]);
+  const tree = page.locator('.details-pane .file-tree');
+  const keys = 'feat(auth): add API keys';
+  await (await row(keys)).click();
+  const hash = h.git(`${pg}/api-server`, 'log', '--format=%H', '-1', '-F', '--grep', 'feat(auth): add API keys', 'main');
+
+  const openMenu = async (name) => {
+    await tree.locator('.tree-row', { hasText: name }).click({ button: 'right' });
+    await page.waitForSelector('.context-menu');
+  };
+  await openMenu('keys.ts');
+  assert.deepEqual(await h.texts(page.locator('.context-menu .menu-item .menu-label')), ['Show Diff', 'Open File', 'Open Repository Version', 'Copy File Name', 'Copy Path']);
+  assert.match(await tree.locator('.tree-row.selected').innerText(), /keys\.ts/, '右鍵同時選取該檔案');
+
+  app.calls.clipboard = undefined;
+  await h.menu(page, 'Copy File Name');
+  await h.until(() => app.calls.clipboard === 'keys.ts');
+  await openMenu('keys.ts');
+  await h.menu(page, 'Copy Path');
+  await h.until(() => app.calls.clipboard === 'src/auth/keys.ts');
+
+  let n = opened().length;
+  await openMenu('keys.ts');
+  await h.menu(page, 'Open File');
+  await h.until(() => opened().length > n);
+  assert.equal(opened().at(-1).scheme, 'file');
+  assert.match(opened().at(-1).fsPath.replace(/\\/g, '/'), /\/api-server\/src\/auth\/keys\.ts$/);
+
+  n = opened().length;
+  await openMenu('keys.ts');
+  await h.menu(page, 'Open Repository Version');
+  await h.until(() => opened().length > n);
+  assert.equal(opened().at(-1).scheme, 'git-workbench');
+  assert.equal(JSON.parse(opened().at(-1).query).ref, hash);
+
+  // Shift+F10 也能開選單
+  await tree.locator('.tree-row', { hasText: 'keys.ts' }).click();
+  await page.keyboard.press('Shift+F10');
+  await page.waitForSelector('.context-menu .menu-item.active');
+  await page.keyboard.press('Escape');
+
+  // 刪除的檔案：開啟檔案、開啟儲存庫版本停用
+  await (await row('chore: drop legacy script')).click();
+  await openMenu('legacy.sh');
+  const disabled = await h.texts(page.locator('.context-menu .menu-item.disabled .menu-label'));
+  assert.deepEqual(disabled, ['Open File', 'Open Repository Version']);
+  await page.keyboard.press('Escape');
+
+  // 資料夾列沒有選單
+  await page.locator('.details-pane .file-tree .tree-row', { hasText: 'scripts' }).click({ button: 'right' });
+  await page.waitForTimeout(200);
+  assert.equal(await page.locator('.context-menu').count(), 0);
+});
+
 test('多選：Shift+點選顯示合併變更；Ctrl+C 與右鍵都複製全部選取的 hash', async () => {
   await (await row('feat(auth): rotate API keys')).click();
   await (await row('docs: describe key rotation')).click({ modifiers: ['Shift'] });

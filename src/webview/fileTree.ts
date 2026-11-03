@@ -1,7 +1,7 @@
 // 變更檔案樹（記錄右欄、儲藏的檔案清單共用）：依目錄／儲存庫／模組分組（對應 IntelliJ 的 Group By）
 import type { ChangedFile } from '../shared/protocol';
 import { buildTree, type TreeNode } from '../shared/tree';
-import { clear, el, icon, iconButton, showMenu, treeItemAttrs } from './dom';
+import { clear, el, icon, iconButton, isContextMenuKey, openContextMenuFor, showMenu, treeItemAttrs, type MenuItem } from './dom';
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { plural, t } from './l10n';
 import { post } from './vscodeApi';
@@ -30,6 +30,8 @@ export interface FileTreeOptions {
   fileDetail?: (file: ChangedFile) => string | undefined;
   /** 把焦點與選取的檔案回報給 extension（F4 等可自訂快速鍵用；需要該 webview 的 host 處理 fileTreeFocus） */
   reportFocus?: boolean;
+  /** 檔案列的右鍵選單（滑鼠右鍵、選單鍵或 Shift+F10）；資料夾、repo 列沒有選單 */
+  fileMenu?: (group: FileGroup, file: ChangedFile) => MenuItem[];
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -56,7 +58,7 @@ interface Row {
   expandable: boolean;
 }
 
-function fileName(p: string): string {
+export function fileName(p: string): string {
   return p.slice(p.lastIndexOf('/') + 1);
 }
 
@@ -286,6 +288,16 @@ export class FileTree {
       row.addEventListener('dblclick', () => {
         if (f) this.open(r.group, f);
       });
+      const fileMenu = this.opts.fileMenu;
+      if (f && fileMenu) {
+        row.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.selected = r.key;
+          this.element.focus();
+          this.render();
+          showMenu(e.clientX, e.clientY, fileMenu(r.group, f));
+        });
+      }
       frag.append(row);
     }
     this.element.append(frag);
@@ -311,6 +323,11 @@ export class FileTree {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'c') {
       // Ctrl+C：複製選取檔案的檔名（資料夾、repo 列不動作）
       if (row?.file) post({ type: 'copy', text: fileName(row.file.path) });
+      e.preventDefault();
+      return;
+    }
+    if (isContextMenuKey(e)) {
+      if (row?.file && this.opts.fileMenu) openContextMenuFor(this.element.querySelector('.tree-row.selected'));
       e.preventDefault();
       return;
     }

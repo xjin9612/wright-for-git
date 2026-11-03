@@ -31,10 +31,14 @@ export function setFileTreeFocus(source: string, hasFocus: boolean, file?: Focus
 /** 開啟檔案樹選取檔案的工作目錄版本（IntelliJ 的 Jump to Source） */
 export async function openFocusedFile(): Promise<void> {
   const file = last ? focused.get(last) : undefined;
-  if (!file) return;
-  const full = path.join(file.root, file.path);
+  if (file) await openWorkingFile(file.root, file.path);
+}
+
+/** 開啟工作目錄中的檔案；已刪除或改名時只在狀態列提示 */
+export async function openWorkingFile(root: string, relPath: string): Promise<void> {
+  const full = path.join(root, relPath);
   if (!fs.existsSync(full)) {
-    vscode.window.setStatusBarMessage(t('File does not exist in the working tree: {0}', file.path), 3000);
+    vscode.window.setStatusBarMessage(t('File does not exist in the working tree: {0}', relPath), 3000);
     return;
   }
   await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(full));
