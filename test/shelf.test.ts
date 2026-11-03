@@ -43,6 +43,25 @@ test('擱置選取的檔案（含刪除與未追蹤）：從工作區移除、�
   assert.equal((await repo.listShelves()).length, 1, '取回不會自動刪除');
 });
 
+test('沒選的已暫存檔案不會被記進擱置，也留在暫存區（git stash push 會記下整個暫存區）', async () => {
+  const { repo, git, dir, read } = await setup();
+  writeFileSync(path.join(dir, 'staged.txt'), 's\n');
+  git('add', 'staged.txt');
+  git('add', 'keep.txt');
+  await repo.shelve('s1', 'x', ['a.txt']);
+  const [shelf] = await repo.listShelves();
+  assert.deepEqual((await repo.getStashFiles(shelf)).map((f) => `${f.status} ${f.path}`), ['M a.txt'], '只有選的檔案');
+  assert.deepEqual(git('diff', '--cached', '--name-only').split('\n').sort(), ['keep.txt', 'staged.txt'], '沒選的仍在暫存區');
+  assert.equal(read('a.txt'), 'a1\n');
+  await repo.unshelve(shelf, ['a.txt']);
+  assert.equal(read('a.txt'), 'a2\n');
+  // keepChanges 也只記選的檔案
+  await repo.shelve('s2', 'y', ['a.txt'], true);
+  const s2 = (await repo.listShelves()).find((s) => s.id === 's2')!;
+  assert.deepEqual((await repo.getStashFiles(s2)).map((f) => f.path), ['a.txt']);
+  assert.equal(read('a.txt'), 'a2\n');
+});
+
 test('沒有可擱置的變更時回傳 undefined，不留下任何 ref', async () => {
   const { repo } = await setup();
   assert.equal(await repo.shelve('s1', 'x', ['b.txt']), undefined);
@@ -116,6 +135,23 @@ test('匯出 patch：在乾淨的工作區以 git apply 套用，得到相同的
   assert.equal(read('a.txt'), 'a2\n');
   assert.equal(read('new.txt'), 'n\n');
   assert.ok(!existsSync(path.join(dir, 'gone.txt')));
+});
+
+test('從擱置移除部分檔案：重建後只剩其餘檔案、時間不變、不動工作區；全部移除時整筆刪除', async () => {
+  const { repo, read } = await setup();
+  await repo.shelve('s1', 'x', ['a.txt', 'gone.txt', 'new.txt']);
+  const [before] = await repo.listShelves();
+  assert.equal(await repo.removeFromShelf('s1', ['a.txt', 'new.txt']), 'kept');
+  const [after] = await repo.listShelves();
+  assert.equal(after.name, 'x');
+  assert.equal(after.time, before.time);
+  assert.deepEqual((await repo.getStashFiles(after)).map((f) => `${f.status} ${f.path}`), ['D gone.txt'], '只剩刪除的檔案，未追蹤的 parent 也移除');
+  assert.equal(after.parents.length, 2, '沒有未追蹤檔案時只有兩個 parent');
+  assert.equal(read('a.txt'), 'a1\n', '不動工作區');
+  // 剩下的仍可取回
+  await repo.unshelve(after, ['gone.txt']);
+  assert.equal(await repo.removeFromShelf('s1', ['gone.txt']), 'dropped');
+  assert.deepEqual(await repo.listShelves(), []);
 });
 
 test('拒絕不合法的 id 與路徑', async () => {

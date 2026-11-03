@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Shelf
+- **Shelve Changes…** in the Commit window sets the selected changes aside — modified, deleted and untracked files, across several repositories as one entry — and restores those files; *Keep in Working Tree* saves a copy without touching them. Shelves are kept in the repositories (not in the stash list) and survive restarts. Files with only some changes selected for commit are shelved as whole files, and the prompt says so
+- New **Shelf** tab: shelved entries with their repositories and date, files grouped by repository with diffs. **Unshelve…** opens a dialog to pick the repositories and files (preselected from the files you selected), the changelist to put them in (the shelf's name by default), and whether to remove the unshelved files from the Shelf — the rest stays shelved. Untracked files that already exist are listed and only overwritten if you check them. Conflicts are left in the files and the conflict list opens, with the shelf's name as the other side. Rename, and Delete one or several entries
+
 ### Changed files
 - `Ctrl+C` in a changed-files tree (commit details, stashes, push and unstash dialogs) copies the selected file's name; on a folder it copies the folder's path in the repository, on a repository row the repository name
 - `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Git Workbench: Open Selected File in Changed Files*

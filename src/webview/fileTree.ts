@@ -30,8 +30,10 @@ export interface FileTreeOptions {
   fileDetail?: (file: ChangedFile) => string | undefined;
   /** 把焦點與選取的檔案回報給 extension（F4 等可自訂快速鍵用；需要該 webview 的 host 處理 fileTreeFocus） */
   reportFocus?: boolean;
-  /** 檔案列的右鍵選單（滑鼠右鍵、選單鍵或 Shift+F10）；資料夾、repo 列沒有選單 */
+  /** 檔案列的右鍵選單（滑鼠右鍵、選單鍵或 Shift+F10）；資料夾、repo 列沒有選單。多選時用 selectedFiles() 取得全部 */
   fileMenu?: (group: FileGroup, file: ChangedFile) => MenuItem[];
+  /** 檔案列可用 Ctrl／Shift+點選多選 */
+  multiSelect?: boolean;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -71,6 +73,8 @@ export class FileTree {
   private grouping: FileGrouping;
   private collapsed = new Set<string>();
   private selected: string | undefined;
+  /** 多選的檔案列（multiSelect 時）；空的時候以 selected 為唯一選取 */
+  private multi = new Set<string>();
   private rows: Row[] = [];
   private emptyText = '';
   private lastReport = '';
@@ -104,7 +108,10 @@ export class FileTree {
   /** 顯示檔案；keepSelection 為 false 時清除選取（換成另一個 commit／儲藏） */
   setGroups(groups: FileGroup[], keepSelection = false): void {
     this.groups = groups;
-    if (!keepSelection) this.selected = undefined;
+    if (!keepSelection) {
+      this.selected = undefined;
+      this.multi.clear();
+    }
     this.element.classList.remove('loading');
     this.render();
   }
@@ -114,8 +121,40 @@ export class FileTree {
     this.groups = null;
     this.emptyText = text;
     this.selected = undefined;
+    this.multi.clear();
     this.element.classList.remove('loading');
     this.render();
+  }
+
+  /** 選取的檔案（多選時全部，依顯示順序；否則為目前選取的那一個） */
+  selectedFiles(): { group: FileGroup; file: ChangedFile }[] {
+    const keys = this.multi.size > 0 ? this.multi : new Set(this.selected ? [this.selected] : []);
+    return this.rows.filter((r) => r.file && keys.has(r.key)).map((r) => ({ group: r.group, file: r.file! }));
+  }
+
+  private isSelected(key: string): boolean {
+    return this.multi.size > 0 ? this.multi.has(key) : key === this.selected;
+  }
+
+  /** 點選檔案列：Ctrl 切換、Shift 從上一個選取的檔案延伸到這裡（只含檔案列） */
+  private clickSelect(key: string, e: MouseEvent): boolean {
+    if (!this.opts.multiSelect || !(e.ctrlKey || e.metaKey || e.shiftKey)) {
+      this.multi.clear();
+      return false;
+    }
+    const isFile = (k: string | undefined) => !!k && this.rows.some((r) => r.key === k && r.file);
+    if (this.multi.size === 0 && isFile(this.selected)) this.multi.add(this.selected!);
+    if (e.shiftKey) {
+      const a = this.rows.findIndex((r) => r.key === this.selected);
+      const b = this.rows.findIndex((r) => r.key === key);
+      const [from, to] = a < 0 ? [b, b] : [Math.min(a, b), Math.max(a, b)];
+      if (!(e.ctrlKey || e.metaKey)) this.multi.clear();
+      for (const r of this.rows.slice(from, to + 1)) if (r.file) this.multi.add(r.key);
+    } else if (this.multi.has(key)) this.multi.delete(key);
+    else this.multi.add(key);
+    // Shift 的起點維持不變；Ctrl 點選移動起點
+    if (!e.shiftKey) this.selected = key;
+    return true;
   }
 
   setLoading(loading = true): void {
@@ -263,7 +302,7 @@ export class FileTree {
       const extra = f ? this.opts.fileDetail?.(f) : undefined;
       const row = el(
         'div',
-        { className: `tree-row${r.key === this.selected ? ' selected' : ''}`, title, attrs: treeItemAttrs(r.depth, r.expandable, r.expanded, r.key === this.selected) },
+        { className: `tree-row${this.isSelected(r.key) ? ' selected' : ''}`, title, attrs: treeItemAttrs(r.depth, r.expandable, r.expanded, this.isSelected(r.key)) },
         twisty,
         f ? fileIcon(f.path) : r.icon === 'section' ? null : icon(r.icon ?? 'folder'),
         el('span', { className: `tree-label${f ? ` ${statusClass(f.untracked ? 'untracked' : f.status)}` : ''}${r.icon === 'section' ? ' commit-section' : ''}`, text: r.label }),
@@ -275,7 +314,11 @@ export class FileTree {
         f ? statusLetter(f.untracked ? 'untracked' : f.status) : null,
       );
       row.style.paddingLeft = `${4 + r.depth * 14}px`;
-      row.addEventListener('click', () => {
+      row.addEventListener('click', (e) => {
+        if (f && this.clickSelect(r.key, e)) {
+          this.render();
+          return;
+        }
         this.selected = r.key;
         if (r.expandable) this.toggle(r.key);
         else this.render();
@@ -287,7 +330,11 @@ export class FileTree {
       if (f && fileMenu) {
         row.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          this.selected = r.key;
+          // 在多選範圍內按右鍵：維持多選；否則只選這一個
+          if (!this.multi.has(r.key)) {
+            this.multi.clear();
+            this.selected = r.key;
+          }
           this.element.focus();
           this.render();
           showMenu(e.clientX, e.clientY, fileMenu(r.group, f));
@@ -312,6 +359,7 @@ export class FileTree {
       const r = this.rows[Math.max(0, Math.min(this.rows.length - 1, i))];
       if (!r) return;
       this.selected = r.key;
+      this.multi.clear();
       this.render();
       this.element.querySelector('.tree-row.selected')?.scrollIntoView({ block: 'nearest' });
     };

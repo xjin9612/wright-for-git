@@ -13,9 +13,9 @@ import { showGitError } from './gitConsole';
 import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
-import { stashChanges } from './stashView';
+import { openStashFile, stashChanges } from './stashView';
 import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
-import { shelveAcross, ShelveError } from './shelf';
+import { dropShelfGroup, listShelfGroups, renameShelfGroup, shelveAcross, ShelveError, unshelveAcross, type ShelfGroup } from './shelf';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
 
@@ -229,6 +229,58 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         case 'commitShelve':
           await this.shelve(m.items, m.keep, m.name);
           break;
+        case 'shelfLoad': {
+          const repos = await this.provider.repositories();
+          const groups = await listShelfGroups(repos.map((r) => this.provider.getRepository(r.root)).filter((r): r is GitRepository => !!r));
+          this.post({ type: 'shelfData', requestId: m.requestId, groups, repoNames: Object.fromEntries(repos.map((r) => [r.root, r.name])) });
+          break;
+        }
+        case 'shelfFiles': {
+          const group = await this.shelfGroup(m.id);
+          const { existsSync } = await import('node:fs');
+          const repos = group
+            ? await Promise.all(
+                group.entries.map(async (e) => ({
+                  root: e.root,
+                  files: ((await this.provider.getRepository(e.root)?.getStashFiles(e.shelf)) ?? []).map((f) => (f.untracked && existsSync(path.join(e.root, f.path)) ? { ...f, exists: true } : f)),
+                })),
+              )
+            : [];
+          this.post({ type: 'shelfFiles', requestId: m.requestId, id: m.id, repos });
+          break;
+        }
+        case 'shelfOpenDiff': {
+          const group = await this.shelfGroup(m.id);
+          const entry = group?.entries.find((e) => e.root === m.root);
+          if (group && entry) await openStashFile(m.root, { ...entry.shelf, ref: group.name || t('Shelved changes') }, m.file);
+          break;
+        }
+        case 'shelfUnshelve':
+          await this.unshelve(m);
+          break;
+        case 'shelfRename': {
+          const group = await this.shelfGroup(m.id);
+          if (!group) break;
+          const name = await vscode.window.showInputBox({ title: t('Rename Shelf'), value: group.name, validateInput: (v) => (v.trim() ? undefined : t('Enter a name for the shelf')) });
+          if (name === undefined || name.trim() === group.name) break;
+          await renameShelfGroup(group, name.trim(), (root) => this.provider.getRepository(root));
+          this.post({ type: 'shelfChanged' });
+          break;
+        }
+        case 'shelfDrop': {
+          const all = await this.shelfGroups();
+          const groups = all.filter((g) => m.ids.includes(g.id));
+          if (groups.length === 0) break;
+          const title =
+            groups.length === 1
+              ? t('Delete "{0}" from the Shelf? Its changes will be lost.', groups[0].name)
+              : t('Delete {0} shelved entries? Their changes will be lost.', groups.length);
+          const detail = groups.length === 1 ? groups[0].entries.map((e) => this.repoName(e.root)).join('\n') : groups.map((g) => g.name).join('\n');
+          if (!(await confirm(title, { detail, ok: t('Delete'), kind: 'danger' }, this.confirms))) break;
+          for (const g of groups) await dropShelfGroup(g, (root) => this.provider.getRepository(root));
+          this.post({ type: 'shelfChanged' });
+          break;
+        }
         case 'commitLastMessage': {
           const repo = this.provider.getRepository(m.root);
           this.post({ type: 'commitLastMessage', root: m.root, message: (await repo?.lastCommitMessage()) ?? '' });
@@ -351,14 +403,83 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     await this.provider.refresh(true);
   }
 
+  private repoName(root: string): string {
+    return this.lastState?.repos.find((r) => r.root === root)?.name ?? path.basename(root);
+  }
+
+  private async shelfGroups(): Promise<ShelfGroup[]> {
+    const repos = (await this.provider.repositories()).map((r) => this.provider.getRepository(r.root)).filter((r): r is GitRepository => !!r);
+    return listShelfGroups(repos);
+  }
+
+  private async shelfGroup(id: string): Promise<ShelfGroup | undefined> {
+    const group = (await this.shelfGroups()).find((g) => g.id === id);
+    if (!group) void vscode.window.showWarningMessage(t('This shelf no longer exists.'));
+    return group;
+  }
+
+  /**
+   * 取回擱置的變更（取回對話框選的檔案）；逐 repo 執行，最後彙整結果：
+   * 有衝突時直接打開衝突清單；已追蹤的檔案放進指定的 changelist
+   */
+  private async unshelve(m: Extract<ToExtension, { type: 'shelfUnshelve' }>): Promise<void> {
+    const group = await this.shelfGroup(m.id);
+    if (!group) return;
+    const outcomes = await unshelveAcross(group, (root) => this.provider.getRepository(root), {
+      paths: new Map(m.paths.map((p) => [p.root, p.paths])),
+      remove: m.remove,
+      overwrite: m.overwrite,
+      label: t('Shelf: {0}', group.name),
+    });
+    const applied = outcomes.filter((o) => o.ok || o.conflict);
+    const failed = outcomes.filter((o) => !o.ok && !o.conflict);
+    const conflicts = outcomes.filter((o) => o.conflict);
+    if (m.changelist?.trim() && applied.length > 0) await this.assignToChangelist(m.changelist.trim(), applied.map((o) => ({ root: o.root, paths: m.paths.find((p) => p.root === o.root)?.paths ?? [] })));
+    if (failed.length > 0) {
+      const detail = failed.map((o) => `${this.repoName(o.root)}: ${o.error ?? ''}`).join('\n');
+      void showGitError(t('Could not unshelve in {0}. Nothing was changed there and its files are kept in the Shelf.', failed.map((o) => this.repoName(o.root)).join(', ')), { detail });
+    }
+    if (conflicts.length > 0) {
+      // 與 IntelliJ 相同：取回有衝突時直接打開衝突清單
+      this.provider.dialogs.conflicts.openList(conflicts.length === 1 ? conflicts[0].root : undefined);
+      vscode.window.setStatusBarMessage(t('Unshelved "{0}" with conflicts', group.name), 5000);
+    } else if (failed.length === 0) {
+      vscode.window.setStatusBarMessage(t('Unshelved "{0}"', group.name), 3000);
+    }
+    this.post({ type: 'shelfChanged' });
+    await this.refresh();
+    await this.provider.refresh(true);
+  }
+
+  /** 取回的已追蹤檔案放進指定名稱的 changelist（沒有就建立）；未追蹤檔案不屬於 changelist */
+  private async assignToChangelist(name: string, items: { root: string; paths: string[] }[]): Promise<void> {
+    const store = this.store;
+    // 預設的 changelist 在介面上顯示翻譯後的名稱
+    let list = store.lists.find((l) => l.name === name || (l.id === 'default' && l.name === 'Changes' && name === t('Changes')));
+    if (!list) {
+      list = { id: `cl-${Date.now()}`, name };
+      store.lists.push(list);
+    }
+    for (const { root, paths } of items) {
+      const repo = this.provider.getRepository(root);
+      if (!repo) continue;
+      const tracked = new Set((await repo.getWorkingChanges()).filter((c) => c.kind === 'changed' || c.kind === 'conflict').map((c) => c.path));
+      for (const p of paths) if (tracked.has(p)) store.assign[keyOf(root, p)] = list.id;
+    }
+    await this.saveStore(store);
+  }
+
   /** 擱置選取的變更（可跨多個 repo，成為同一筆 shelf）；keep 時工作區保留原樣 */
   private async shelve(items: { root: string; change: WorkingChange }[], keep: boolean, suggested: string): Promise<void> {
     const list = items.filter((x) => x.change.kind === 'changed' || x.change.kind === 'untracked');
     if (list.length === 0) return;
     const roots = new Set(list.map((x) => x.root));
+    // 提交時只選了部分段落的檔案：擱置的是整個檔案，先說清楚
+    const partial = list.filter((x) => this.partial.has(keyOf(x.root, x.change.path))).length;
+    const count = roots.size > 1 ? t('Shelve {0} file(s) from {1} repositories', list.length, roots.size) : t('Shelve {0} file(s)', list.length);
     const name = await vscode.window.showInputBox({
       title: keep ? t('Shelve Changes, Keep in Working Tree') : t('Shelve Changes'),
-      prompt: roots.size > 1 ? t('Shelve {0} file(s) from {1} repositories', list.length, roots.size) : t('Shelve {0} file(s)', list.length),
+      prompt: partial > 0 ? `${count}. ${t('{0} file(s) have only some changes selected for commit; the whole file is shelved.', partial)}` : count,
       placeHolder: t('Shelf name'),
       value: suggested,
       validateInput: (v) => (v.trim() ? undefined : t('Enter a name for the shelf')),
@@ -381,7 +502,7 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       else vscode.window.setStatusBarMessage(t('Shelved to "{0}"', name.trim()), 3000);
     } catch (e) {
       if (e instanceof ShelveError) {
-        const repoName = (root: string) => this.lastState?.repos.find((r) => r.root === root)?.name ?? path.basename(root);
+        const repoName = (root: string) => this.repoName(root);
         const detail = e.rollbackErrors.map((r) => `${repoName(r.root)}: ${r.error}`).join('\n');
         void showGitError(
           e.rollbackErrors.length > 0

@@ -414,9 +414,12 @@ export class GitRepository {
         }
         return { op, ours: onto && isHash(onto) ? await name(onto) : await short('HEAD'), theirs: await subject('REBASE_HEAD') };
       }
-      default:
-        // 沒有進行中的操作：多半是套用儲藏時的衝突
-        return { op, ours: branch, theirs: 'stash' };
+      default: {
+        // 沒有進行中的操作：套用儲藏或取回擱置時的衝突（取回擱置時會留下名稱）
+        const { promises: fsp } = await import('node:fs');
+        const shelf = (await fsp.readFile(this.unshelveMarker, 'utf8').catch(() => '')).trim();
+        return { op, ours: branch, theirs: shelf || 'stash' };
+      }
     }
   }
 
@@ -776,6 +779,7 @@ export class GitRepository {
   /** 套用 stash；pop 時成功後刪除；index 時同時還原 staged 狀態 */
   async stashApply(ref: string, opts: { pop?: boolean; index?: boolean } = {}): Promise<void> {
     this.assertStash(ref);
+    await this.clearUnshelveMarker();
     await this.run(['stash', opts.pop ? 'pop' : 'apply', ...(opts.index ? ['--index'] : []), ref]);
   }
 
@@ -814,11 +818,13 @@ export class GitRepository {
       env: LITERAL,
       input: paths.join('\0'),
     });
-    const hash = await top();
-    if (!hash || hash === before) return undefined;
-    await this.run(['update-ref', '-m', 'shelve', SHELF_REF + id, hash]);
+    const stashed = await top();
+    if (!stashed || stashed === before) return undefined;
+    // stash push 會把整個暫存區記進去：只留下選取的路徑，沒選的已暫存檔案（仍在工作區）不算擱置
+    const hash = await this.rewriteShelfCommit(stashed, paths, 'only');
+    if (hash) await this.run(['update-ref', '-m', 'shelve', SHELF_REF + id, hash]);
     await this.run(['stash', 'drop', '--quiet', 'stash@{0}']);
-    if (keepChanges) await this.run(['stash', 'apply', '--index', hash]);
+    if (hash && keepChanges) await this.run(['stash', 'apply', '--index', hash]);
     return hash;
   }
 
@@ -836,12 +842,24 @@ export class GitRepository {
       .sort((a, b) => b.time - a.time);
   }
 
+  /** 取回擱置發生衝突時記下擱置名稱，讓衝突畫面標示「對方」是哪一筆擱置 */
+  private get unshelveMarker(): string {
+    return path.join(this.gitDir, 'gitworkbench-unshelve');
+  }
+
+  private async clearUnshelveMarker(): Promise<void> {
+    const { promises: fsp } = await import('node:fs');
+    await fsp.rm(this.unshelveMarker, { force: true });
+  }
+
   /**
    * 取回 shelf 的變更到工作區。未指定 paths 時整筆套用（git stash apply，三方合併）；
-   * 指定時只取回這些檔案：已追蹤的以 patch 套用（套不上時改用三方合併，衝突留在工作區），未追蹤的直接還原（已存在則中止）。
+   * 指定時只取回這些檔案：已追蹤的以 patch 套用（套不上時改用三方合併，衝突標記留在檔案中、仍會還原未追蹤檔案再丟出錯誤），
+   * 未追蹤的直接還原（已存在時中止，overwrite 時覆蓋）。label 為衝突畫面上「對方」的名稱。
    */
-  async unshelve(shelf: Pick<ShelfInfo, 'hash' | 'parents'>, paths?: string[]): Promise<void> {
+  async unshelve(shelf: Pick<ShelfInfo, 'hash' | 'parents'>, paths?: string[], opts: { overwrite?: boolean; label?: string } = {}): Promise<void> {
     if (!isHash(shelf.hash)) throw new GitError(`Invalid shelf: ${shelf.hash}`, null, '');
+    await this.clearUnshelveMarker();
     if (!paths) {
       await this.run(['stash', 'apply', shelf.hash]);
       return;
@@ -852,19 +870,103 @@ export class GitRepository {
     const want = new Set(paths);
     const untracked = untrackedAll.filter((p) => want.has(p));
     const tracked = paths.filter((p) => !untracked.includes(p));
-    const { existsSync } = await import('node:fs');
+    const { existsSync, promises: fsp } = await import('node:fs');
     const exists = untracked.filter((p) => existsSync(path.join(this.root, p)));
-    if (exists.length > 0) throw new GitError(`Already exists, not restored: ${exists.join(', ')}`, null, '');
+    if (exists.length > 0 && !opts.overwrite) throw new GitError(`Already exists, not restored: ${exists.join(', ')}`, null, '');
+    // 已追蹤的先套用：失敗（沒有衝突）時整批都沒套用，未追蹤的也不還原，工作區維持原樣
+    let conflict: unknown;
     if (tracked.length > 0) {
       const patch = await this.diffPaths([`${shelf.hash}^1`, shelf.hash], tracked);
       if (patch.length > 0) {
         const apply = (args: string[]) => runGit(this.gitPath, ['apply', ...args, '--whitespace=nowarn', '-'], { cwd: this.root, input: patch });
-        // 先直接套用（變更留在工作區、不動 index）；套不上再用三方合併（會寫入 index，衝突以標記留在檔案中）
-        await apply([]).catch(() => apply(['--3way']));
+        try {
+          // 先直接套用（變更留在工作區、不動 index）；套不上再用三方合併（會寫入 index，衝突以標記留在檔案中）
+          await apply([]).catch(() => apply(['--3way']));
+        } catch (e) {
+          if ((await this.conflictedPaths()).length === 0) throw e;
+          conflict = e;
+          if (opts.label) await fsp.writeFile(this.unshelveMarker, opts.label, 'utf8');
+        }
       }
     }
     for (let i = 0; i < untracked.length; i += 200) {
       await runGit(this.gitPath, ['restore', `--source=${untrackedCommit}`, '--worktree', '--', ...untracked.slice(i, i + 200)], { cwd: this.root, env: LITERAL });
+    }
+    if (conflict) throw conflict;
+  }
+
+  /**
+   * 從 shelf 移除這些檔案（取回後），其餘保留：重建 stash 結構的 commit，不動工作區與真正的 index。
+   * 全部移除後沒有任何變更時刪除整筆，回傳 'dropped'。paths 中 rename 要包含新舊路徑。
+   */
+  async removeFromShelf(id: string, paths: string[]): Promise<'kept' | 'dropped'> {
+    assertShelfId(id);
+    for (const p of paths) assertRelPath(p);
+    const ref = SHELF_REF + id;
+    const hash = (await this.run(['rev-parse', '--verify', `${ref}^{commit}`])).trim();
+    const rewritten = await this.rewriteShelfCommit(hash, paths, 'remove');
+    if (!rewritten) {
+      await this.run(['update-ref', '-d', ref, hash]);
+      return 'dropped';
+    }
+    await this.run(['update-ref', '-m', 'unshelve files', ref, rewritten, hash]);
+    return 'kept';
+  }
+
+  /**
+   * 以暫時的 index 重建 stash 結構的 commit（工作區 tree、index commit、未追蹤檔案 commit），保留原本的訊息與時間：
+   * - 'only'：只留下 paths 的變更（git stash push -- 路徑 會把整個暫存區記進去，擱置要排除沒選的檔案）
+   * - 'remove'：移除 paths 的變更，其餘保留
+   * 結果沒有任何變更時回傳 undefined。
+   */
+  private async rewriteShelfCommit(hash: string, paths: string[], mode: 'only' | 'remove'): Promise<string | undefined> {
+    const [parentList, subject, authorDate, committerDate] = (await this.run(['log', '-1', '--format=%P%x1f%s%x1f%aI%x1f%cI', hash])).trim().split('\x1f');
+    const [base, indexCommit, untrackedCommit] = parentList.split(' ');
+    const { existsSync, promises: fsp } = await import('node:fs');
+    const tmpIndex = path.join(this.gitDir, `gitworkbench-shelf-index-${process.pid}-${Date.now()}`);
+    const env = { GIT_INDEX_FILE: tmpIndex, ...LITERAL };
+    const git = (args: string[], input?: string) => runGit(this.gitPath, args, { cwd: this.root, env, input });
+    const dates = { GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: committerDate };
+    const commitTree = async (tree: string, parents: string[], message: string) =>
+      (await runGit(this.gitPath, ['commit-tree', tree, ...parents.flatMap((p) => ['-p', p]), '-m', message], { cwd: this.root, env: dates })).trim();
+    /** treeish 中這些路徑（含資料夾底下）的項目：路徑 → 「mode blob」 */
+    const entries = async (treeish: string): Promise<Map<string, string>> => {
+      const map = new Map<string, string>();
+      for (let i = 0; i < paths.length; i += 200) {
+        const out = await runGit(this.gitPath, ['ls-tree', '-r', '-z', treeish, '--', ...paths.slice(i, i + 200)], { cwd: this.root, env: LITERAL });
+        for (const rec of out.split('\0').filter(Boolean)) {
+          const tab = rec.indexOf('\t');
+          const [m, , blob] = rec.slice(0, tab).split(' ');
+          map.set(rec.slice(tab + 1), `${m} ${blob}`);
+        }
+      }
+      return map;
+    };
+    /** 從 start 的 tree 開始，把 paths 換成 source 中的內容（source 沒有、或未指定 source 時移除）後寫出 tree */
+    const patchTree = async (start: string, source: string | undefined): Promise<string> => {
+      await git(['read-tree', start]);
+      const want = source ? await entries(source) : new Map<string, string>();
+      const remove = [...(await entries(start)).keys()].filter((p) => !want.has(p));
+      if (want.size > 0) await git(['update-index', '-z', '--index-info'], [...want].map(([p, e]) => `${e}\t${p}\0`).join(''));
+      for (let i = 0; i < remove.length; i += 200) await git(['update-index', '--force-remove', '--', ...remove.slice(i, i + 200)]);
+      return (await git(['write-tree'])).trim();
+    };
+    try {
+      const msg = async (c: string) => (await this.run(['log', '-1', '--format=%B', c])).trim();
+      const only = mode === 'only';
+      const indexTree = only ? await patchTree(base, indexCommit) : await patchTree(indexCommit, base);
+      const workTree = only ? await patchTree(base, hash) : await patchTree(hash, base);
+      // 未追蹤檔案：git stash push -- 路徑 本來就只收指定的路徑
+      const untrackedTree = untrackedCommit ? (only ? (await this.run(['rev-parse', `${untrackedCommit}^{tree}`])).trim() : await patchTree(untrackedCommit, undefined)) : undefined;
+      const emptyTree = (await runGit(this.gitPath, ['hash-object', '-t', 'tree', '--stdin'], { cwd: this.root, input: '' })).trim();
+      const baseTree = (await this.run(['rev-parse', `${base}^{tree}`])).trim();
+      const hasUntracked = !!untrackedTree && untrackedTree !== emptyTree;
+      if (workTree === baseTree && indexTree === baseTree && !hasUntracked) return undefined;
+      const newIndex = await commitTree(indexTree, [base], await msg(indexCommit));
+      const newUntracked = hasUntracked ? await commitTree(untrackedTree!, [], await msg(untrackedCommit)) : undefined;
+      return await commitTree(workTree, [base, newIndex, ...(newUntracked ? [newUntracked] : [])], subject);
+    } finally {
+      for (const f of [tmpIndex, `${tmpIndex}.lock`]) if (existsSync(f)) await fsp.rm(f, { force: true });
     }
   }
 

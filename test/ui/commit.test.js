@@ -210,6 +210,8 @@ test('擱置：跨兩個 repo 選取的檔案擱置成同一筆（不在 stash �
   await fileRow('shelf-b.txt').click({ button: 'right' });
   await h.menu(cv, 'Shelve Changes…');
   await h.until(() => !fs.existsSync(path.join(api, 'shelf-a.txt')) && !fs.existsSync(path.join(web, 'shelf-b.txt')), '兩個 repo 的檔案都被擱置');
+  // 檔案先移走、擱置記錄稍後才寫入：等兩個 repo 都有記錄
+  await h.until(() => shelfRefs(api).length === 1 && shelfRefs(web).length === 1, '兩個 repo 都有擱置記錄');
   const [refA] = shelfRefs(api);
   assert.ok(refA, 'api-server 有 shelf');
   assert.deepEqual(shelfRefs(web), [refA], '兩個 repo 共用同一個 id');
@@ -224,6 +226,73 @@ test('擱置：跨兩個 repo 選取的檔案擱置成同一筆（不在 stash �
   await h.menu(cv, 'Shelve Changes, Keep in Working Tree…');
   await h.until(() => shelfRefs(api).length === 2, '多一筆 shelf');
   assert.ok(fs.existsSync(path.join(api, 'shelf-c.txt')), '檔案保留');
+});
+
+test('擱置分頁：清單、檔案依 repo 分組、diff；取回對話框（預先勾選、移除取回的檔案、保留）、改名、多選刪除', async () => {
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
+  const dialogFiles = () => h.texts(cv.locator('.unshelve-dialog .unshelve-file'));
+  const checkedFiles = () => cv.locator('.unshelve-dialog .unshelve-file input:checked').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+  await h.until(async () => (await cv.locator('.shelf-list .tree-row').count()) === 2, '兩筆擱置');
+  assert.deepEqual(await h.texts(cv.locator('.shelf-list .tree-row .tree-label')), ['keep copy', 'ui shelf'], '新的在前');
+  assert.match(await shelfRow('ui shelf').innerText(), /2 repositories/);
+
+  // 檔案依 repo 分組；雙擊開 diff
+  await shelfRow('ui shelf').click();
+  await h.eventually(async () => {
+    const files = (await h.texts(cv.locator('.shelf-pane .stash-files .tree-row'))).join(' / ');
+    for (const x of ['api-server', 'web-app', 'shelf-a.txt', 'shelf-b.txt']) assert.ok(files.includes(x), files);
+  });
+  const diffs = app.calls.executed.filter((c) => c[0] === 'vscode.diff').length;
+  await cv.locator('.shelf-pane .stash-files .tree-row', { hasText: 'shelf-a.txt' }).dblclick();
+  await h.until(() => app.calls.executed.filter((c) => c[0] === 'vscode.diff').length > diffs, '開 diff');
+
+  // 從檔案右鍵取回：對話框只預先勾選這個檔案；取回後該檔案從擱置移除（web-app 沒有剩下的檔案，整筆移除）
+  await cv.locator('.shelf-pane .stash-files .tree-row', { hasText: 'shelf-b.txt' }).click({ button: 'right' });
+  await h.menu(cv, 'Unshelve…');
+  await cv.waitForSelector('.unshelve-dialog');
+  assert.equal((await dialogFiles()).length, 2, `對話框列出全部檔案：${(await dialogFiles()).join(' / ')}`);
+  assert.deepEqual(await checkedFiles(), ['shelf-b.txt'], '只預先勾選右鍵的檔案');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.existsSync(path.join(web, 'shelf-b.txt')), 'web-app 的檔案取回');
+  await h.until(() => shelfRefs(web).length === 0, 'web-app 的部分移除');
+  await h.until(async () => !/2 repositories/.test(await shelfRow('ui shelf').innerText()), '清單更新');
+
+  // 雙擊整筆開對話框；取消「從擱置移除」：檔案取回、擱置保留
+  await shelfRow('ui shelf').dblclick();
+  await cv.waitForSelector('.unshelve-dialog');
+  assert.deepEqual(await checkedFiles(), ['shelf-a.txt']);
+  await cv.locator('#unshelve-remove').uncheck();
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.existsSync(path.join(api, 'shelf-a.txt')), 'api-server 的檔案取回');
+  await cv.waitForTimeout(300);
+  assert.equal(shelfRefs(api).length, 2, '保留在擱置中');
+
+  // Esc 關閉對話框，不取回
+  await shelfRow('ui shelf').dblclick();
+  await cv.waitForSelector('.unshelve-dialog');
+  await cv.keyboard.press('Escape');
+  assert.equal(await cv.locator('.unshelve-dialog').count(), 0);
+
+  // 改名
+  app.calls.inputs.push('renamed shelf');
+  await shelfRow('ui shelf').click({ button: 'right' });
+  await h.menu(cv, 'Rename…');
+  await h.until(async () => (await shelfRow('renamed shelf').count()) === 1, '改名');
+
+  // 多選兩筆一起刪除（需確認）；多選時取回停用
+  await shelfRow('keep copy').click();
+  await shelfRow('renamed shelf').click({ modifiers: ['Control'] });
+  await shelfRow('renamed shelf').click({ button: 'right' });
+  assert.equal(await cv.locator('.context-menu .menu-item.disabled', { hasText: 'Unshelve…' }).count(), 1, '多選時取回停用');
+  await h.menu(cv, 'Delete 2 Entries…');
+  await cv.waitForSelector('.confirm-dialog');
+  await cv.locator('.confirm-dialog .button.danger').click();
+  await h.until(async () => (await cv.locator('.shelf-list .tree-row').count()) === 0, '全部刪除');
+  assert.equal(shelfRefs(api).length, 0);
+  for (const f of [path.join(api, 'shelf-a.txt'), path.join(api, 'shelf-c.txt'), path.join(web, 'shelf-b.txt')]) fs.rmSync(f, { force: true });
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
 });
 
 test('鍵盤：空白鍵切換勾選；提交訊息中 Ctrl+Enter 提交', async () => {

@@ -40,8 +40,8 @@ export async function stashChanges(repo: GitRepository): Promise<boolean> {
   }
 }
 
-/** 開啟儲藏中某個檔案的 diff（儲藏當時的 HEAD ↔ 儲藏內容；未追蹤檔案左側為空） */
-export async function openStashFile(root: string, stash: StashInfo, file: ChangedFile & { untracked?: boolean }, viewColumn?: vscode.ViewColumn): Promise<void> {
+/** 開啟儲藏（或擱置，ref 傳名稱）中某個檔案的 diff（當時的 HEAD ↔ 儲藏內容；未追蹤檔案左側為空） */
+export async function openStashFile(root: string, stash: Pick<StashInfo, 'hash' | 'parents' | 'ref'>, file: ChangedFile & { untracked?: boolean }, viewColumn?: vscode.ViewColumn): Promise<void> {
   const base = stash.parents[0];
   const left = file.untracked || file.status === 'A' ? revisionUri(root, '', file.path) : revisionUri(root, base, file.oldPath ?? file.path);
   const rightRef = file.untracked ? stash.parents[2] : file.status === 'D' ? '' : stash.hash;

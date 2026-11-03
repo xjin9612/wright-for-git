@@ -2,26 +2,20 @@
 // 擱置中途失敗時把已擱置的 repo 還原，不留下只擱置一半的狀態；取回時逐 repo 執行並回報結果。
 // 不依賴 vscode，方便以真實 git repo 做單元測試。
 import type { GitRepository } from './git/repository';
-import type { ShelfInfo } from './shared/protocol';
+import type { ShelfGroup, ShelfInfo } from './shared/protocol';
 
-/** 一次擱置（可能跨多個 repo） */
-export interface ShelfGroup {
-  id: string;
-  name: string;
-  /** 各 repo 中最新的擱置時間（Unix 秒） */
-  time: number;
-  entries: { root: string; shelf: ShelfInfo }[];
-}
+export type { ShelfGroup };
 
 export interface UnshelveOutcome {
   root: string;
+  /** 全部取回且沒有衝突 */
   ok: boolean;
-  /** 取回後是否已從 Shelf 移除 */
-  dropped?: boolean;
-  /** 失敗原因（git 的錯誤訊息） */
-  error?: string;
-  /** 失敗是因為合併衝突（衝突標記留在工作區，可用衝突對話框處理） */
+  /** 有衝突：變更已套用，衝突標記留在檔案中（可用衝突對話框處理） */
   conflict?: boolean;
+  /** 從擱置移除取回的檔案後，這個 repo 的部分是否還有剩（kept）或已整筆刪除（dropped）；沒有移除時為 undefined */
+  removed?: 'kept' | 'dropped';
+  /** 失敗原因或衝突訊息（git 的錯誤訊息） */
+  error?: string;
 }
 
 /** 依時間排序、同一毫秒也不會重複的 id（只用 ref 名稱允許的字元） */
@@ -45,7 +39,8 @@ export async function listShelfGroups(repos: readonly GitRepository[]): Promise<
       g.entries.push({ root: repo.root, shelf });
     }
   });
-  return [...groups.values()].sort((a, b) => b.time - a.time || a.id.localeCompare(b.id));
+  // 同一秒內的多筆：id 以毫秒時間開頭，依 id 由新到舊
+  return [...groups.values()].sort((a, b) => b.time - a.time || b.id.localeCompare(a.id));
 }
 
 /** 擱置失敗；rollbackErrors 為還原時又失敗的 repo（這些 repo 的變更仍在 shelf 中，沒有遺失） */
@@ -91,33 +86,46 @@ export async function shelveAcross(
 }
 
 /**
- * 逐 repo 取回；某個 repo 失敗不影響其他 repo。
- * paths 指定某個 repo 只取回部分檔案（該 repo 的 shelf 保留，因為還有沒取回的檔案）；
- * 整個 repo 取回成功且 keep 為 false 時，從 Shelf 移除該 repo 的部分。
+ * 逐 repo 取回 paths 指定的檔案（rename 要包含新舊路徑）；某個 repo 失敗不影響其他 repo。
+ * remove 時，取回的檔案從擱置中移除（有衝突也算已取回：內容已在工作區的衝突標記裡），其餘保留；
+ * 失敗（沒有套用任何東西）的 repo 不移除。overwrite 時覆蓋工作區已存在的未追蹤檔案。
+ * label 是衝突畫面上「對方」的名稱（預設為擱置名稱）。
  */
 export async function unshelveAcross(
   group: ShelfGroup,
   repoOf: (root: string) => GitRepository | undefined,
-  opts: { roots?: readonly string[]; paths?: ReadonlyMap<string, string[]>; keep?: boolean } = {},
+  opts: { paths: ReadonlyMap<string, readonly string[]>; remove: boolean; overwrite?: boolean; label?: string },
 ): Promise<UnshelveOutcome[]> {
   const outcomes: UnshelveOutcome[] = [];
   for (const { root, shelf } of group.entries) {
-    if (opts.roots && !opts.roots.includes(root)) continue;
+    const paths = opts.paths.get(root);
+    if (!paths || paths.length === 0) continue;
     const repo = repoOf(root);
     if (!repo) {
       outcomes.push({ root, ok: false, error: 'Repository not found' });
       continue;
     }
-    const paths = opts.paths?.get(root);
+    let error: string | undefined;
+    let conflict = false;
     try {
-      await repo.unshelve(shelf, paths);
-      const drop = !opts.keep && !paths;
-      if (drop) await repo.dropShelf(group.id);
-      outcomes.push({ root, ok: true, dropped: drop });
+      await repo.unshelve(shelf, [...paths], { overwrite: opts.overwrite, label: opts.label ?? group.name });
     } catch (e) {
-      const conflict = (await repo.conflictedPaths().catch(() => [])).length > 0;
-      outcomes.push({ root, ok: false, error: errorText(e), conflict: conflict || undefined });
+      error = errorText(e);
+      conflict = (await repo.conflictedPaths().catch(() => [])).length > 0;
+      if (!conflict) {
+        outcomes.push({ root, ok: false, error });
+        continue;
+      }
     }
+    let removed: UnshelveOutcome['removed'];
+    if (opts.remove) {
+      try {
+        removed = await repo.removeFromShelf(group.id, [...paths]);
+      } catch (e) {
+        error = [error, errorText(e)].filter(Boolean).join('\n');
+      }
+    }
+    outcomes.push({ root, ok: !conflict && !error, conflict: conflict || undefined, removed, error });
   }
   return outcomes;
 }

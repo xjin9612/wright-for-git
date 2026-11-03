@@ -458,6 +458,16 @@ select.push-remote {
 /* 說明在頂端固定的搜尋框下方（與作者選擇框的 .picker-hint 相同樣式） */
 .menu-hint { color: var(--muted); font-size: 0.88em; padding: 4px 2px 0; }
 .paths-dialog { width: min(560px, calc(100vw - 24px)); }
+.unshelve-dialog { height: min(480px, calc(100vh - 16px)); }
+.unshelve-tree .tree-row { cursor: default; }
+.unshelve-exists { color: var(--vscode-editorWarning-foreground, var(--muted)); }
+.unshelve-options { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--vscode-panel-border, var(--border)); flex: none; }
+.unshelve-option { display: flex; align-items: center; gap: 8px; }
+.unshelve-option .text-input {
+  flex: 1; height: 24px; padding: 0 6px; border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 2px; background: var(--vscode-input-background);
+}
+.unshelve-option .text-input:focus { border-color: var(--vscode-focusBorder); }
+.unshelve-summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .paths-search { margin: 8px 12px 4px; }
 .paths-tree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; }
 .paths-tree input[type="checkbox"] { margin: 0 4px 0 0; }

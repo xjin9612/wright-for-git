@@ -238,6 +238,15 @@ export interface ShelfInfo {
   time: number;
 }
 
+/** 一次擱置（可能跨多個 repo，各 repo 共用 id） */
+export interface ShelfGroup {
+  id: string;
+  name: string;
+  /** 各 repo 中最新的擱置時間（Unix 秒） */
+  time: number;
+  entries: { root: string; shelf: ShelfInfo }[];
+}
+
 export interface StashInfo {
   /** stash@{n} */
   ref: string;
@@ -375,6 +384,17 @@ export type ToExtension =
   | { type: 'commitRollback'; items: { root: string; change: WorkingChange }[] }
   /** 擱置選取的變更（keep：工作區保留原樣）；name 為預設名稱 */
   | { type: 'commitShelve'; items: { root: string; change: WorkingChange }[]; keep: boolean; name: string }
+  /** 擱置分頁 */
+  | { type: 'shelfLoad'; requestId: number }
+  | { type: 'shelfFiles'; requestId: number; id: string }
+  | { type: 'shelfOpenDiff'; id: string; root: string; file: ChangedFile & { untracked?: boolean } }
+  /**
+   * 取回 paths 列出的檔案（rename 含新舊路徑）；remove：取回的檔案從擱置移除；
+   * overwrite：覆蓋工作區已存在的未追蹤檔案；changelist：已追蹤的檔案放進這個 changelist（沒有就建立）
+   */
+  | { type: 'shelfUnshelve'; id: string; paths: { root: string; paths: string[] }[]; remove: boolean; overwrite: boolean; changelist?: string }
+  | { type: 'shelfRename'; id: string }
+  | { type: 'shelfDrop'; ids: string[] }
   | { type: 'commitLastMessage'; root: string }
   | { type: 'commitRun'; requestId: number; message: string; amend: boolean; signOff: boolean; noVerify: boolean; push: boolean; items: { root: string; changes: WorkingChange[] }[] }
   | { type: 'commitHunks'; root: string; path: string }
@@ -492,6 +512,9 @@ export type ToWebview =
   | { type: 'stashChanged' }
   /** Shelf 有變動（擱置、取回、改名、刪除） */
   | { type: 'shelfChanged' }
+  | { type: 'shelfData'; requestId: number; groups: ShelfGroup[]; repoNames: Record<string, string> }
+  /** exists：未追蹤檔案在工作區已存在（取回時要覆蓋才會還原） */
+  | { type: 'shelfFiles'; requestId: number; id: string; repos: { root: string; files: (ChangedFile & { untracked?: boolean; exists?: boolean })[] }[] }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */

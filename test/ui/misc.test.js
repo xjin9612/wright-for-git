@@ -33,7 +33,7 @@ test('介面語言 zh-tw：面板、選單、提交視窗都是中文', async ()
   await page.keyboard.press('Escape');
   const cv = await app.commitView();
   await h.eventually(async () => {
-    assert.deepEqual(await h.texts(cv.page.locator('.commit-tab')), ['提交', '儲藏']);
+    assert.deepEqual(await h.texts(cv.page.locator('.commit-tab')), ['提交', '儲藏', '擱置']);
     assert.ok((await h.texts(cv.page.locator('.commit-tree .tree-row'))).some((r) => r.startsWith('變更')));
   });
   await cv.page.close();

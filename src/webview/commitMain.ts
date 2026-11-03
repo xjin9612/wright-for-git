@@ -7,13 +7,14 @@ import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { FileTree, type FileGrouping } from './fileTree';
 import { plural, t } from './l10n';
 import { handleSettings } from './settingsPanel';
+import { createShelfPane } from './shelfPane';
 import { loadState, post, saveState } from './vscodeApi';
 
 type Change = WorkingChange & { module?: string };
 type Section = 'list' | 'unversioned' | 'ignored' | 'conflicts';
 
 interface Persisted {
-  tab: 'commit' | 'stash';
+  tab: 'commit' | 'stash' | 'shelf';
   message: string;
   amend: boolean;
   signOff: boolean;
@@ -28,6 +29,8 @@ interface Persisted {
   split: number;
   /** 儲藏分頁檔案清單的分組 */
   stashGrouping?: FileGrouping;
+  /** 擱置分頁檔案清單的分組 */
+  shelfGrouping?: FileGrouping;
 }
 
 const saved = loadState<Persisted>();
@@ -45,6 +48,7 @@ const ui: Persisted = {
   explicit: saved?.explicit ?? [],
   split: saved?.split ?? 0.5,
   stashGrouping: saved?.stashGrouping,
+  shelfGrouping: saved?.shelfGrouping,
 };
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 const persist = () => {
@@ -69,22 +73,30 @@ const app = document.getElementById('app')!;
 app.className = 'commit-app';
 const tabCommit = el('button', { className: 'commit-tab', text: t('Commit'), attrs: { type: 'button', role: 'tab' } });
 const tabStash = el('button', { className: 'commit-tab', text: t('Stash'), attrs: { type: 'button', role: 'tab' } });
+const tabShelf = el('button', { className: 'commit-tab', text: t('Shelf'), attrs: { type: 'button', role: 'tab' } });
 tabCommit.addEventListener('click', () => setTab('commit'));
 tabStash.addEventListener('click', () => setTab('stash'));
+tabShelf.addEventListener('click', () => setTab('shelf'));
 const commitPane = el('div', { className: 'commit-pane' });
 const stashPane = el('div', { className: 'commit-pane stash-pane' });
-app.append(el('div', { className: 'commit-tabs', attrs: { role: 'tablist' } }, tabCommit, tabStash), commitPane, stashPane);
+const shelfPane = el('div', { className: 'commit-pane stash-pane shelf-pane' });
+app.append(el('div', { className: 'commit-tabs', attrs: { role: 'tablist' } }, tabCommit, tabStash, tabShelf), commitPane, stashPane, shelfPane);
 
-function setTab(tab: 'commit' | 'stash'): void {
+function setTab(tab: Persisted['tab']): void {
   ui.tab = tab;
   persist();
-  tabCommit.classList.toggle('active', tab === 'commit');
-  tabStash.classList.toggle('active', tab === 'stash');
-  tabCommit.setAttribute('aria-selected', String(tab === 'commit'));
-  tabStash.setAttribute('aria-selected', String(tab === 'stash'));
-  commitPane.classList.toggle('hidden', tab !== 'commit');
-  stashPane.classList.toggle('hidden', tab !== 'stash');
+  const tabs: [Persisted['tab'], HTMLElement, HTMLElement][] = [
+    ['commit', tabCommit, commitPane],
+    ['stash', tabStash, stashPane],
+    ['shelf', tabShelf, shelfPane],
+  ];
+  for (const [id, button, pane] of tabs) {
+    button.classList.toggle('active', tab === id);
+    button.setAttribute('aria-selected', String(tab === id));
+    pane.classList.toggle('hidden', tab !== id);
+  }
   if (tab === 'stash') stash.load();
+  if (tab === 'shelf') shelf.load();
 }
 
 // ---------- 提交分頁 ----------
@@ -976,6 +988,15 @@ const stash = (() => {
   };
 })();
 
+// ---------- 擱置分頁 ----------
+const shelf = createShelfPane(shelfPane, {
+  grouping: ui.shelfGrouping,
+  onGroupChange: (g) => {
+    ui.shelfGrouping = g;
+    persist();
+  },
+  changelists: () => (state?.changelists ?? []).map((l) => (l.id === 'default' && l.name === 'Changes' ? t('Changes') : l.name)),
+});
 
 // ---------- 訊息 ----------
 window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
@@ -1023,6 +1044,15 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       break;
     case 'unstashFiles':
       stash.onFiles(m);
+      break;
+    case 'shelfChanged':
+      if (ui.tab === 'shelf') shelf.load();
+      break;
+    case 'shelfData':
+      shelf.onData(m);
+      break;
+    case 'shelfFiles':
+      shelf.onFiles(m);
       break;
     case 'confirm':
       showConfirm(m);
