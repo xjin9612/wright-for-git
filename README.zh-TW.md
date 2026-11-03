@@ -53,6 +53,7 @@
 | `Shift+↑↓`、`Ctrl`／`Shift`+點選、`Ctrl+A` | 多選 commit |
 | `Ctrl+C` | 複製選取 commit 的 hash |
 | `Ctrl+C`（變更檔案樹） | 複製選取檔案的檔名 |
+| `F4`（變更檔案樹） | 開啟選取檔案的工作目錄版本；可在「鍵盤快速鍵」改「開啟變更檔案樹中選取的檔案」的按鍵 |
 | `Ctrl+F` | 聚焦搜尋框 |
 | `Esc`（搜尋框內） | 清除文字篩選 |
 | `Ctrl+Alt+PageUp`／`Ctrl+Alt+PageDown`（diff 中） | 上一個／下一個變更檔案 |

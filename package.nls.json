@@ -22,6 +22,7 @@
   "command.stash.save": "Stash Changes…",
   "command.diff.previousFile": "Previous Changed File",
   "command.diff.nextFile": "Next Changed File",
+  "command.openSelectedFile": "Open Selected File in Changed Files",
   "config.language": "Language of the Git Workbench panel, dialogs and messages. Command names and settings always follow the VS Code display language.",
   "config.language.auto": "Follow the VS Code display language",
   "command.compareWithRef": "Compare with Branch or Tag…",

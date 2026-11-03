@@ -19,6 +19,12 @@ test('快捷鍵：Alt+9、Alt+0 對應的指令可以執行，並打開記錄與
   const keys: { command: string; key: string }[] = ext.packageJSON.contributes.keybindings;
   assert.equal(keys.find((k) => k.key === 'alt+9')?.command, 'gitWorkbench.show');
   assert.equal(keys.find((k) => k.key === 'alt+0')?.command, 'gitWorkbench.showCommit');
+  // F4：只在變更檔案樹有焦點時作用（使用者可在「鍵盤快速鍵」改鍵）
+  const f4 = keys.find((k) => k.command === 'gitWorkbench.openSelectedFile') as { key: string; when?: string } | undefined;
+  assert.equal(f4?.key, 'f4');
+  assert.equal(f4?.when, 'gitWorkbench.fileTreeFocus');
+  // 沒有檔案樹焦點時執行不做任何事、不丟錯
+  await vscode.commands.executeCommand('gitWorkbench.openSelectedFile');
   const a = await api();
   await vscode.commands.executeCommand('gitWorkbench.show');
   // 記錄面板打開後 webview 會請求載入記錄

@@ -19,6 +19,7 @@ import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { DialogPanels } from './dialogPanel';
 import { opName } from './conflicts';
+import { setFileTreeFocus } from './fileTreeFocus';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -314,6 +315,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     view.webview.onDidReceiveMessage((m: ToExtension) => this.onMessage(m), undefined, this.disposables);
     view.onDidChangeVisibility(
       () => {
+        if (!view.visible) setFileTreeFocus('log', false);
         if (view.visible && this.dirtyWhileHidden) {
           this.dirtyWhileHidden = false;
           void this.refresh(false);
@@ -326,6 +328,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     setWebviewConfirm((message, opts) => (this.view?.visible ? this.confirms.request(message, opts) : Promise.resolve(undefined)));
     view.onDidDispose(() => {
       this.view = undefined;
+      setFileTreeFocus('log', false);
       setWebviewConfirm(undefined);
       this.confirms.cancelAll();
       this.logAbort?.abort();
@@ -398,6 +401,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'openExternal':
           if (/^https?:\/\//i.test(m.url)) await vscode.env.openExternal(vscode.Uri.parse(m.url));
+          break;
+        case 'fileTreeFocus':
+          setFileTreeFocus('log', m.focused, m.file);
           break;
         case 'copy':
           await vscode.env.clipboard.writeText(m.text);

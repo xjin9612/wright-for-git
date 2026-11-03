@@ -88,6 +88,11 @@
     },
     "commands": [
       {
+        "command": "gitWorkbench.openSelectedFile",
+        "title": "%command.openSelectedFile%",
+        "category": "Git Workbench"
+      },
+      {
         "command": "gitWorkbench.refresh",
         "title": "%command.refresh%",
         "category": "Git Workbench",
@@ -269,6 +274,10 @@
       ],
       "commandPalette": [
         {
+          "command": "gitWorkbench.openSelectedFile",
+          "when": "false"
+        },
+        {
           "command": "gitWorkbench.showHistory",
           "when": "resourceScheme == file"
         },
@@ -412,6 +421,11 @@
       }
     },
     "keybindings": [
+      {
+        "command": "gitWorkbench.openSelectedFile",
+        "key": "f4",
+        "when": "gitWorkbench.fileTreeFocus"
+      },
       {
         "command": "gitWorkbench.show",
         "key": "alt+9"

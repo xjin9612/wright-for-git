@@ -86,6 +86,12 @@ export const EMPTY_FILTER: LogFilter = { text: '', regex: false, matchCase: fals
 
 export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'U' | 'X';
 
+/** 變更檔案樹有焦點時選取的檔案（供 F4 開啟） */
+export interface FocusedFile {
+  root: string;
+  path: string;
+}
+
 export interface ChangedFile {
   status: FileStatus;
   path: string;
@@ -323,6 +329,8 @@ export type ToExtension =
   | { type: 'requestPaths'; root: string }
   | { type: 'refresh' }
   | { type: 'copy'; text: string }
+  /** 變更檔案樹的焦點與選取檔案（失去焦點時 focused 為 false） */
+  | { type: 'fileTreeFocus'; focused: boolean; file?: FocusedFile }
   /** 開啟外部連結（只接受 http／https） */
   | { type: 'openExternal'; url: string }
   /** 同步：對 roots 中的 repository 執行 */

@@ -192,6 +192,36 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
   assert.equal(app.calls.clipboard, undefined, '資料夾不複製');
 });
 
+test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔案；檔案已不存在時提示；失去焦點後不作用', async () => {
+  const focusContext = () => app.calls.executed.filter(([c, k]) => c === 'setContext' && k === 'gitWorkbench.fileTreeFocus').map((a) => a[2]);
+  const opened = () => app.calls.executed.filter(([c]) => c === 'vscode.open').map((a) => a[1].fsPath.replace(/\\/g, '/'));
+  const openSelected = () => app.calls.commands['gitWorkbench.openSelectedFile']();
+  const tree = page.locator('.details-pane .file-tree');
+
+  await (await row('feat(auth): add API keys')).click();
+  await tree.locator('.tree-row', { hasText: 'keys.ts' }).click();
+  await h.until(() => focusContext().at(-1) === true, '檔案樹有焦點時設定 context key');
+  const before = opened().length;
+  await openSelected();
+  await h.until(() => opened().length > before);
+  assert.match(opened().at(-1), /\/api-server\/src\/auth\/keys\.ts$/);
+
+  // 已刪除的檔案：工作目錄沒有，不開啟，只在狀態列提示
+  await (await row('chore: drop legacy script')).click();
+  await tree.locator('.tree-row', { hasText: 'legacy.sh' }).click();
+  await page.waitForTimeout(200);
+  const n = opened().length;
+  await openSelected();
+  assert.equal(opened().length, n);
+  assert.match(app.calls.status.at(-1), /legacy\.sh/);
+
+  // 焦點移回 commit 清單：context key 關閉，指令不作用
+  await (await row('feat(auth): add API keys')).click();
+  await h.until(() => focusContext().at(-1) === false, '失去焦點時清除 context key');
+  await openSelected();
+  assert.equal(opened().length, n);
+});
+
 test('多選：Shift+點選顯示合併變更；Ctrl+C 與右鍵都複製全部選取的 hash', async () => {
   await (await row('feat(auth): rotate API keys')).click();
   await (await row('docs: describe key rotation')).click({ modifiers: ['Shift'] });

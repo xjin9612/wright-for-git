@@ -12,6 +12,7 @@ import { registerGitConsole } from './gitConsole';
 import { registerExplorerCommands } from './explorerCommands';
 import { createTestApi, type TestApi } from './testApi';
 import { optimizeRepositories } from './optimize';
+import { openFocusedFile } from './fileTreeFocus';
 
 export async function activate(context: vscode.ExtensionContext): Promise<TestApi> {
   initI18n(context);
@@ -41,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     vscode.commands.registerCommand('gitWorkbench.push', () => provider.openPush()),
     vscode.commands.registerCommand('gitWorkbench.diff.nextFile', () => provider.navigateDiff(1)),
     vscode.commands.registerCommand('gitWorkbench.diff.previousFile', () => provider.navigateDiff(-1)),
+    vscode.commands.registerCommand('gitWorkbench.openSelectedFile', () => openFocusedFile()),
     vscode.commands.registerCommand('gitWorkbench.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),
     // 設定變更集中處理，避免同一次變更觸發多次重新載入
     vscode.workspace.onDidChangeConfiguration((e) => {

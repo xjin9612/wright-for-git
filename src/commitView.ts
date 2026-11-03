@@ -14,6 +14,7 @@ import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
 import { stashChanges } from './stashView';
+import { setFileTreeFocus } from './fileTreeFocus';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
 
@@ -112,9 +113,11 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     view.webview.onDidReceiveMessage((m: ToExtension) => this.onMessage(m), undefined, this.disposables);
     view.onDidChangeVisibility(() => {
       if (view.visible) void this.refresh();
+      else setFileTreeFocus('commit', false);
     });
     view.onDidDispose(() => {
       this.view = undefined;
+      setFileTreeFocus('commit', false);
       this.confirms.cancelAll();
     });
   }
@@ -274,6 +277,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
           break;
         case 'openConflicts':
           this.provider.dialogs.conflicts.openList(m.root);
+          break;
+        case 'fileTreeFocus':
+          setFileTreeFocus('commit', m.focused, m.file);
           break;
         case 'copy':
           if (m.text) await vscode.env.clipboard.writeText(m.text);

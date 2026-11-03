@@ -28,6 +28,8 @@ export interface FileTreeOptions {
   repoName: (root: string) => string;
   /** 檔案列的額外說明（如「未追蹤」） */
   fileDetail?: (file: ChangedFile) => string | undefined;
+  /** 把焦點與選取的檔案回報給 extension（F4 等可自訂快速鍵用；需要該 webview 的 host 處理 fileTreeFocus） */
+  reportFocus?: boolean;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -67,12 +69,39 @@ export class FileTree {
   private selected: string | undefined;
   private rows: Row[] = [];
   private emptyText = '';
+  private windowFocused = true;
+  private lastReport = '';
 
   constructor(private readonly opts: FileTreeOptions) {
     this.grouping = { directory: true, repository: true, module: false, ...opts.grouping };
     this.groupButton = iconButton('eye', t('Group By'), () => this.showGroupMenu());
     this.element = el('div', { className: 'tree file-tree', attrs: { tabindex: '0', role: 'tree' } });
     this.element.addEventListener('keydown', (e) => this.onKey(e));
+    if (opts.reportFocus) {
+      this.element.addEventListener('focus', () => this.reportFocus());
+      this.element.addEventListener('blur', () => this.reportFocus());
+      // 焦點移到 webview 外（編輯器、其他 view）時，元素不一定收到 blur
+      window.addEventListener('blur', () => {
+        this.windowFocused = false;
+        this.reportFocus();
+      });
+      window.addEventListener('focus', () => {
+        this.windowFocused = true;
+        this.reportFocus();
+      });
+    }
+  }
+
+  /** 回報焦點與選取檔案；內容沒變時不重送 */
+  private reportFocus(): void {
+    if (!this.opts.reportFocus) return;
+    const focused = this.windowFocused && document.activeElement === this.element;
+    const row = focused ? this.rows.find((r) => r.key === this.selected && r.file) : undefined;
+    const file = row?.file ? { root: row.group.root, path: row.file.path } : undefined;
+    const key = JSON.stringify([focused, file]);
+    if (key === this.lastReport) return;
+    this.lastReport = key;
+    post({ type: 'fileTreeFocus', focused, file });
   }
 
   /** 顯示檔案；keepSelection 為 false 時清除選取（換成另一個 commit／儲藏） */
@@ -219,6 +248,7 @@ export class FileTree {
 
   private render(): void {
     this.rows = this.buildRows();
+    this.reportFocus();
     clear(this.element);
     if (!this.groups) {
       if (this.emptyText) this.element.append(el('div', { className: 'empty-text', text: this.emptyText }));

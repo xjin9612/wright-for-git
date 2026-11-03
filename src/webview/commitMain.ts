@@ -796,6 +796,7 @@ const stash = (() => {
   const filesTitle = el('div', { className: 'push-files-title muted stash-files-title', text: t('Changed files') });
   let filesFor: { root: string; hash: string } | undefined;
   const fileTree = new FileTree({
+    reportFocus: true,
     grouping: ui.stashGrouping ?? { directory: true, repository: true, module: false },
     onGroupChange: (g) => {
       ui.stashGrouping = g;

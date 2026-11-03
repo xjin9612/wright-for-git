@@ -52,6 +52,7 @@ export class DetailsPane {
     this.splitRatio = splitRatio ?? 0.55;
     this.tree = new FileTree({
       grouping,
+      reportFocus: true,
       onGroupChange: cb.onGroupChange,
       repoName: (root) => this.states.get(root)?.name ?? '',
       onOpen: (g, file, files) => {

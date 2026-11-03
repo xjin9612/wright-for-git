@@ -93,6 +93,7 @@
 | 4.1.7 | 工具列：Show Diff、Revert selected changes、File History | P1 |
 | 4.1.8 | 依模組／repo 分組（`web-app 2 files`） | P2 |
 | 4.1.9 | `Ctrl+C` 複製選取檔案的檔名（資料夾不動作） | P1 |
+| 4.1.10 | `F4` 開啟選取檔案的工作目錄版本（Jump to Source；可在鍵盤快速鍵改鍵） | P1 |
 
 ### 4.2 Commit 詳情
 
