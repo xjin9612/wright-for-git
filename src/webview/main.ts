@@ -104,6 +104,8 @@ let requestId = 0;
 let generation = 0;
 /** 本次載入是否為「狀態更新後的重載」（保留捲動位置） */
 let quietReload = false;
+/** 開啟後的第一次載入：畫面從最上面開始，選取上次的 commit／HEAD 但不為它捲動（同 IntelliJ） */
+let initialLoad = true;
 let pendingSelect: string | undefined = ui.selectedHash?.includes('|') ? ui.selectedHash : undefined;
 let users: UserInfo[] | undefined;
 let usersPicker: { refresh: () => void } | undefined;
@@ -279,6 +281,7 @@ const filterBar = el(
   el('div', { className: 'toolbar-spacer' }),
   syncGroup,
   el('div', { className: 'toolbar-divider' }),
+  iconButton('locate', t('Go to HEAD'), () => goToHead()),
   iconButton('refresh', t('Refresh'), () => post({ type: 'refresh' })),
   viewButton,
 );
@@ -925,7 +928,7 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
     const idx = indexOf(repoIdx, hash);
     if (idx !== undefined) {
       pendingSelect = undefined;
-      table.select(idx, true, quietReload ? 'none' : 'center');
+      table.select(idx, true, quietReload || initialLoad ? 'none' : 'center');
     }
   }
 
@@ -939,14 +942,31 @@ function onBatch(m: Extract<ToWebview, { type: 'logBatch' }>): void {
     } else if (table.selectedIndex < 0) {
       pendingSelect = undefined;
       // 預設選取最上方的 HEAD（多 repo 時為最近有動的 repo）
-      let headIdx: number | undefined;
-      for (const st of visibleRepos()) {
-        const idx = st.head.hash ? indexOf(repos.indexOf(st), st.head.hash) : undefined;
-        if (idx !== undefined && (headIdx === undefined || idx < headIdx)) headIdx = idx;
-      }
-      table.select(headIdx ?? 0, true, 'center');
+      table.select(headIndex() ?? 0, true, initialLoad ? 'none' : 'center');
     }
+    initialLoad = false;
   }
+}
+
+/** 目前顯示的 repo 中，最上方的 HEAD 所在列（多 repo 時為最近有動的 repo） */
+function headIndex(): number | undefined {
+  let headIdx: number | undefined;
+  for (const st of visibleRepos()) {
+    const idx = st.head.hash ? indexOf(repos.indexOf(st), st.head.hash) : undefined;
+    if (idx !== undefined && (headIdx === undefined || idx < headIdx)) headIdx = idx;
+  }
+  return headIdx;
+}
+
+/** 選取 HEAD 並捲到畫面中間 */
+function goToHead(): void {
+  const idx = headIndex();
+  if (idx === undefined) {
+    setWarnings([t('{0} is not in the current log (check the filters).', 'HEAD')]);
+    return;
+  }
+  table.select(idx, true, 'center');
+  table.focus();
 }
 
 // ---------- 長線性分支折疊 ----------

@@ -58,6 +58,24 @@ test('合併顯示所有 repo 的 commit；同名 local／remote 合併標籤；
 
 test('載入提示：開啟時在 Log 面板頂端顯示 VS Code 的進度（找 repo、讀取狀態期間）', async () => {
   assert.ok(app.calls.progress.some((l) => l?.viewId === 'gitWorkbench.log'), JSON.stringify(app.calls.progress));
+  // 開啟後畫面從最上面開始（仍選取 HEAD，但不為它捲動）
+  assert.equal(await page.locator('.log-viewport').evaluate((e) => e.scrollTop), 0);
+  assert.equal(await page.locator('.log-row.selected.is-head:visible').count(), 1, '選取 HEAD');
+});
+
+test('前往 HEAD：捲到最下面後按工具列按鈕，選取並捲回 HEAD', async () => {
+  // 視窗調矮，確保清單需要捲動
+  const size = page.viewportSize();
+  await page.setViewportSize({ width: size.width, height: 300 });
+  try {
+    await visibleRows().first().click();
+    await page.keyboard.press('End');
+    await h.until(async () => (await page.locator('.log-viewport').evaluate((e) => e.scrollTop)) > 0, '捲到最下面');
+    await page.locator('[title="Go to HEAD"]').click();
+    await h.eventually(async () => assert.equal(await page.locator('.log-row.selected.is-head:visible').count(), 1, '選取 HEAD 並在畫面內'));
+  } finally {
+    await page.setViewportSize(size);
+  }
 });
 
 test('文字篩選、hash 前綴、regex', async () => {
