@@ -54,6 +54,8 @@ interface Row {
   label: string;
   count?: number;
   file?: ChangedFile;
+  /** 非檔案列按 Ctrl+C 複製的內容：資料夾為 repo 內的相對路徑、模組為模組路徑、repo 列為 repo 名稱 */
+  copy?: string;
   expanded: boolean;
   expandable: boolean;
 }
@@ -199,7 +201,7 @@ export class FileTree {
           } else {
             const key = `${prefix}\u0000dir:${n.path}/`;
             const open = !this.collapsed.has(key);
-            rows.push({ key, group: g, depth: d, label: n.name, count: n.count, expanded: open, expandable: true });
+            rows.push({ key, group: g, depth: d, label: n.name, count: n.count, copy: base ? `${base}/${n.path}` : n.path, expanded: open, expandable: true });
             if (open) walk(n.children, d + 1);
           }
         }
@@ -220,7 +222,7 @@ export class FileTree {
       if (repository || multiRepo) {
         const key = `${base}\u0000repo`;
         const open = !this.collapsed.has(key);
-        rows.push({ key, group: g, depth, label: this.opts.repoName(g.root), count: g.files.length, expanded: open, expandable: true, icon: 'repo' });
+        rows.push({ key, group: g, depth, label: this.opts.repoName(g.root), count: g.files.length, copy: this.opts.repoName(g.root), expanded: open, expandable: true, icon: 'repo' });
         if (!open) return;
         depth++;
       }
@@ -238,7 +240,7 @@ export class FileTree {
           const key = `${base}\u0000module:${m}`;
           const open = !this.collapsed.has(key);
           const label = m ? m.slice(m.lastIndexOf('/') + 1) : this.opts.repoName(g.root);
-          rows.push({ key, group: g, depth, label, count: files.length, expanded: open, expandable: true, icon: 'module', detail: m || undefined });
+          rows.push({ key, group: g, depth, label, count: files.length, copy: m || this.opts.repoName(g.root), expanded: open, expandable: true, icon: 'module', detail: m || undefined });
           if (open) addFiles(g, files, depth + 1, key, m);
         }
       } else {
@@ -321,8 +323,9 @@ export class FileTree {
       this.element.querySelector('.tree-row.selected')?.scrollIntoView({ block: 'nearest' });
     };
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'c') {
-      // Ctrl+C：複製選取檔案的檔名（資料夾、repo 列不動作）
-      if (row?.file) post({ type: 'copy', text: fileName(row.file.path) });
+      // Ctrl+C：檔案複製檔名；資料夾複製 repo 內的相對路徑；repo、模組列複製其名稱／路徑
+      const text = row?.file ? fileName(row.file.path) : row?.copy;
+      if (text) post({ type: 'copy', text });
       e.preventDefault();
       return;
     }

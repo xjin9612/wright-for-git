@@ -177,7 +177,7 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
   await page.locator('.details-info .issue-link', { hasText: 'PROJ-42' }).click();
   await h.until(() => app.calls.opened?.includes('https://tracker.example.com/browse/PROJ-42'));
 
-  // 檔案樹 Ctrl+C：選到檔案時複製檔名；選到資料夾時不複製
+  // 檔案樹 Ctrl+C：選到檔案時複製檔名；選到資料夾時複製 repo 內的相對路徑；repo 列複製 repo 名稱
   // （資料夾用 ↑ 選取，不用點擊：點資料夾會收合它，影響後面的測試）
   const tree = page.locator('.details-pane .file-tree');
   await tree.locator('.tree-row', { hasText: 'keys.ts' }).click();
@@ -186,10 +186,11 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
   await h.until(() => app.calls.clipboard === 'keys.ts');
   await page.keyboard.press('ArrowUp');
   assert.match(await tree.locator('.tree-row.selected').innerText(), /src\/auth/);
-  app.calls.clipboard = undefined;
   await page.keyboard.press('Control+c');
-  await page.waitForTimeout(200);
-  assert.equal(app.calls.clipboard, undefined, '資料夾不複製');
+  await h.until(() => app.calls.clipboard === 'src/auth', '資料夾複製路徑');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Control+c');
+  await h.until(() => app.calls.clipboard === 'api-server', 'repo 列複製名稱');
 });
 
 test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔案；檔案已不存在時提示；失去焦點後不作用', async () => {
