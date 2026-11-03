@@ -560,8 +560,10 @@ async function diagnose() {
   return out.length ? `診斷：\n${out.join('\n')}` : '';
 }
 
-/** 等條件成立（輪詢）；逾時時附上診斷資訊 */
-async function until(fn, timeout = 20000, interval = 100) {
+/** 等條件成立（輪詢）；逾時時附上診斷資訊。第二個參數可以是逾時毫秒數，或等待內容的說明（逾時訊息會帶上） */
+async function until(fn, timeoutOrLabel = 20000, interval = 100) {
+  const label = typeof timeoutOrLabel === 'string' ? timeoutOrLabel : '';
+  const timeout = typeof timeoutOrLabel === 'number' ? timeoutOrLabel : 20000;
   const end = Date.now() + timeout;
   for (;;) {
     let v;
@@ -571,7 +573,7 @@ async function until(fn, timeout = 20000, interval = 100) {
       v = undefined; // 條件中的 git 指令暫時失敗（例如 upstream 尚未設定）視為還沒成立
     }
     if (v) return v;
-    if (Date.now() > end) throw new Error(`等待逾時（${timeout / 1000} 秒）\n${await diagnose()}`);
+    if (Date.now() > end) throw new Error(`等待逾時（${timeout / 1000} 秒）${label ? `：${label}` : ''}\n${await diagnose()}`);
     await new Promise((r) => setTimeout(r, interval));
   }
 }
