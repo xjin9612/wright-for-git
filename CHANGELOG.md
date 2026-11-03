@@ -16,6 +16,7 @@
 ### Pop-ups
 - With many entries (or a short panel), the User filter's input box was squeezed to a thin line, and menu items could get shorter; inputs and items now keep their height and only the list scrolls
 - A menu opened from a button that doesn't fit below it (Paths with many repositories) now scrolls below the button instead of moving up and covering the filter bar
+- Menus, the User filter's list and the custom date range now close when you click outside the panel (the editor, another view) or start typing there; they used to stay open
 - The Paths menu's *Ctrl+Click to show only that repository* hint moved under the search box, like the User filter's hint, and no longer scrolls away at the end of a long list
 
 ### Keyboard

@@ -73,7 +73,6 @@ export class FileTree {
   private selected: string | undefined;
   private rows: Row[] = [];
   private emptyText = '';
-  private windowFocused = true;
   private lastReport = '';
 
   constructor(private readonly opts: FileTreeOptions) {
@@ -84,22 +83,16 @@ export class FileTree {
     if (opts.reportFocus) {
       this.element.addEventListener('focus', () => this.reportFocus());
       this.element.addEventListener('blur', () => this.reportFocus());
-      // 焦點移到 webview 外（編輯器、其他 view）時，元素不一定收到 blur
-      window.addEventListener('blur', () => {
-        this.windowFocused = false;
-        this.reportFocus();
-      });
-      window.addEventListener('focus', () => {
-        this.windowFocused = true;
-        this.reportFocus();
-      });
+      // 焦點移到 webview 外（編輯器、其他 view）時，元素不一定收到 blur；下一輪再看頁面是否還有焦點
+      window.addEventListener('blur', () => setTimeout(() => this.reportFocus()));
+      window.addEventListener('focus', () => this.reportFocus());
     }
   }
 
   /** 回報焦點與選取檔案；內容沒變時不重送 */
   private reportFocus(): void {
     if (!this.opts.reportFocus) return;
-    const focused = this.windowFocused && document.activeElement === this.element;
+    const focused = document.hasFocus() && document.activeElement === this.element;
     const row = focused ? this.rows.find((r) => r.key === this.selected && r.file) : undefined;
     const file = row?.file ? { root: row.group.root, path: row.file.path } : undefined;
     const key = JSON.stringify([focused, file]);

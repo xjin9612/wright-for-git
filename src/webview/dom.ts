@@ -324,8 +324,12 @@ export function showMenu(x: number, y: number, items: MenuItem[], opts: MenuOpti
     document.querySelectorAll('.context-menu').forEach((m) => m.remove());
     document.removeEventListener('mousedown', onMouse, true);
     document.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('blur', onBlur);
   };
+  // 點到 webview 外（編輯器、其他 view）時 webview 收不到 mousedown：焦點離開 webview 就關閉
+  const onBlur = () => cleanup();
   menuCleanup = cleanup;
+  window.addEventListener('blur', onBlur);
   // 按鍵立即接手（避免選單剛開時按鍵落到底下的清單）；滑鼠延後，以免開啟選單的那一下就把它關掉
   document.addEventListener('keydown', onKey, true);
   setTimeout(() => {

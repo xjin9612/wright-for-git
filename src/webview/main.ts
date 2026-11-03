@@ -645,10 +645,17 @@ function openDateRange(): void {
   const close = () => {
     box.remove();
     document.removeEventListener('mousedown', outside, true);
+    window.removeEventListener('blur', onBlur);
   };
   const outside = (e: MouseEvent) => {
     if (!box.contains(e.target as Node)) close();
   };
+  // 點到 webview 外（編輯器、其他 view）時收不到 mousedown：焦點真的離開 webview 才關閉（取消）。
+  // 下一輪再確認 document.hasFocus()：日期欄位的日曆是瀏覽器內建的彈出視窗，開啟時若也觸發 blur，焦點仍在這個頁面，不關閉
+  const onBlur = () =>
+    setTimeout(() => {
+      if (!document.hasFocus()) close();
+    });
   apply.addEventListener('click', () => {
     let [a, b] = [from.value, to.value];
     if (a && b && a > b) [a, b] = [b, a];
@@ -664,6 +671,7 @@ function openDateRange(): void {
   box.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - box.offsetWidth - 4))}px`;
   box.style.top = `${r.bottom + 2}px`;
   setTimeout(() => document.addEventListener('mousedown', outside, true));
+  window.addEventListener('blur', onBlur);
   from.focus();
 }
 

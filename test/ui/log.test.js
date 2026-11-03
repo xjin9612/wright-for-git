@@ -144,6 +144,38 @@ test('從按鈕展開的選單放不下時在按鈕下方捲動，不往上移�
   }
 });
 
+test('焦點離開 webview（點到編輯器等）時，選單與作者選擇框關閉', async (t) => {
+  const blur = () => page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  // 模擬焦點回到 webview，避免影響後面的測試
+  t.after(() => page.evaluate(() => window.dispatchEvent(new Event('focus'))));
+  await chip('Paths').click();
+  await page.waitForSelector('.context-menu');
+  await blur();
+  assert.equal(await page.locator('.context-menu').count(), 0, '選單關閉');
+  await chip('User').click();
+  await page.waitForSelector('.picker');
+  await blur();
+  assert.equal(await page.locator('.picker').count(), 0, '作者選擇框關閉');
+
+  // 自訂日期區間：焦點仍在頁面（日期欄位的日曆彈出時）不關閉；真的離開才關閉
+  await chip('Date').click();
+  await h.menu(page, 'Select Period…');
+  await page.waitForSelector('.date-range');
+  await blur();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.date-range').count(), 1, '焦點還在頁面時不關閉');
+  await page.evaluate(() => {
+    window.__hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+  });
+  try {
+    await blur();
+    await h.until(async () => (await page.locator('.date-range').count()) === 0, '日期區間關閉');
+  } finally {
+    await page.evaluate(() => (document.hasFocus = window.__hasFocus));
+  }
+});
+
 test('Branch 篩選：串接選單只顯示該 branch；HEAD 不在篩選中時提示', async () => {
   await chip('Branch').click();
   const top = await h.texts(page.locator('.context-menu[data-level="0"] .menu-item'));

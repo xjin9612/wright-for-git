@@ -146,8 +146,12 @@ export function openPicker(cfg: PickerConfig): { refresh: () => void } {
     if (!popup.contains(e.target as Node) && !cfg.anchor.contains(e.target as Node)) apply();
   };
 
+  // 點到 webview 外（編輯器、其他 view）時收不到 mousedown：焦點離開 webview 視同點在外面（套用輸入的值）
+  const onBlur = () => apply();
+
   const close = () => {
     document.removeEventListener('mousedown', onOutside, true);
+    window.removeEventListener('blur', onBlur);
     popup.remove();
     cfg.anchor.classList.remove('open');
     current = undefined;
@@ -162,6 +166,7 @@ export function openPicker(cfg: PickerConfig): { refresh: () => void } {
   popup.style.maxHeight = `${Math.max(120, window.innerHeight - r.bottom - 10)}px`;
   cfg.anchor.classList.add('open');
   document.addEventListener('mousedown', onOutside, true);
+  window.addEventListener('blur', onBlur);
   render();
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
