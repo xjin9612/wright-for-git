@@ -225,6 +225,19 @@ export interface DiffHunk {
   lines: string[];
 }
 
+/**
+ * Shelf 在單一 repo 的一筆：存成 refs/git-workbench/shelf/<id>，內容與 stash 相同（git stash push 產生的 commit），
+ * 但不在 refs/stash，不會出現在 stash 清單，也不會被 gc 清掉。同一次 shelve 的各 repo 共用 id。
+ */
+export interface ShelfInfo {
+  id: string;
+  name: string;
+  hash: string;
+  parents: string[];
+  /** Unix 秒 */
+  time: number;
+}
+
 export interface StashInfo {
   /** stash@{n} */
   ref: string;

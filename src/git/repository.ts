@@ -1,6 +1,6 @@
 // 單一 git repository 的高階操作（不依賴 vscode，可在 Node 直接測試）
 import * as path from 'node:path';
-import type { ChangedFile, CommitDetails, CommitInfo, DiffHunk, FileStatus, LogFilter, PushPlan, RepoState, StashInfo, UserInfo, WorkingChange } from '../shared/protocol';
+import type { ChangedFile, CommitDetails, CommitInfo, DiffHunk, FileStatus, LogFilter, PushPlan, RepoState, ShelfInfo, StashInfo, UserInfo, WorkingChange } from '../shared/protocol';
 import { runGit, runGitBuffer, streamGit, GitError } from './gitRunner';
 import {
   buildLogArgs,
@@ -21,6 +21,15 @@ import {
 
 /** 路徑一律當作字面名稱（[id].tsx、:memo.txt 這類檔名不會被當成 pathspec 樣式） */
 const LITERAL = { GIT_LITERAL_PATHSPECS: '1' };
+
+/** Shelf 的 ref 前綴（每筆 refs/git-workbench/shelf/<id>） */
+const SHELF_REF = 'refs/git-workbench/shelf/';
+/** stash 訊息中的 shelf 標記：git stash push -m 會存成「On <branch>: shelf:<id> <name>」 */
+const SHELF_MARK = /shelf:([0-9A-Za-z_-]+)(?: (.*))?$/s;
+
+function assertShelfId(id: string): void {
+  if (!/^[0-9A-Za-z][0-9A-Za-z_-]{0,63}$/.test(id)) throw new GitError(`Invalid shelf id: ${id}`, null, '');
+}
 
 /** 只接受 repo 內的相對路徑 */
 function assertRelPath(p: string): void {
@@ -744,8 +753,8 @@ export class GitRepository {
       });
   }
 
-  /** stash 的檔案：已追蹤檔案相對 stash 當時的 HEAD（parent 1），加上 -u 存入的未追蹤檔案（parent 3） */
-  async getStashFiles(stash: StashInfo): Promise<(ChangedFile & { untracked?: boolean })[]> {
+  /** stash（或 shelf）的檔案：已追蹤檔案相對 stash 當時的 HEAD（parent 1），加上 -u 存入的未追蹤檔案（parent 3） */
+  async getStashFiles(stash: Pick<StashInfo, 'hash' | 'parents'>): Promise<(ChangedFile & { untracked?: boolean })[]> {
     const files: (ChangedFile & { untracked?: boolean })[] = await this.getChangedFiles(stash.hash, stash.parents.slice(0, 1));
     const untrackedCommit = stash.parents[2];
     if (untrackedCommit && isHash(untrackedCommit)) {
@@ -785,6 +794,117 @@ export class GitRepository {
     this.assertStash(ref);
     if (!(await this.isValidRefName(name, 'branch'))) throw new GitError(`Invalid branch name: ${name}`, null, '');
     await this.run(['stash', 'branch', name, ref]);
+  }
+
+  // ---------- Shelf ----------
+
+  /**
+   * 把指定路徑的變更（含未追蹤檔案）擱置成一筆 shelf，並從工作區移除；keepChanges 時工作區保留原樣。
+   * 用 git stash push 產生 commit 後搬到自己的 ref，再從 stash 清單移除。沒有可擱置的變更時回傳 undefined。
+   */
+  async shelve(id: string, name: string, paths: string[], keepChanges = false): Promise<string | undefined> {
+    assertShelfId(id);
+    for (const p of paths) assertRelPath(p);
+    if (paths.length === 0) return undefined;
+    const top = async () => (await this.tryRun(['rev-parse', '-q', '--verify', 'refs/stash']))?.trim() || undefined;
+    const before = await top();
+    // 路徑從 stdin 傳入（NUL 分隔），不受命令列長度限制
+    await runGit(this.gitPath, ['stash', 'push', '--include-untracked', '-m', `shelf:${id} ${name.trim()}`.trim(), '--pathspec-from-file=-', '--pathspec-file-nul'], {
+      cwd: this.root,
+      env: LITERAL,
+      input: paths.join('\0'),
+    });
+    const hash = await top();
+    if (!hash || hash === before) return undefined;
+    await this.run(['update-ref', '-m', 'shelve', SHELF_REF + id, hash]);
+    await this.run(['stash', 'drop', '--quiet', 'stash@{0}']);
+    if (keepChanges) await this.run(['stash', 'apply', '--index', hash]);
+    return hash;
+  }
+
+  async listShelves(): Promise<ShelfInfo[]> {
+    const out = (await this.tryRun(['for-each-ref', '--format=%(refname)%1f%(objectname)%1f%(parent)%1f%(committerdate:unix)%1f%(subject)%1e', SHELF_REF])) ?? '';
+    return out
+      .split('\x1e')
+      .map((r) => r.replace(/^\n/, ''))
+      .filter(Boolean)
+      .map((r) => {
+        const [ref, hash, parents, ct, subject = ''] = r.split('\x1f');
+        const id = ref.slice(SHELF_REF.length);
+        return { id, name: SHELF_MARK.exec(subject)?.[2] ?? '', hash, parents: parents ? parents.split(' ') : [], time: Number(ct) };
+      })
+      .sort((a, b) => b.time - a.time);
+  }
+
+  /**
+   * 取回 shelf 的變更到工作區。未指定 paths 時整筆套用（git stash apply，三方合併）；
+   * 指定時只取回這些檔案：已追蹤的以 patch 套用（套不上時改用三方合併，衝突留在工作區），未追蹤的直接還原（已存在則中止）。
+   */
+  async unshelve(shelf: Pick<ShelfInfo, 'hash' | 'parents'>, paths?: string[]): Promise<void> {
+    if (!isHash(shelf.hash)) throw new GitError(`Invalid shelf: ${shelf.hash}`, null, '');
+    if (!paths) {
+      await this.run(['stash', 'apply', shelf.hash]);
+      return;
+    }
+    for (const p of paths) assertRelPath(p);
+    const untrackedCommit = shelf.parents[2] && isHash(shelf.parents[2]) ? shelf.parents[2] : undefined;
+    const untrackedAll = untrackedCommit ? (await this.run(['ls-tree', '-r', '-z', '--name-only', untrackedCommit])).split('\0').filter(Boolean) : [];
+    const want = new Set(paths);
+    const untracked = untrackedAll.filter((p) => want.has(p));
+    const tracked = paths.filter((p) => !untracked.includes(p));
+    const { existsSync } = await import('node:fs');
+    const exists = untracked.filter((p) => existsSync(path.join(this.root, p)));
+    if (exists.length > 0) throw new GitError(`Already exists, not restored: ${exists.join(', ')}`, null, '');
+    if (tracked.length > 0) {
+      const patch = await this.diffPaths([`${shelf.hash}^1`, shelf.hash], tracked);
+      if (patch.length > 0) {
+        const apply = (args: string[]) => runGit(this.gitPath, ['apply', ...args, '--whitespace=nowarn', '-'], { cwd: this.root, input: patch });
+        // 先直接套用（變更留在工作區、不動 index）；套不上再用三方合併（會寫入 index，衝突以標記留在檔案中）
+        await apply([]).catch(() => apply(['--3way']));
+      }
+    }
+    for (let i = 0; i < untracked.length; i += 200) {
+      await runGit(this.gitPath, ['restore', `--source=${untrackedCommit}`, '--worktree', '--', ...untracked.slice(i, i + 200)], { cwd: this.root, env: LITERAL });
+    }
+  }
+
+  /** 二進位安全的 diff，路徑多時分批再串接 */
+  private async diffPaths(range: string[], paths: string[]): Promise<Buffer> {
+    const parts: Buffer[] = [];
+    for (let i = 0; i < paths.length; i += 200) {
+      parts.push(await runGitBuffer(this.gitPath, ['diff', '--binary', '--no-color', '--no-ext-diff', ...range, '--', ...paths.slice(i, i + 200)], { cwd: this.root, env: LITERAL }));
+    }
+    return Buffer.concat(parts);
+  }
+
+  /** 改名：以相同內容與時間建立新的 commit（訊息換成新名稱），ref 指向它 */
+  async renameShelf(id: string, name: string): Promise<string> {
+    assertShelfId(id);
+    const ref = SHELF_REF + id;
+    const [tree, parents, subject, authorDate, committerDate] = (await this.run(['log', '-1', '--format=%T%x1f%P%x1f%s%x1f%aI%x1f%cI', ref])).trim().split('\x1f');
+    const prefix = /^(.*?)shelf:/s.exec(subject)?.[1] ?? '';
+    const message = `${prefix}shelf:${id} ${name.trim()}`.trim();
+    const args = ['commit-tree', tree, ...parents.split(' ').filter(Boolean).flatMap((p) => ['-p', p]), '-m', message];
+    const hash = (await runGit(this.gitPath, args, { cwd: this.root, env: { GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: committerDate } })).trim();
+    await this.run(['update-ref', '-m', 'rename shelf', ref, hash]);
+    return hash;
+  }
+
+  async dropShelf(id: string): Promise<void> {
+    assertShelfId(id);
+    await this.run(['update-ref', '-d', SHELF_REF + id]);
+  }
+
+  /** 匯出成可用 git apply（或 IntelliJ）套用的 patch：已追蹤檔案的變更，加上未追蹤檔案（以新增檔的 diff 表示） */
+  async shelfPatch(shelf: Pick<ShelfInfo, 'hash' | 'parents'>): Promise<Buffer> {
+    if (!isHash(shelf.hash)) throw new GitError(`Invalid shelf: ${shelf.hash}`, null, '');
+    const parts = [await runGitBuffer(this.gitPath, ['diff', '--binary', '--no-color', '--no-ext-diff', `${shelf.hash}^1`, shelf.hash], { cwd: this.root })];
+    const untrackedCommit = shelf.parents[2];
+    if (untrackedCommit && isHash(untrackedCommit)) {
+      // 未追蹤檔案的 commit 沒有 parent：--root 讓它與空的 tree 比較，每個檔案都成為新增
+      parts.push(await runGitBuffer(this.gitPath, ['diff-tree', '-p', '--binary', '--root', '--no-commit-id', '-r', '--no-color', '--no-ext-diff', untrackedCommit], { cwd: this.root }));
+    }
+    return Buffer.concat(parts);
   }
 
   /** 工作區是否有可 stash 的變更（含未追蹤檔案） */
