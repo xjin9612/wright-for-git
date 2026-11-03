@@ -97,6 +97,7 @@ npm run test:ui     # UI 端對端測試（Chromium；第一次執行會自動�
 npm run test:vscode # 在真實 VS Code 中執行的測試（第一次會下載 VS Code）
 npm run bench:vscode # 大型 repo 載入效能量測（見 docs/TESTING.md）
 npm run package     # 打包 .vsix
+npm run check       # 依序跑型別檢查、所有測試與打包（不含效能量測），任一步失敗就停止
 ```
 
 在 VS Code 開啟此資料夾按 `F5` 啟動 Extension Development Host。

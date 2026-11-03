@@ -97,6 +97,7 @@ npm run test:ui     # UI end-to-end tests in Chromium (downloads Chromium on the
 npm run test:vscode # tests inside a real VS Code (downloads VS Code on the first run)
 npm run bench:vscode # log loading benchmark on a large repository (see docs/TESTING.md)
 npm run package     # create the .vsix
+npm run check       # all of the above except the benchmark, in order, stopping at the first failure
 ```
 
 Open this folder in VS Code and press `F5` to launch an Extension Development Host.
