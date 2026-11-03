@@ -13,6 +13,8 @@ export interface UnshelveDialogInput {
   preselect?: ReadonlySet<string>;
   /** 既有 changelist 的名稱（輸入框的建議） */
   changelists: string[];
+  /** 依序取回多筆時目前是第幾筆（標題顯示 1/3） */
+  step?: { index: number; total: number };
 }
 
 export interface UnshelveDialogResult {
@@ -25,7 +27,7 @@ export interface UnshelveDialogResult {
 
 const keyOf = (root: string, p: string) => `${root}\0${p}`;
 
-export function openUnshelveDialog(input: UnshelveDialogInput, onDone: (result: UnshelveDialogResult) => void): void {
+export function openUnshelveDialog(input: UnshelveDialogInput, onDone: (result: UnshelveDialogResult) => void, onCancel?: () => void): void {
   document.querySelector('.unshelve-overlay')?.remove();
   const checked = new Set<string>();
   for (const r of input.repos) {
@@ -100,6 +102,10 @@ export function openUnshelveDialog(input: UnshelveDialogInput, onDone: (result: 
     overlay.remove();
     document.removeEventListener('keydown', onKey, true);
   };
+  const cancelDialog = () => {
+    close();
+    onCancel?.();
+  };
   const finish = () => {
     if (checked.size === 0) return;
     const paths: { root: string; paths: string[] }[] = [];
@@ -117,19 +123,19 @@ export function openUnshelveDialog(input: UnshelveDialogInput, onDone: (result: 
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      close();
+      cancelDialog();
     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       finish();
     }
   };
   ok.addEventListener('click', finish);
-  cancel.addEventListener('click', close);
+  cancel.addEventListener('click', cancelDialog);
 
   const dialog = el(
     'div',
     { className: 'push-dialog paths-dialog unshelve-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': t('Unshelve Changes') } },
-    el('div', { className: 'push-header', text: t('Unshelve "{0}"', input.name) }),
+    el('div', { className: 'push-header', text: input.step ? `${t('Unshelve "{0}"', input.name)} (${input.step.index}/${input.step.total})` : t('Unshelve "{0}"', input.name) }),
     list,
     el(
       'div',

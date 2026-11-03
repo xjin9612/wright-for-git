@@ -285,7 +285,7 @@ test('擱置分頁：清單、檔案依 repo 分組、diff；取回對話框（�
   await shelfRow('keep copy').click();
   await shelfRow('renamed shelf').click({ modifiers: ['Control'] });
   await shelfRow('renamed shelf').click({ button: 'right' });
-  assert.equal(await cv.locator('.context-menu .menu-item.disabled', { hasText: 'Unshelve…' }).count(), 1, '多選時取回停用');
+  assert.equal(await cv.locator('.context-menu .menu-item:not(.disabled)', { hasText: 'Unshelve 2 Entries…' }).count(), 1, '多選時可依序取回');
   await h.menu(cv, 'Delete 2 Entries…');
   await cv.waitForSelector('.confirm-dialog');
   await cv.locator('.confirm-dialog .button.danger').click();
@@ -339,6 +339,55 @@ test('擱置匯出／匯入 patch：跨 repo 匯出成各 repo 一個檔；匯�
   await cv.waitForSelector('.confirm-dialog');
   await cv.locator('.confirm-dialog .button.danger').click();
   await h.until(() => shelfRefs(api).length === 0, '清除');
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+});
+
+test('多筆擱置依序取回：由舊到新逐筆開對話框；中途取消時剩下的保留並提示', async () => {
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
+  const shelveFile = async (file, name) => {
+    fs.writeFileSync(path.join(api, file), `${file}\n`);
+    await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+    await reload();
+    app.calls.inputs.push(name);
+    await fileRow(file).click({ button: 'right' });
+    await h.menu(cv, 'Shelve Changes…');
+    await h.until(() => !fs.existsSync(path.join(api, file)), `擱置 ${file}`);
+  };
+  const header = () => cv.locator('.unshelve-dialog .push-header').innerText();
+  const pickBoth = async (a, b) => {
+    await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+    await h.until(async () => (await shelfRow(a).count()) === 1 && (await shelfRow(b).count()) === 1, '清單');
+    await shelfRow(a).click();
+    await shelfRow(b).click({ modifiers: ['Control'] });
+    await shelfRow(b).click({ button: 'right' });
+    await h.menu(cv, 'Unshelve 2 Entries…');
+    await cv.waitForSelector('.unshelve-dialog');
+  };
+
+  await shelveFile('seq-1.txt', 'first');
+  await shelveFile('seq-2.txt', 'second');
+  await pickBoth('first', 'second');
+  assert.match(await header(), /first.*\(1\/2\)/, '由舊到新');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(async () => (await cv.locator('.unshelve-dialog').count()) === 1 && /second.*\(2\/2\)/.test(await header()), '接著開第二筆');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.existsSync(path.join(api, 'seq-1.txt')) && fs.existsSync(path.join(api, 'seq-2.txt')), '兩筆都取回');
+  await h.until(() => shelfRefs(api).length === 0, '兩筆都移除');
+
+  // 中途取消：第一筆就取消 → 兩筆都保留，提示沒有取回
+  fs.rmSync(path.join(api, 'seq-1.txt'));
+  fs.rmSync(path.join(api, 'seq-2.txt'));
+  await shelveFile('seq-3.txt', 'third');
+  await shelveFile('seq-4.txt', 'fourth');
+  await pickBoth('third', 'fourth');
+  const warnings = app.calls.warnings.length;
+  await cv.locator('.unshelve-dialog .dialog-cancel').click();
+  await h.until(() => app.calls.warnings.slice(warnings).some((w) => /2 shelved entries were not unshelved/.test(w)), '提示沒有取回');
+  assert.equal(await cv.locator('.unshelve-dialog').count(), 0, '不再開下一筆');
+  assert.equal(shelfRefs(api).length, 2);
+  // 清理：直接刪掉這兩筆擱置
+  for (const ref of shelfRefs(api)) h.git(api, 'update-ref', '-d', ref);
   await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
 });
 

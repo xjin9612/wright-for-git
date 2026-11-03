@@ -392,7 +392,9 @@ export type ToExtension =
    * 取回 paths 列出的檔案（rename 含新舊路徑）；remove：取回的檔案從擱置移除；
    * overwrite：覆蓋工作區已存在的未追蹤檔案；changelist：已追蹤的檔案放進這個 changelist（沒有就建立）
    */
-  | { type: 'shelfUnshelve'; id: string; paths: { root: string; paths: string[] }[]; remove: boolean; overwrite: boolean; changelist?: string }
+  | { type: 'shelfUnshelve'; id: string; paths: { root: string; paths: string[] }[]; remove: boolean; overwrite: boolean; changelist?: string; next?: string[] }
+  /** 依序取回多筆時，使用者取消了某一筆：剩下的 id 不取回 */
+  | { type: 'shelfUnshelveStopped'; ids: string[] }
   | { type: 'shelfRename'; id: string }
   /** 匯出成 .patch（每個 repo 一個檔） */
   | { type: 'shelfExport'; id: string }
@@ -518,6 +520,8 @@ export type ToWebview =
   | { type: 'shelfChanged' }
   /** 切到提交視窗的某個分頁（例如匯入 patch 後顯示擱置） */
   | { type: 'commitShowTab'; tab: 'commit' | 'stash' | 'shelf' }
+  /** 依序取回多筆：上一筆順利取回，接著開下一筆的取回對話框 */
+  | { type: 'shelfUnshelveNext'; ids: string[] }
   | { type: 'shelfData'; requestId: number; groups: ShelfGroup[]; repoNames: Record<string, string> }
   /** exists：未追蹤檔案在工作區已存在（取回時要覆蓋才會還原） */
   | { type: 'shelfFiles'; requestId: number; id: string; repos: { root: string; files: (ChangedFile & { untracked?: boolean; exists?: boolean })[] }[] }

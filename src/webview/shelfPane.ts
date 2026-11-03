@@ -24,8 +24,10 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
   /** 多選的擱置；空的時候以 selId 為唯一選取 */
   const multi = new Set<string>();
   let files: { id: string; repos: { root: string; files: ShelfFile[] }[] } | undefined;
-  /** 檔案還沒載入時要開的取回對話框 */
-  let pendingDialog: { id: string; preselect?: Set<string> } | undefined;
+  /** 檔案還沒載入時要開的取回對話框（依序取回多筆時帶著剩下的 id） */
+  let pendingDialog: { id: string; preselect?: Set<string>; next?: string[] } | undefined;
+  /** 依序取回多筆的總數（標題顯示第幾筆） */
+  let sequenceTotal = 0;
   let loadReq = 0;
   let filesReq = 0;
   let seq = 1;
@@ -50,7 +52,7 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
       const picked: { group: FileGroup; file: ShelfFile }[] = fileTree.selectedFiles();
       return [
         { label: t('Show Diff'), keybinding: 'Enter', disabled: picked.length !== 1, action: () => fileTree.openSelected() },
-        { label: picked.length > 1 ? t('Unshelve {0} Files…', picked.length) : t('Unshelve…'), action: () => openDialog(id, new Set(picked.map((p) => keyOf(p.group.root, p.file.path)))) },
+        { label: picked.length > 1 ? t('Unshelve {0} Files…', picked.length) : t('Unshelve…'), action: () => openSingle(id, new Set(picked.map((p) => keyOf(p.group.root, p.file.path)))) },
       ];
     },
   });
@@ -98,10 +100,12 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
     }
   });
 
-  /** 多選時一次取回多筆會互相衝突，先只允許一筆 */
+  /** 取回選取的擱置；多筆時由舊到新逐筆開取回對話框（有衝突、失敗或取消就停） */
   function unshelveSelected(): void {
-    const ids = selectedIds();
-    if (ids.length === 1) openDialog(ids[0]);
+    const ids = selectedIds().reverse();
+    if (ids.length === 0) return;
+    sequenceTotal = ids.length;
+    openDialog(ids[0], undefined, ids.slice(1));
   }
 
   function dropSelected(): void {
@@ -109,24 +113,41 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
     if (ids.length > 0) post({ type: 'shelfDrop', ids });
   }
 
-  function openDialog(id: string, preselect?: Set<string>): void {
+  /** 只取回一筆（不是依序取回） */
+  function openSingle(id: string, preselect?: Set<string>): void {
+    sequenceTotal = 0;
+    openDialog(id, preselect);
+  }
+
+  function openDialog(id: string, preselect?: Set<string>, next: string[] = []): void {
     const g = groups.find((x) => x.id === id);
-    if (!g) return;
+    if (!g) {
+      // 這一筆已不存在：直接處理下一筆
+      if (next.length > 0) openDialog(next[0], undefined, next.slice(1));
+      return;
+    }
     if (files?.id !== id) {
       // 檔案還沒載入（或載入的是另一筆）：載入後再開
-      pendingDialog = { id, preselect };
+      pendingDialog = { id, preselect, next };
+      multi.clear();
       if (selId !== id) select(id);
       else requestFiles();
       return;
     }
+    const total = next.length > 0 || sequenceTotal > 1 ? sequenceTotal : 0;
     openUnshelveDialog(
       {
         name: g.name || t('Shelved changes'),
         repos: files.repos.map((r) => ({ root: r.root, name: repoName(r.root), files: r.files })),
         preselect,
         changelists: opts.changelists(),
+        step: total > 1 ? { index: total - next.length, total } : undefined,
       },
-      (r) => post({ type: 'shelfUnshelve', id, paths: r.paths, remove: r.remove, overwrite: r.overwrite, changelist: r.changelist || undefined }),
+      (r) => post({ type: 'shelfUnshelve', id, paths: r.paths, remove: r.remove, overwrite: r.overwrite, changelist: r.changelist || undefined, next: next.length > 0 ? next : undefined }),
+      () => {
+        // 依序取回中按取消：這一筆與剩下的都不取回
+        if (next.length > 0) post({ type: 'shelfUnshelveStopped', ids: [id, ...next] });
+      },
     );
   }
 
@@ -134,13 +155,13 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
     const ids = selectedIds();
     if (ids.length > 1) {
       return [
-        { label: t('Unshelve…'), disabled: true, detail: t('one at a time') },
+        { label: t('Unshelve {0} Entries…', ids.length), action: () => unshelveSelected() },
         '-',
         { label: t('Delete {0} Entries…', ids.length), action: () => dropSelected() },
       ];
     }
     return [
-      { label: t('Unshelve…'), action: () => openDialog(g.id) },
+      { label: t('Unshelve…'), action: () => openSingle(g.id) },
       { label: t('Export Patch…'), action: () => post({ type: 'shelfExport', id: g.id }) },
       '-',
       { label: t('Rename…'), action: () => post({ type: 'shelfRename', id: g.id }) },
@@ -208,7 +229,7 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
       );
       row.style.paddingLeft = '6px';
       row.addEventListener('click', (e) => clickSelect(g.id, e));
-      row.addEventListener('dblclick', () => openDialog(g.id));
+      row.addEventListener('dblclick', () => openSingle(g.id));
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         // 在多選範圍內按右鍵：維持多選
@@ -238,6 +259,10 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
 
   return {
     load,
+    /** 依序取回多筆：上一筆順利取回，開下一筆 */
+    onNext(ids: string[]) {
+      if (ids.length > 0) openDialog(ids[0], undefined, ids.slice(1));
+    },
     onData(m: Extract<ToWebview, { type: 'shelfData' }>) {
       if (m.requestId !== loadReq) return;
       groups = m.groups;
@@ -265,7 +290,7 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
       if (pendingDialog?.id === m.id) {
         const p = pendingDialog;
         pendingDialog = undefined;
-        openDialog(p.id, p.preselect);
+        openDialog(p.id, p.preselect, p.next);
       }
     },
   };

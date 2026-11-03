@@ -1051,6 +1051,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'commitShowTab':
       setTab(m.tab);
       break;
+    case 'shelfUnshelveNext':
+      shelf.onNext(m.ids);
+      break;
     case 'shelfData':
       shelf.onData(m);
       break;

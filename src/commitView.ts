@@ -258,6 +258,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         case 'shelfUnshelve':
           await this.unshelve(m);
           break;
+        case 'shelfUnshelveStopped':
+          await this.reportUnshelveStopped(m.ids);
+          break;
         case 'shelfExport':
           await this.exportShelf(m.id);
           break;
@@ -455,6 +458,21 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     this.post({ type: 'shelfChanged' });
     await this.refresh();
     await this.provider.refresh(true);
+    // 依序取回多筆：這一筆順利才繼續下一筆；有衝突或失敗就停，告訴使用者還有哪些沒取回
+    const next = m.next ?? [];
+    if (next.length > 0) {
+      if (conflicts.length === 0 && failed.length === 0) this.post({ type: 'shelfUnshelveNext', ids: next });
+      else await this.reportUnshelveStopped(next, group.name);
+    }
+  }
+
+  private async reportUnshelveStopped(ids: string[], at?: string): Promise<void> {
+    const names = (await this.shelfGroups()).filter((g) => ids.includes(g.id)).map((g) => g.name);
+    if (names.length === 0) return;
+    void vscode.window.showWarningMessage(
+      at ? t('Stopped after "{0}". {1} shelved entries were not unshelved.', at, names.length) : t('{0} shelved entries were not unshelved.', names.length),
+      { detail: names.join('\n') },
+    );
   }
 
   /** 匯出成 .patch：單一 repo 存成一個檔；多個 repo 選資料夾，每個 repo 一個「<擱置名稱>-<repo 名稱>.patch」 */
