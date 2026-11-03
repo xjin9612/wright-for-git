@@ -280,6 +280,12 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
 }
 .picker { padding: 6px; gap: 4px; }
+/* 直向排列的彈出框裡，清單很長（或視窗很矮）時 flex 會依比例壓縮每個子項目：
+   輸入框、提示、選單項目固定高度，只讓清單捲動（作者很多時 User 的輸入框曾被壓到只剩一條線） */
+.picker > :not(.picker-list),
+.context-menu > *,
+.paths-search,
+.branches-main .search-box { flex: none; }
 .picker-input {
   resize: none; font: inherit; color: var(--vscode-input-foreground); background: var(--vscode-input-background);
   border: 1px solid var(--vscode-focusBorder); border-radius: 2px; padding: 4px 6px; outline: none;

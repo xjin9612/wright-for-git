@@ -13,6 +13,9 @@
 ### Loading
 - Opening the log in a large workspace no longer shows a blank panel while repositories are found and read: the log shows *Loading repositories…*, VS Code's progress bar runs at the top of the panel and on its tab, and the side-bar Branches shows *Loading…*. The Commit window shows VS Code's progress bar on its first load
 
+### Pop-ups
+- With many entries (or a short panel), the User filter's input box was squeezed to a thin line, and menu items could get shorter; inputs and items now keep their height and only the list scrolls
+
 ### Keyboard
 - Keys a Git Workbench panel handles itself (such as `Shift+F10` for the context menu, arrows, `Enter`) no longer also run a VS Code shortcut bound to the same key — e.g. with an IntelliJ keymap, `Shift+F10` used to open the menu and the Run Task list at once
 

@@ -89,6 +89,31 @@ test('User 篩選：me 代表 Alice', async () => {
   assert.ok(new Set(await h.texts(page.locator('.log-row:visible .cell-author'))).size > 1);
 });
 
+test('彈出框內容放不下時，輸入框與選單項目維持原本高度，只讓清單捲動', async () => {
+  const size = page.viewportSize();
+  await page.setViewportSize({ width: size.width, height: 120 });
+  try {
+    await chip('User').click();
+    const input = page.locator('.picker .picker-input');
+    await input.waitFor();
+    const list = page.locator('.picker .picker-list');
+    assert.ok(await list.evaluate((e) => e.scrollHeight > e.clientHeight), '清單要放不下（才測得到壓縮）');
+    const inputHeight = await input.evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(inputHeight >= 20, `User 輸入框高度 ${inputHeight}`);
+    await page.keyboard.press('Escape');
+
+    await chip('Branch').click();
+    const menu = page.locator('.context-menu[data-level="0"]');
+    await menu.waitFor();
+    assert.ok(await menu.evaluate((e) => e.scrollHeight > e.clientHeight), '選單要放不下');
+    const heights = await menu.locator('.menu-item').evaluateAll((items) => items.map((e) => Math.round(e.getBoundingClientRect().height)));
+    assert.ok(heights.every((x) => x === 24), `選單項目高度 ${heights.join(', ')}`);
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.setViewportSize(size);
+  }
+});
+
 test('Branch 篩選：串接選單只顯示該 branch；HEAD 不在篩選中時提示', async () => {
   await chip('Branch').click();
   const top = await h.texts(page.locator('.context-menu[data-level="0"] .menu-item'));
