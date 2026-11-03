@@ -578,7 +578,8 @@ body.dialog-page { overflow: hidden; }
 .settings-check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; line-height: 1.4; }
 .settings-check input { margin: 2px 0 0; flex: none; }
 .settings-sep { height: 1px; background: var(--border); margin: 4px 0; }
-.settings-links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.settings-links { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; }
+.settings-links .link { white-space: nowrap; }
 .commit-tabs { align-items: center; }
 :is(.vscode-high-contrast, .vscode-high-contrast-light) .settings-popover { border-color: var(--vscode-contrastBorder); }
 

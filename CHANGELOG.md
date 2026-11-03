@@ -13,7 +13,7 @@
 ### Commit log
 - Opening the log starts at the top of the list, like IntelliJ: the last selected commit (or HEAD) is still selected and shown in the details, but the list no longer scrolls to it
 - *Go to HEAD* button in the toolbar selects HEAD and scrolls to it
-- The settings (gear) has a *Keyboard shortcuts…* link that opens Keyboard Shortcuts filtered to Git Workbench, e.g. to rebind `F4`
+- The settings (gear) has a *Keyboard shortcuts* link that opens Keyboard Shortcuts filtered to Git Workbench, e.g. to rebind `F4`
 
 ### Branches
 - The Branches view options (group by, favorites only) use the eye icon like the other view options; the gear stays for options that change what a command does, like the Commit window's commit options

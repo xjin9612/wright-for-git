@@ -70,8 +70,8 @@ function select<T extends string | number>(id: string, current: T, options: { va
 const row = (label: string, id: string, control: HTMLElement, hint?: string) =>
   el('div', { className: 'settings-row' }, el('label', { className: 'settings-label', text: label, title: hint, attrs: { for: id } }), control);
 
-function link(text: string, onClick: () => void): HTMLAnchorElement {
-  const a = el('a', { className: 'link', text, attrs: { href: '#' } });
+function link(text: string, onClick: () => void, title?: string): HTMLAnchorElement {
+  const a = el('a', { className: 'link', text, attrs: { href: '#', ...(title ? { title } : {}) } });
   a.addEventListener('click', (e) => {
     e.preventDefault();
     onClick();
@@ -112,13 +112,18 @@ function render(): void {
     row(t('Repository scan depth'), 'gwb-depth', depth, t('How many folder levels below each workspace folder are scanned for repositories')),
     el('label', { className: 'settings-check', attrs: { for: 'gwb-auto' } }, auto, t('Refresh automatically when branches, tags or HEAD change')),
     el('div', { className: 'settings-sep' }),
+    // 連結都是直接打開頁面，不加「…」（與 VS Code 管理選單的「設定」「鍵盤快速鍵」一致；設定框窄，加了看起來像被截斷）
     el('div', { className: 'settings-links' },
-      link(v.issueLinks > 0 ? t('Issue link rules ({0})…', v.issueLinks) : t('Issue link rules…'), () => post({ type: 'editIssueLinks' })),
-      link(t('Keyboard shortcuts…'), () => {
+      link(
+        v.issueLinks > 0 ? t('Issue numbers to links ({0})', v.issueLinks) : t('Issue numbers to links'),
+        () => post({ type: 'editIssueLinks' }),
+        t('Turn issue numbers in commit messages (such as PROJ-42 or #123) into links. Click to edit the rules.'),
+      ),
+      link(t('Keyboard shortcuts'), () => {
         close();
         post({ type: 'openKeybindingsPage' });
       }),
-      link(t('All settings…'), () => {
+      link(t('All settings'), () => {
         close();
         post({ type: 'openSettingsPage' });
       }),

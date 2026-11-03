@@ -74,11 +74,11 @@ test('標題列齒輪指令：打開面板內設定框', async () => {
   await page.locator('.settings-popover .link').last().click();
   await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openSettings'));
 
-  // 鍵盤快速鍵…：打開快速鍵頁並只列出這個擴充功能
+  // 鍵盤快速鍵：打開快速鍵頁並只列出這個擴充功能
   await app.run('gitWorkbench.openSettings');
   await page.waitForSelector('.settings-popover');
   // 這個測試檔的介面語言是繁體中文
-  await page.locator('.settings-popover .link', { hasText: '鍵盤快速鍵…' }).click();
+  await page.locator('.settings-popover .link', { hasText: '鍵盤快速鍵' }).click();
   await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openGlobalKeybindings' && c[1] === '@ext:xjin9612.vscode-git-workbench'));
 });
 
