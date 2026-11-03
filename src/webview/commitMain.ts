@@ -95,6 +95,7 @@ const toolbar = el(
   { className: 'pane-toolbar commit-toolbar' },
   iconButton('refresh', t('Refresh'), () => post({ type: 'commitRefresh', showIgnored: ui.showIgnored })),
   iconButton('rollback', t('Rollback…'), () => rollback(selectedChanges())),
+  iconButton('shelve', t('Shelve Changes…'), () => shelve(selectedChanges(), false)),
   iconButton('diff', t('Show Diff'), () => openDiff()),
   iconButton('add', t('New Changelist…'), () => post({ type: 'changelistNew' })),
   viewButton,
@@ -634,6 +635,21 @@ function rollback(items: { root: string; change: Change }[]): void {
   post({ type: 'commitRollback', items });
 }
 
+/** 可擱置的變更：已追蹤的修改與未追蹤檔案（衝突、已忽略的不行） */
+function shelvable(items: { root: string; change: Change }[]): { root: string; change: Change }[] {
+  return items.filter((f) => f.change.kind === 'changed' || f.change.kind === 'untracked');
+}
+
+/** 擱置選取的檔案；名稱預設為提交訊息的第一行，沒有時用這些檔案所屬的 changelist 名稱（預設的 Changes 除外） */
+function shelve(items: { root: string; change: Change }[], keep: boolean): void {
+  const list = shelvable(items);
+  if (list.length === 0) return;
+  const lists = new Set(list.map((f) => listOf(f.root, f.change)));
+  const cl = lists.size === 1 ? state?.changelists.find((l) => lists.has(l.id)) : undefined;
+  const name = message.value.split('\n')[0].trim() || (cl && !(cl.id === 'default' && cl.name === 'Changes') ? cl.name : '');
+  post({ type: 'commitShelve', items: list, keep, name });
+}
+
 function showRowMenu(r: Row, x: number, y: number): void {
   const items = selectedChanges();
   const keys = items.map((f) => keyOf(f.root, f.change.path));
@@ -686,6 +702,8 @@ function showRowMenu(r: Row, x: number, y: number): void {
     { label: t('Commit Whole File'), disabled: !keys.some((k) => state?.partial[k]), action: () => post({ type: 'commitClearPartial', keys }) },
     '-',
     { label: t('Rollback…'), disabled: tracked.length === 0, action: () => rollback(tracked) },
+    { label: t('Shelve Changes…'), disabled: shelvable(items).length === 0, action: () => shelve(items, false) },
+    { label: t('Shelve Changes, Keep in Working Tree…'), disabled: shelvable(items).length === 0, action: () => shelve(items, true) },
     {
       label: t('Move to Another Changelist…'),
       disabled: tracked.length === 0,

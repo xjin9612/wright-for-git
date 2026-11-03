@@ -373,6 +373,8 @@ export type ToExtension =
   | { type: 'commitDiff'; root: string; change: WorkingChange }
   | { type: 'commitOpenFile'; root: string; path: string }
   | { type: 'commitRollback'; items: { root: string; change: WorkingChange }[] }
+  /** 擱置選取的變更（keep：工作區保留原樣）；name 為預設名稱 */
+  | { type: 'commitShelve'; items: { root: string; change: WorkingChange }[]; keep: boolean; name: string }
   | { type: 'commitLastMessage'; root: string }
   | { type: 'commitRun'; requestId: number; message: string; amend: boolean; signOff: boolean; noVerify: boolean; push: boolean; items: { root: string; changes: WorkingChange[] }[] }
   | { type: 'commitHunks'; root: string; path: string }
@@ -488,6 +490,8 @@ export type ToWebview =
   | { type: 'commitLastMessage'; root: string; message: string }
   | { type: 'commitDone'; requestId: number; ok: boolean }
   | { type: 'stashChanged' }
+  /** Shelf 有變動（擱置、取回、改名、刪除） */
+  | { type: 'shelfChanged' }
   /** 在面板內顯示確認框（取代 VS Code 的 modal 對話框） */
   | { type: 'confirm'; id: number; message: string; detail?: string; ok: string; cancel: string; kind: 'info' | 'warning' | 'danger' }
   /** 由 extension 指定篩選（如檔案總管的「顯示 Git 歷史」） */

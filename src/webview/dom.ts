@@ -52,6 +52,7 @@ const ICONS = {
   changelist: '<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M5 6h6M5 8.5h6M5 11h3.5"/>',
   module: '<path d="M2 4.5 8 2l6 2.5v7L8 14l-6-2.5z"/><path d="M2 4.5 8 7l6-2.5M8 7v7"/>',
   pop: '<path d="M8 13V5M4.5 8.5 8 5l3.5 3.5"/><path d="M3 2.5h10"/>',
+  shelve: '<path d="M2.5 9.5v4h11v-4"/><path d="M8 1.5v8M5 6.5l3 3 3-3"/>',
   stash: '<path d="M2.5 5.5h11v8h-11z"/><path d="M4 3h8M5.5 8.5h5"/>',
   warning: '<path d="M8 1.8 15 14H1z"/><path d="M8 6v4M8 11.9v.1"/>',
   refresh: '<path d="M13.2 8.5A5.2 5.2 0 1 1 11.6 4.3"/><path d="M12.5 1.8v3h-3"/>',

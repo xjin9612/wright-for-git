@@ -15,6 +15,7 @@ import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
 import { stashChanges } from './stashView';
 import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
+import { shelveAcross, ShelveError } from './shelf';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
 
@@ -225,6 +226,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         case 'commitRollback':
           await this.rollback(m.items);
           break;
+        case 'commitShelve':
+          await this.shelve(m.items, m.keep, m.name);
+          break;
         case 'commitLastMessage': {
           const repo = this.provider.getRepository(m.root);
           this.post({ type: 'commitLastMessage', root: m.root, message: (await repo?.lastCommitMessage()) ?? '' });
@@ -343,6 +347,52 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       }
       for (const c of requested) this.partial.delete(keyOf(root, c.path));
     }
+    await this.refresh();
+    await this.provider.refresh(true);
+  }
+
+  /** 擱置選取的變更（可跨多個 repo，成為同一筆 shelf）；keep 時工作區保留原樣 */
+  private async shelve(items: { root: string; change: WorkingChange }[], keep: boolean, suggested: string): Promise<void> {
+    const list = items.filter((x) => x.change.kind === 'changed' || x.change.kind === 'untracked');
+    if (list.length === 0) return;
+    const roots = new Set(list.map((x) => x.root));
+    const name = await vscode.window.showInputBox({
+      title: keep ? t('Shelve Changes, Keep in Working Tree') : t('Shelve Changes'),
+      prompt: roots.size > 1 ? t('Shelve {0} file(s) from {1} repositories', list.length, roots.size) : t('Shelve {0} file(s)', list.length),
+      placeHolder: t('Shelf name'),
+      value: suggested,
+      validateInput: (v) => (v.trim() ? undefined : t('Enter a name for the shelf')),
+    });
+    if (name === undefined) return;
+    const byRoot = new Map<string, WorkingChange[]>();
+    for (const x of list) byRoot.set(x.root, [...(byRoot.get(x.root) ?? []), x.change]);
+    const targets: { repo: GitRepository; paths: string[] }[] = [];
+    for (const [root, requested] of byRoot) {
+      const repo = this.provider.getRepository(root);
+      if (!repo) continue;
+      // 以目前實際的狀態為準（webview 的清單可能已過期）；rename 要連同原路徑一起擱置
+      const changes = (await this.current(repo, requested)).filter((c) => c.kind === 'changed' || c.kind === 'untracked');
+      const paths = [...new Set(changes.flatMap((c) => (c.oldPath ? [c.path, c.oldPath] : [c.path])))];
+      if (paths.length > 0) targets.push({ repo, paths });
+    }
+    try {
+      const result = await shelveAcross(targets, name.trim(), { keepChanges: keep });
+      if (result.roots.length === 0) void vscode.window.showInformationMessage(t('Nothing to shelve: the selected files have no changes.'));
+      else vscode.window.setStatusBarMessage(t('Shelved to "{0}"', name.trim()), 3000);
+    } catch (e) {
+      if (e instanceof ShelveError) {
+        const repoName = (root: string) => this.lastState?.repos.find((r) => r.root === root)?.name ?? path.basename(root);
+        const detail = e.rollbackErrors.map((r) => `${repoName(r.root)}: ${r.error}`).join('\n');
+        void showGitError(
+          e.rollbackErrors.length > 0
+            ? t('Shelving failed in {0}: {1}. Some repositories could not be restored; their changes are kept in the Shelf.', repoName(e.root), e.message)
+            : t('Shelving failed in {0}: {1}. Nothing was shelved.', repoName(e.root), e.message),
+          ...(detail ? [{ detail }] : []),
+        );
+      } else void showGitError(errorMessage(e));
+    }
+    for (const x of list) this.partial.delete(keyOf(x.root, x.change.path));
+    this.post({ type: 'shelfChanged' });
     await this.refresh();
     await this.provider.refresh(true);
   }

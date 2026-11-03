@@ -197,6 +197,35 @@ test('儲藏變更：從工具列儲藏 web-app 的修改', async () => {
   await h.until(async () => (await h.texts(cv.locator('.stash-list .tree-row'))).some((s) => s.startsWith('from ui test')));
 });
 
+test('擱置：跨兩個 repo 選取的檔案擱置成同一筆（不在 stash 清單）；保留工作目錄的版本檔案留著', async () => {
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const stashesBefore = h.git(web, 'stash', 'list');
+  fs.writeFileSync(path.join(api, 'shelf-a.txt'), 'a\n');
+  fs.writeFileSync(path.join(web, 'shelf-b.txt'), 'b\n');
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+  await reload();
+  await fileRow('shelf-a.txt').click();
+  await fileRow('shelf-b.txt').click({ modifiers: ['Control'] });
+  app.calls.inputs.push('ui shelf');
+  await fileRow('shelf-b.txt').click({ button: 'right' });
+  await h.menu(cv, 'Shelve Changes…');
+  await h.until(() => !fs.existsSync(path.join(api, 'shelf-a.txt')) && !fs.existsSync(path.join(web, 'shelf-b.txt')), '兩個 repo 的檔案都被擱置');
+  const [refA] = shelfRefs(api);
+  assert.ok(refA, 'api-server 有 shelf');
+  assert.deepEqual(shelfRefs(web), [refA], '兩個 repo 共用同一個 id');
+  assert.match(h.git(api, 'log', '-1', '--format=%s', refA), /shelf:\S+ ui shelf$/);
+  assert.equal(h.git(web, 'stash', 'list'), stashesBefore, 'stash 清單不變');
+
+  // 保留工作目錄：檔案還在，多一筆 shelf
+  fs.writeFileSync(path.join(api, 'shelf-c.txt'), 'c\n');
+  await reload();
+  app.calls.inputs.push('keep copy');
+  await fileRow('shelf-c.txt').click({ button: 'right' });
+  await h.menu(cv, 'Shelve Changes, Keep in Working Tree…');
+  await h.until(() => shelfRefs(api).length === 2, '多一筆 shelf');
+  assert.ok(fs.existsSync(path.join(api, 'shelf-c.txt')), '檔案保留');
+});
+
 test('鍵盤：空白鍵切換勾選；提交訊息中 Ctrl+Enter 提交', async () => {
   await cv.locator('.commit-tab', { hasText: 'Commit' }).click();
   fs.appendFileSync(path.join(web, 'src/App.css'), '/* keyboard */\n');
