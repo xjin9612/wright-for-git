@@ -114,6 +114,36 @@ test('彈出框內容放不下時，輸入框與選單項目維持原本高度�
   }
 });
 
+test('從按鈕展開的選單放不下時在按鈕下方捲動，不往上移蓋住按鈕（Paths）', async () => {
+  const size = page.viewportSize();
+  const chipBottom = await chip('Paths').evaluate((e) => e.getBoundingClientRect().bottom);
+  // 下方留約 170px：放不下整個選單，但足夠在下方捲動
+  await page.setViewportSize({ width: size.width, height: Math.round(chipBottom + 176) });
+  try {
+    await chip('Paths').click();
+    const menu = page.locator('.context-menu[data-level="0"]');
+    await menu.waitFor();
+    assert.ok(await menu.evaluate((e) => e.scrollHeight > e.clientHeight), '選單要放不下（才測得到）');
+    const top = await menu.evaluate((e) => e.getBoundingClientRect().top);
+    assert.ok(top >= chipBottom, `選單頂端 ${top} 蓋到按鈕（底部 ${chipBottom}）`);
+    assert.equal(await menu.locator('.menu-hint').count(), 1, '說明在選單內');
+    // 說明在頂端搜尋框正下方（與作者選擇框一致）：沒捲動時就看得到，捲到中間也一樣
+    const hintVisible = () =>
+      menu.evaluate((m) => {
+        const box = m.getBoundingClientRect();
+        const hint = m.querySelector('.menu-hint').getBoundingClientRect();
+        const input = m.querySelector('.menu-search input').getBoundingClientRect();
+        return hint.top >= input.bottom && hint.top >= box.top && hint.bottom <= box.bottom + 1;
+      });
+    assert.ok(await hintVisible(), '一打開就看得到說明');
+    await menu.evaluate((m) => (m.scrollTop = (m.scrollHeight - m.clientHeight) / 2));
+    assert.ok(await hintVisible(), '捲到中間仍看得到說明');
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.setViewportSize(size);
+  }
+});
+
 test('Branch 篩選：串接選單只顯示該 branch；HEAD 不在篩選中時提示', async () => {
   await chip('Branch').click();
   const top = await h.texts(page.locator('.context-menu[data-level="0"] .menu-item'));

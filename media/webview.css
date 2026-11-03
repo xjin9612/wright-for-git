@@ -455,7 +455,8 @@ select.push-remote {
 .menu-star { cursor: pointer; color: var(--muted); }
 .menu-star .favorite { color: var(--vscode-charts-yellow, #e2c08d); }
 
-.menu-hint { padding: 4px 10px 2px; color: var(--muted); font-size: 0.85em; border-top: 1px solid var(--vscode-menu-separatorBackground, var(--border)); margin-top: 4px; }
+/* 說明在頂端固定的搜尋框下方（與作者選擇框的 .picker-hint 相同樣式） */
+.menu-hint { color: var(--muted); font-size: 0.88em; padding: 4px 2px 0; }
 .paths-dialog { width: min(560px, calc(100vw - 24px)); }
 .paths-search { margin: 8px 12px 4px; }
 .paths-tree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; }

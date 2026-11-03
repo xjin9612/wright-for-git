@@ -174,6 +174,8 @@ export interface MenuOptions {
     /** 自訂搜尋結果（q 已轉小寫、去頭尾空白） */
     items?: (q: string) => MenuItem[];
   };
+  /** 選單頂端（搜尋框下方）的淡色說明，捲動時不會捲走；定位前加入，計入選單高度 */
+  hint?: string;
 }
 
 /** 攤平子選單，留下名稱或說明包含 q 的項目 */
@@ -210,7 +212,6 @@ export function showMenu(x: number, y: number, items: MenuItem[], opts: MenuOpti
     // 固定寬度：篩選後選單不因內容變短而跳動
     root.style.minWidth = `${root.offsetWidth}px`;
     root.prepend(box);
-    root.style.top = `${Math.max(4, Math.min(y, window.innerHeight - root.offsetHeight - 4))}px`;
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase();
       const list = q ? (cfg.items ? cfg.items(q) : filterMenuItems(items, q)) : items;
@@ -227,6 +228,15 @@ export function showMenu(x: number, y: number, items: MenuItem[], opts: MenuOpti
     });
     input.focus();
   }
+  if (opts.hint) {
+    // 說明放在頂端固定的搜尋框正下方（與作者選擇框一致）：一打開就看得到，捲動時也不會捲走
+    const hint = el('div', { className: 'menu-hint', text: opts.hint });
+    const header = root.querySelector(':scope > .menu-search');
+    if (header) header.append(hint);
+    else root.prepend(el('div', { className: 'menu-search' }, hint));
+  }
+  // 加入搜尋框、說明後高度變了，重新決定垂直位置
+  if (opts.search || opts.hint) placeVertically(root, y);
   const onMouse = (e: Event) => {
     if (!(e.target as Element | null)?.closest?.('.context-menu')) cleanup();
   };
@@ -339,8 +349,26 @@ function openLevel(x: number, y: number, items: MenuItem[], level: number): HTML
     left = parent ? parent.getBoundingClientRect().left - r.width + 2 : window.innerWidth - r.width - 4;
   }
   menu.style.left = `${Math.max(4, Math.min(left, window.innerWidth - r.width - 4))}px`;
-  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+  placeVertically(menu, y);
   return menu;
+}
+
+/**
+ * 選單的垂直位置：放得下就從 y 往下展開；放不下但下方還有足夠空間時，限制高度在下方捲動
+ * （從按鈕展開的選單才不會往上移而蓋住按鈕本身，例如 repo 很多時的 Paths）；下方太窄才往上移到放得下。
+ */
+function placeVertically(menu: HTMLElement, y: number): void {
+  const below = window.innerHeight - y - 4;
+  menu.style.maxHeight = '';
+  const height = menu.offsetHeight;
+  if (height <= below) {
+    menu.style.top = `${y}px`;
+  } else if (below >= 160) {
+    menu.style.top = `${y}px`;
+    menu.style.maxHeight = `${below}px`;
+  } else {
+    menu.style.top = `${Math.max(4, window.innerHeight - height - 4)}px`;
+  }
 }
 
 /** 建立選單項目（加入 menu 前先放在 fragment；搜尋時重建） */

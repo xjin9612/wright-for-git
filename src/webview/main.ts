@@ -813,9 +813,7 @@ function showPathsMenu(): void {
     ...repos.map(repoItem),
   ];
   const search = (q: string) => repos.filter((x) => `${x.name}\n${x.head.branch ?? ''}`.toLowerCase().includes(q)).map(repoItem);
-  showMenu(r.left, r.bottom + 2, items, { search: { placeholder: t('Search repositories'), items: search } });
-  const hint = el('div', { className: 'menu-hint', text: t('Ctrl+Click to show only that repository') });
-  document.querySelector('.context-menu[data-level="0"]')?.append(hint);
+  showMenu(r.left, r.bottom + 2, items, { search: { placeholder: t('Search repositories'), items: search }, hint: t('Ctrl+Click to show only that repository') });
 }
 
 function openFoldersDialog(): void {

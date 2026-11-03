@@ -15,6 +15,8 @@
 
 ### Pop-ups
 - With many entries (or a short panel), the User filter's input box was squeezed to a thin line, and menu items could get shorter; inputs and items now keep their height and only the list scrolls
+- A menu opened from a button that doesn't fit below it (Paths with many repositories) now scrolls below the button instead of moving up and covering the filter bar
+- The Paths menu's *Ctrl+Click to show only that repository* hint moved under the search box, like the User filter's hint, and no longer scrolls away at the end of a long list
 
 ### Keyboard
 - Keys a Git Workbench panel handles itself (such as `Shift+F10` for the context menu, arrows, `Enter`) no longer also run a VS Code shortcut bound to the same key — e.g. with an IntelliJ keymap, `Shift+F10` used to open the menu and the Run Task list at once
