@@ -24,13 +24,14 @@
   - 互動式 rebase：pick、reword、edit、squash、fixup、drop，拖曳或 `Alt+↑↓` 調整順序；rebase／merge／cherry-pick／revert 進行中時，Log 上方顯示解決衝突、繼續、略過、中止
   - 提交訊息中的 issue 編號轉連結（`gitWorkbench.issueLinks`）；選取 commit 時淡化不在其路徑上的列；👁 選單「收合線性分支」把分支上連續的 commit 收成一列虛線的「⋯ N commits」，點一下展開
 - **Commit 視窗**（`Alt+0`）：勾選要提交的檔案或只提交部分 hunk；Changelist；未追蹤與已忽略檔案；依目錄／repo／模組分組；Amend、Sign-off、略過 hooks、提交並推送；捨棄變更、加入 `.gitignore`。透過暫時 index 提交，不影響內建原始檔控制的暫存區。另有「儲藏」分頁列出所有 repo 的 stash
+- **擱置（Shelf）**：不提交、先把修改擱置起來，可以跨多個 repo 成為同一筆（提交視窗的「擱置變更…」）。「擱置」分頁列出每一筆與其檔案；「取回…」可勾選 repo 與檔案、放進哪個 changelist、取回的檔案是否從擱置移除；有衝突時直接打開衝突清單。擱置存在各 repo 中（不在 stash 清單），可匯出成 `.patch`，也能匯入 `git apply` 或 IntelliJ 產生的 patch
 - **合併衝突**：衝突清單分頁（採用我的／採用他們的／合併…，解決完直接繼續）與三方合併分頁：左邊我的、中間可直接編輯的結果、右邊他們的，每個變更有 ≫ ✕，「逐行」模式每一行各有 ≫ ✕；套用所有不衝突的變更、復原／重做。merge、rebase、cherry-pick、revert、套用儲藏的衝突都適用
 - **同步**：Fetch 在 Branches 工具列，Pull／Push 在 Log 工具列。Push 一律先開 Push Commits 對話框（編輯器分頁），列出要推的 commit 與檔案；Force Push（`--force-with-lease`）在對話框的下拉選單；右鍵 Push All up to Here… 只推到指定 commit；Branches 樹顯示 ↑領先 ↓落後
-- **變更檔案**：樹狀或平鋪清單，可依目錄／repo／模組分組，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列的 ← → 可切換上一個／下一個檔案
+- **變更檔案**：樹狀或平鋪清單，可依目錄／repo／模組分組，依檔案類型顯示圖示（新增綠、修改藍、刪除灰），雙擊或 Enter 開啟 VS Code 原生 diff；diff 標題列的 ← → 可切換上一個／下一個檔案；右鍵：顯示差異、開啟檔案（`F4`）、開啟儲存庫版本、複製檔名（`Ctrl+C`）、複製路徑
 - **Commit 詳情**：完整 message、作者／提交者、refs、包含此 commit 的 branch
 - **活動列兩個圖示**：「提交」打開 Commit 視窗；「Git 歷程」在側邊欄顯示 Branches 樹，同時打開底部的 Log（Log 會收起自己的 Branches 欄，commit 清單變寬；側邊欄切到別的畫面時，Log 的 Branches 欄自動回來）
 - 開啟 Log：活動列「Git 歷程」圖示、狀態列「Git Log」按鈕、`Alt+9`
-- 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」
+- 檔案總管／編輯器右鍵「顯示 Git 歷史」：自動切到該檔所屬的 repository 並以 Paths 篩選；檔案總管的 Git Workbench 子選單另有「與分支或標籤比較」「儲藏變更」「取消儲藏」，以及在 `.patch` 檔上的「匯入 Patch 到擱置」
 - **Git 主控台**：在「輸出」面板的 *Git Workbench* 頻道記錄每個 git 指令、輸出與失敗原因（Log 面板標題列有按鈕）
 - 編輯器右鍵「切換 Git Blame 標註」（沿用 VS Code 內建 blame）
 - 英文／繁體中文介面，可用 `gitWorkbench.language` 獨立切換
