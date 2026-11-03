@@ -72,6 +72,8 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
     el('div', { className: 'toolbar-sep-h' }),
     iconButton('pop', t('Unshelve…'), () => unshelveSelected()),
     iconButton('trash', t('Delete…'), () => dropSelected()),
+    el('div', { className: 'toolbar-spacer' }),
+    iconButton('add', t('Import Patches…'), () => post({ type: 'shelfImport' })),
   );
   container.append(bar, list, el('div', { className: 'stash-files-pane' }, filesBar, fileTree.element));
 
@@ -137,7 +139,13 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
         { label: t('Delete {0} Entries…', ids.length), action: () => dropSelected() },
       ];
     }
-    return [{ label: t('Unshelve…'), action: () => openDialog(g.id) }, '-', { label: t('Rename…'), action: () => post({ type: 'shelfRename', id: g.id }) }, { label: t('Delete…'), action: () => dropSelected() }];
+    return [
+      { label: t('Unshelve…'), action: () => openDialog(g.id) },
+      { label: t('Export Patch…'), action: () => post({ type: 'shelfExport', id: g.id }) },
+      '-',
+      { label: t('Rename…'), action: () => post({ type: 'shelfRename', id: g.id }) },
+      { label: t('Delete…'), action: () => dropSelected() },
+    ];
   }
 
   function select(id: string): void {
@@ -179,7 +187,12 @@ export function createShelfPane(container: HTMLElement, opts: ShelfPaneOptions) 
   function render(): void {
     clear(list);
     if (groups.length === 0) {
-      list.append(el('div', { className: 'empty-text' }, t('No shelved changes'), el('br'), el('span', { className: 'muted', text: t('Select files in the Commit tab and choose Shelve Changes… to set them aside.') })));
+      const importLink = el('a', { className: 'link', text: t('Import Patches…'), attrs: { href: '#' } });
+      importLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        post({ type: 'shelfImport' });
+      });
+      list.append(el('div', { className: 'empty-text' }, t('No shelved changes'), el('br'), el('span', { className: 'muted', text: t('Select files in the Commit tab and choose Shelve Changes… to set them aside.') }), el('br'), importLink));
       return;
     }
     for (const g of groups) {

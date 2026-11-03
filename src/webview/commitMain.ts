@@ -1048,6 +1048,9 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
     case 'shelfChanged':
       if (ui.tab === 'shelf') shelf.load();
       break;
+    case 'commitShowTab':
+      setTab(m.tab);
+      break;
     case 'shelfData':
       shelf.onData(m);
       break;

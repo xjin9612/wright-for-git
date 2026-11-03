@@ -30,6 +30,7 @@
   "command.optimizeRepository": "Optimize Repository (speed up history)",
   "command.resolveConflicts": "Resolve Conflicts…",
   "command.unstash": "Unstash Changes…",
+  "command.importPatch": "Import Patch to Shelf…",
   "submenu.explorer": "Git Workbench",
   "view.commit": "Commit",
   "command.showCommit": "Show Commit Window",

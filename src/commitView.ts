@@ -15,7 +15,7 @@ import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
 import { openStashFile, stashChanges } from './stashView';
 import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
-import { dropShelfGroup, listShelfGroups, renameShelfGroup, shelveAcross, ShelveError, unshelveAcross, type ShelfGroup } from './shelf';
+import { dropShelfGroup, importAcross, listShelfGroups, matchPatchRepos, patchFileName, renameShelfGroup, shelfNameFromPatch, shelveAcross, ShelveError, unshelveAcross, type ShelfGroup } from './shelf';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
 
@@ -258,6 +258,12 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
         case 'shelfUnshelve':
           await this.unshelve(m);
           break;
+        case 'shelfExport':
+          await this.exportShelf(m.id);
+          break;
+        case 'shelfImport':
+          await this.importPatches();
+          break;
         case 'shelfRename': {
           const group = await this.shelfGroup(m.id);
           if (!group) break;
@@ -449,6 +455,84 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
     this.post({ type: 'shelfChanged' });
     await this.refresh();
     await this.provider.refresh(true);
+  }
+
+  /** 匯出成 .patch：單一 repo 存成一個檔；多個 repo 選資料夾，每個 repo 一個「<擱置名稱>-<repo 名稱>.patch」 */
+  private async exportShelf(id: string): Promise<void> {
+    const group = await this.shelfGroup(id);
+    if (!group) return;
+    const multi = group.entries.length > 1;
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri ?? vscode.Uri.file(group.entries[0].root);
+    const filters = { [t('Patch files')]: ['patch', 'diff'] };
+    const targets: { uri: vscode.Uri; root: string; shelf: ShelfGroup['entries'][number]['shelf'] }[] = [];
+    if (!multi) {
+      const e = group.entries[0];
+      const uri = await vscode.window.showSaveDialog({ title: t('Export Patch'), defaultUri: vscode.Uri.joinPath(folder, patchFileName(group.name, this.repoName(e.root), false)), filters });
+      if (!uri) return;
+      targets.push({ uri, root: e.root, shelf: e.shelf });
+    } else {
+      const picked = await vscode.window.showOpenDialog({ title: t('Export Patches to Folder'), defaultUri: folder, canSelectFiles: false, canSelectFolders: true, openLabel: t('Export Here') });
+      if (!picked?.[0]) return;
+      for (const e of group.entries) targets.push({ uri: vscode.Uri.joinPath(picked[0], patchFileName(group.name, this.repoName(e.root), true)), root: e.root, shelf: e.shelf });
+      const { existsSync } = await import('node:fs');
+      const existing = targets.filter((x) => existsSync(x.uri.fsPath)).map((x) => path.basename(x.uri.fsPath));
+      if (existing.length > 0 && !(await confirm(t('Overwrite {0} existing file(s)?', existing.length), { detail: existing.join('\n'), ok: t('Overwrite'), kind: 'danger' }, this.confirms))) return;
+    }
+    try {
+      for (const x of targets) {
+        const patch = await this.provider.getRepository(x.root)?.shelfPatch(x.shelf);
+        if (patch) await vscode.workspace.fs.writeFile(x.uri, patch);
+      }
+      vscode.window.setStatusBarMessage(t('Exported {0} patch file(s)', targets.length), 3000);
+    } catch (e) {
+      void showGitError(errorMessage(e));
+    }
+  }
+
+  /**
+   * 匯入 .patch 成一筆擱置：依檔名與「能否套用到 HEAD」判斷每個檔案屬於哪個 repo，判斷不出來的請使用者選；
+   * 不動工作區，匯入後切到擱置分頁。
+   */
+  async importPatches(uris?: readonly vscode.Uri[]): Promise<void> {
+    const picked = uris?.length
+      ? uris
+      : await vscode.window.showOpenDialog({ title: t('Import Patches to Shelf'), canSelectMany: true, filters: { [t('Patch files')]: ['patch', 'diff'] }, openLabel: t('Import') });
+    if (!picked?.length) return;
+    const summaries = await this.provider.repositories();
+    const repos = summaries.map((s) => ({ repo: this.provider.getRepository(s.root)!, name: s.name })).filter((r) => r.repo);
+    const files = await Promise.all(picked.map(async (u) => ({ fileName: path.basename(u.fsPath), patch: Buffer.from(await vscode.workspace.fs.readFile(u)) })));
+    const matched = await matchPatchRepos(files, repos);
+    for (const m of matched) {
+      if (m.repo) continue;
+      const pick = await vscode.window.showQuickPick(
+        repos.map((r) => ({ label: r.name, description: r.repo.root, repo: r.repo })),
+        { title: t('Import Patches to Shelf'), placeHolder: t('{0} does not apply to any repository as is. Import it into which repository?', m.fileName) },
+      );
+      if (!pick) return;
+      m.repo = pick.repo;
+    }
+    const first = matched[0];
+    const name = await vscode.window.showInputBox({
+      title: t('Import Patches to Shelf'),
+      value: shelfNameFromPatch(first.fileName, repos.find((r) => r.repo === first.repo)?.name),
+      placeHolder: t('Shelf name'),
+      validateInput: (v) => (v.trim() ? undefined : t('Enter a name for the shelf')),
+    });
+    if (name === undefined) return;
+    const byRepo = new Map<GitRepository, Buffer[]>();
+    for (const m of matched) byRepo.set(m.repo!, [...(byRepo.get(m.repo!) ?? []), m.patch]);
+    try {
+      const { roots } = await importAcross([...byRepo].map(([repo, patches]) => ({ repo, patches })), name.trim());
+      if (roots.length === 0) void vscode.window.showInformationMessage(t('Nothing to import: the patches contain no changes.'));
+      else vscode.window.setStatusBarMessage(t('Imported to "{0}"', name.trim()), 3000);
+    } catch (e) {
+      const where = e instanceof ShelveError ? this.repoName(e.root) : '';
+      void showGitError(where ? t('Could not import into {0}: {1}. Nothing was imported.', where, errorMessage(e)) : errorMessage(e));
+      return;
+    }
+    await vscode.commands.executeCommand(`${CommitViewProvider.viewId}.focus`);
+    this.post({ type: 'commitShowTab', tab: 'shelf' });
+    this.post({ type: 'shelfChanged' });
   }
 
   /** 取回的已追蹤檔案放進指定名稱的 changelist（沒有就建立）；未追蹤檔案不屬於 changelist */

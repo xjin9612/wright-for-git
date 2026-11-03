@@ -88,6 +88,11 @@
     },
     "commands": [
       {
+        "command": "gitWorkbench.importPatch",
+        "title": "%command.importPatch%",
+        "category": "Git Workbench"
+      },
+      {
         "command": "gitWorkbench.openSelectedFile",
         "title": "%command.openSelectedFile%",
         "category": "Git Workbench"
@@ -330,6 +335,11 @@
         {
           "command": "gitWorkbench.unstash",
           "group": "2_stash@2"
+        },
+        {
+          "command": "gitWorkbench.importPatch",
+          "when": "resourceExtname =~ /^\\.(patch|diff)$/i",
+          "group": "2_stash@3"
         }
       ]
     },

@@ -997,6 +997,64 @@ export class GitRepository {
     await this.run(['update-ref', '-d', SHELF_REF + id]);
   }
 
+  /**
+   * 以暫時的 index 把 patch 套用到 HEAD（不動工作區與真正的 index），回傳套用後的 tree；套不上時回傳 undefined。
+   * 依序試 -p1（git 格式，a/ b/ 前綴）與 -p0（沒有前綴，例如部分 IntelliJ 的 patch）。
+   */
+  private async applyToHeadTree(patches: Buffer[]): Promise<{ head: string; tree: string } | undefined> {
+    const head = await this.headHash();
+    if (!head) return undefined;
+    const { existsSync, promises: fsp } = await import('node:fs');
+    const tmpIndex = path.join(this.gitDir, `gitworkbench-patch-index-${process.pid}-${Date.now()}`);
+    const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env: { GIT_INDEX_FILE: tmpIndex }, input });
+    try {
+      await git(['read-tree', head]);
+      for (const patch of patches) {
+        let ok = false;
+        for (const strip of ['-p1', '-p0']) {
+          try {
+            await git(['apply', '--cached', '--binary', '--whitespace=nowarn', strip, '-'], patch);
+            ok = true;
+            break;
+          } catch {
+            // 換另一種路徑前綴再試
+          }
+        }
+        if (!ok) return undefined;
+      }
+      return { head, tree: (await git(['write-tree'])).trim() };
+    } finally {
+      for (const f of [tmpIndex, `${tmpIndex}.lock`]) if (existsSync(f)) await fsp.rm(f, { force: true });
+    }
+  }
+
+  /** patch 能否套用到這個 repo 的 HEAD（匯入時判斷 patch 屬於哪個 repo） */
+  async patchAppliesToHead(patch: Buffer): Promise<boolean> {
+    return !!(await this.applyToHeadTree([patch]));
+  }
+
+  /**
+   * 把一或多個 patch 匯入成一筆擱置（以 HEAD 為基準，不動工作區）：新增的檔案在取回時建立。
+   * 套不上 HEAD 時丟出錯誤；套用後沒有任何變更時回傳 undefined。
+   */
+  async importShelf(id: string, name: string, patches: Buffer[]): Promise<string | undefined> {
+    assertShelfId(id);
+    const applied = await this.applyToHeadTree(patches);
+    if (!applied) throw new GitError('The patch does not apply to HEAD of this repository', null, '');
+    const { head, tree } = applied;
+    const headTree = (await this.run(['rev-parse', `${head}^{tree}`])).trim();
+    if (tree === headTree) return undefined;
+    const branch = ((await this.tryRun(['symbolic-ref', '--quiet', '--short', 'HEAD'])) ?? '').trim() || '(no branch)';
+    const subject = (await this.run(['log', '-1', '--format=%h %s', head])).trim();
+    const commitTree = async (t: string, parents: string[], message: string) =>
+      (await runGit(this.gitPath, ['commit-tree', t, ...parents.flatMap((p) => ['-p', p]), '-m', message], { cwd: this.root })).trim();
+    // 與 git stash 相同的結構：index commit（與 HEAD 相同）＋工作區 commit
+    const index = await commitTree(headTree, [head], `index on ${branch}: ${subject}`);
+    const hash = await commitTree(tree, [head, index], `On ${branch}: shelf:${id} ${name.trim()}`.trim());
+    await this.run(['update-ref', '-m', 'import patch', SHELF_REF + id, hash]);
+    return hash;
+  }
+
   /** 匯出成可用 git apply（或 IntelliJ）套用的 patch：已追蹤檔案的變更，加上未追蹤檔案（以新增檔的 diff 表示） */
   async shelfPatch(shelf: Pick<ShelfInfo, 'hash' | 'parents'>): Promise<Buffer> {
     if (!isHash(shelf.hash)) throw new GitError(`Invalid shelf: ${shelf.hash}`, null, '');

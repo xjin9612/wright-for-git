@@ -30,6 +30,7 @@
   "command.optimizeRepository": "最佳化儲存庫（加快歷史讀取）",
   "command.resolveConflicts": "解決衝突…",
   "command.unstash": "取消儲藏…",
+  "command.importPatch": "匯入 Patch 到擱置…",
   "submenu.explorer": "Git Workbench",
   "view.commit": "提交",
   "command.showCommit": "顯示提交視窗",

@@ -39,6 +39,8 @@ function resetCalls() {
     picks: [],
     /** showInputBox 的回答；沒排時取消 */
     inputs: [],
+    /** showSaveDialog／showOpenDialog 的回答：路徑（開檔可為路徑陣列）；沒排時取消 */
+    dialogs: [],
     inputErrors: [],
     /** modal 確認框的回答：true 按確認、false 取消；沒排時按確認 */
     modal: [],
@@ -168,6 +170,14 @@ const vscode = {
       calls.warnings.push(m);
       return modalAnswer(o, ok);
     },
+    showSaveDialog: async () => {
+      const p = calls.dialogs.shift();
+      return p ? Uri.file(p) : undefined;
+    },
+    showOpenDialog: async () => {
+      const p = calls.dialogs.shift();
+      return p ? [].concat(p).map((x) => Uri.file(x)) : undefined;
+    },
     showQuickPick: async (items) => {
       const list = await items;
       calls.quickPicks.push(list.map((i) => (typeof i === 'string' ? i : i.label)));
@@ -237,7 +247,11 @@ const vscode = {
   },
   workspace: {
     workspaceFolders: [],
-    fs: { stat: async (u) => ({ type: fs.statSync(u.fsPath).isDirectory() ? 2 : 1 }) },
+    fs: {
+      stat: async (u) => ({ type: fs.statSync(u.fsPath).isDirectory() ? 2 : 1 }),
+      readFile: async (u) => new Uint8Array(fs.readFileSync(u.fsPath)),
+      writeFile: async (u, data) => fs.writeFileSync(u.fsPath, data),
+    },
     getConfiguration: (section) => ({
       get: (k, d) => {
         const key = section ? `${section}.${k}` : k;

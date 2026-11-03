@@ -295,6 +295,53 @@ test('擱置分頁：清單、檔案依 repo 分組、diff；取回對話框（�
   await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
 });
 
+test('擱置匯出／匯入 patch：跨 repo 匯出成各 repo 一個檔；匯入後判斷 repo 並成為一筆擱置', async () => {
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
+  const out = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'gwb-patch-'));
+  fs.writeFileSync(path.join(api, 'patch-a.txt'), 'pa\n');
+  fs.writeFileSync(path.join(web, 'patch-b.txt'), 'pb\n');
+  await reload();
+  await fileRow('patch-a.txt').click();
+  await fileRow('patch-b.txt').click({ modifiers: ['Control'] });
+  app.calls.inputs.push('patch me');
+  await fileRow('patch-b.txt').click({ button: 'right' });
+  await h.menu(cv, 'Shelve Changes…');
+  await h.until(() => shelfRefs(api).length === 1 && shelfRefs(web).length === 1, '擱置');
+
+  // 匯出：兩個 repo，選資料夾，每個 repo 一個檔
+  await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+  await h.until(async () => (await shelfRow('patch me').count()) === 1, '清單');
+  app.calls.dialogs.push(out);
+  await shelfRow('patch me').click({ button: 'right' });
+  await h.menu(cv, 'Export Patch…');
+  const files = ['patch me-api-server.patch', 'patch me-web-app.patch'].map((f) => path.join(out, f));
+  await h.until(() => files.every((f) => fs.existsSync(f)), '匯出兩個檔');
+  assert.match(fs.readFileSync(files[0], 'utf8'), /patch-a\.txt/);
+
+  // 刪除擱置後再匯入：依檔名判斷 repo，成為一筆跨兩個 repo 的擱置，不動工作區
+  await shelfRow('patch me').click({ button: 'right' });
+  await h.menu(cv, 'Delete…');
+  await cv.waitForSelector('.confirm-dialog');
+  await cv.locator('.confirm-dialog .button.danger').click();
+  await h.until(() => shelfRefs(api).length === 0 && shelfRefs(web).length === 0, '刪除');
+  app.calls.dialogs.push(files);
+  app.calls.inputs.push('imported');
+  await cv.locator('.shelf-pane [title="Import Patches…"]').click();
+  await h.until(async () => (await shelfRow('imported').count()) === 1, '匯入');
+  assert.match(await shelfRow('imported').innerText(), /2 repositories/);
+  assert.ok(!fs.existsSync(path.join(api, 'patch-a.txt')), '匯入不動工作區');
+  assert.equal(shelfRefs(api).length, 1);
+  assert.equal(shelfRefs(web).length, 1);
+
+  await shelfRow('imported').click({ button: 'right' });
+  await h.menu(cv, 'Delete…');
+  await cv.waitForSelector('.confirm-dialog');
+  await cv.locator('.confirm-dialog .button.danger').click();
+  await h.until(() => shelfRefs(api).length === 0, '清除');
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+});
+
 test('鍵盤：空白鍵切換勾選；提交訊息中 Ctrl+Enter 提交', async () => {
   await cv.locator('.commit-tab', { hasText: 'Commit' }).click();
   fs.appendFileSync(path.join(web, 'src/App.css'), '/* keyboard */\n');

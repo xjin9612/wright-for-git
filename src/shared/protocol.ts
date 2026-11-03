@@ -394,6 +394,10 @@ export type ToExtension =
    */
   | { type: 'shelfUnshelve'; id: string; paths: { root: string; paths: string[] }[]; remove: boolean; overwrite: boolean; changelist?: string }
   | { type: 'shelfRename'; id: string }
+  /** 匯出成 .patch（每個 repo 一個檔） */
+  | { type: 'shelfExport'; id: string }
+  /** 選 .patch 檔匯入成一筆擱置 */
+  | { type: 'shelfImport' }
   | { type: 'shelfDrop'; ids: string[] }
   | { type: 'commitLastMessage'; root: string }
   | { type: 'commitRun'; requestId: number; message: string; amend: boolean; signOff: boolean; noVerify: boolean; push: boolean; items: { root: string; changes: WorkingChange[] }[] }
@@ -512,6 +516,8 @@ export type ToWebview =
   | { type: 'stashChanged' }
   /** Shelf 有變動（擱置、取回、改名、刪除） */
   | { type: 'shelfChanged' }
+  /** 切到提交視窗的某個分頁（例如匯入 patch 後顯示擱置） */
+  | { type: 'commitShowTab'; tab: 'commit' | 'stash' | 'shelf' }
   | { type: 'shelfData'; requestId: number; groups: ShelfGroup[]; repoNames: Record<string, string> }
   /** exists：未追蹤檔案在工作區已存在（取回時要覆蓋才會還原） */
   | { type: 'shelfFiles'; requestId: number; id: string; repos: { root: string; files: (ChangedFile & { untracked?: boolean; exists?: boolean })[] }[] }

@@ -130,6 +130,78 @@ export async function unshelveAcross(
   return outcomes;
 }
 
+// ---------- 匯出／匯入 patch ----------
+
+/** 檔名中不能用的字元換成 _ */
+function safeName(name: string): string {
+  return name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/\s+/g, ' ').trim() || 'shelf';
+}
+
+/** 匯出的檔名：單一 repo 為「<擱置名稱>.patch」，多個 repo 為「<擱置名稱>-<repo 名稱>.patch」 */
+export function patchFileName(shelfName: string, repoName: string, multi: boolean): string {
+  return multi ? `${safeName(shelfName)}-${safeName(repoName)}.patch` : `${safeName(shelfName)}.patch`;
+}
+
+/**
+ * 判斷每個 patch 屬於哪個 repo：先依檔名（「…-<repo 名稱>.patch」或「<repo 名稱>.patch」）找，
+ * 再確認能套用到該 repo 的 HEAD；檔名對不上時，試每個 repo，取第一個能套用的。都不行時 repo 為 undefined。
+ */
+export async function matchPatchRepos<T extends { fileName: string; patch: Buffer }>(
+  files: readonly T[],
+  repos: readonly { repo: GitRepository; name: string }[],
+): Promise<(T & { repo?: GitRepository })[]> {
+  // 名稱長的先比對，避免「api」先吃掉「api-server」
+  const byName = [...repos].sort((a, b) => safeName(b.name).length - safeName(a.name).length);
+  const out: (T & { repo?: GitRepository })[] = [];
+  for (const f of files) {
+    const base = f.fileName.replace(/\.(patch|diff)$/i, '');
+    const named = byName.find((r) => base === safeName(r.name) || base.endsWith(`-${safeName(r.name)}`));
+    let repo: GitRepository | undefined;
+    if (named && (await named.repo.patchAppliesToHead(f.patch))) repo = named.repo;
+    else {
+      for (const r of repos) {
+        if (await r.repo.patchAppliesToHead(f.patch)) {
+          repo = r.repo;
+          break;
+        }
+      }
+    }
+    out.push({ ...f, repo });
+  }
+  return out;
+}
+
+/** 匯入後的擱置名稱預設：第一個檔名去掉「-<repo 名稱>」與副檔名 */
+export function shelfNameFromPatch(fileName: string, repoName?: string): string {
+  let base = fileName.replace(/\.(patch|diff)$/i, '');
+  if (repoName && base.endsWith(`-${safeName(repoName)}`)) base = base.slice(0, -(safeName(repoName).length + 1));
+  return base.trim();
+}
+
+/**
+ * 把 patch 匯入成同一筆擱置（各 repo 共用 id，不動工作區）。任何一個 repo 失敗時，已匯入的刪除後丟出 ShelveError。
+ */
+export async function importAcross(items: readonly { repo: GitRepository; patches: Buffer[] }[], name: string, opts: { id?: string } = {}): Promise<{ id: string; roots: string[] }> {
+  const id = opts.id ?? newShelfId();
+  const done: GitRepository[] = [];
+  for (const { repo, patches } of items) {
+    try {
+      if (await repo.importShelf(id, name, patches)) done.push(repo);
+    } catch (e) {
+      const rollbackErrors: { root: string; error: string }[] = [];
+      for (const r of done) {
+        try {
+          await r.dropShelf(id);
+        } catch (err) {
+          rollbackErrors.push({ root: r.root, error: errorText(err) });
+        }
+      }
+      throw new ShelveError(errorText(e), repo.root, rollbackErrors);
+    }
+  }
+  return { id, roots: done.map((r) => r.root) };
+}
+
 export async function renameShelfGroup(group: ShelfGroup, name: string, repoOf: (root: string) => GitRepository | undefined): Promise<void> {
   for (const { root } of group.entries) await repoOf(root)?.renameShelf(group.id, name);
 }
