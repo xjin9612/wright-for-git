@@ -31,7 +31,7 @@ after(async () => {
 });
 
 const viewMenu = async (label) => {
-  await page.locator('[title="View options"]').first().click();
+  await page.locator('.filter-bar [title="View options"]').click();
   await h.menu(page, label);
 };
 const row = (text) => page.locator('.log-row:visible', { hasText: text }).first();
@@ -119,7 +119,7 @@ test('全部展開；文字篩選時選單項目停用', async () => {
   await page.locator('.log-search input').fill('change 1');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(800);
-  await page.locator('[title="View options"]').first().click();
+  await page.locator('.filter-bar [title="View options"]').click();
   const item = page.locator('.context-menu .menu-item', { hasText: 'Collapse Linear Branches' });
   assert.ok(await item.evaluate((e) => e.classList.contains('disabled') || e.getAttribute('aria-disabled') === 'true'));
   await page.keyboard.press('Escape');

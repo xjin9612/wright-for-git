@@ -97,11 +97,14 @@ test('側邊欄 Branches：顯示時 Log 收起自己的 Branches 欄；點分�
   await page.waitForSelector('.log-tabs:not(.hidden)');
   await settle();
 
-  // 選項（不顯示標籤）同步到 Log 的 Branches 樹
-  await sp.locator('[title="Branch options"]').click();
+  // 選項（不顯示標籤）同步到 Log 的 Branches 樹；側邊欄的選單開在按鈕下方，不蓋住按鈕
+  await sp.locator('[title="View options"]').click();
+  const buttonBottom = await sp.locator('[title="View options"]').evaluate((e) => e.getBoundingClientRect().bottom);
+  const menuTop = await sp.locator('.context-menu').evaluate((e) => e.getBoundingClientRect().top);
+  assert.ok(menuTop >= buttonBottom, `選單頂端 ${menuTop} 蓋到按鈕（底部 ${buttonBottom}）`);
   await h.menu(sp, 'Show Tags');
   await h.until(async () => (await page.locator('.branch-tree .tree-row', { hasText: /^\s*Tags\s*$/ }).count()) === 0, 'Log 的 Branches 樹不顯示標籤');
-  await sp.locator('[title="Branch options"]').click();
+  await sp.locator('[title="View options"]').click();
   await h.menu(sp, 'Show Tags');
   await h.until(async () => (await page.locator('.branch-tree .tree-row', { hasText: /^\s*Tags\s*$/ }).count()) === 1, 'Log 的 Branches 樹再顯示標籤');
 

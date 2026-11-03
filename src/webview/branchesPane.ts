@@ -68,7 +68,7 @@ export class BranchesPane {
   /** 需要選取 ref 才能使用的工具列按鈕 */
   private readonly refButtons: HTMLButtonElement[] = [];
   private readonly favToolButton: HTMLButtonElement;
-  private readonly settingsButton: HTMLButtonElement;
+  private readonly viewButton: HTMLButtonElement;
 
   constructor(
     private readonly cb: BranchesCallbacks,
@@ -97,7 +97,8 @@ export class BranchesPane {
       const ref = this.selectedRef;
       if (ref && ref.type !== 'tag') this.toggleFavorite(ref);
     });
-    this.settingsButton = iconButton('gear', t('Branch options'), () => this.showOptions());
+    // 分組、只顯示我的最愛等顯示選項：與 Log、提交視窗、變更檔案樹相同用「眼睛」（齒輪只用於會改變行為的選項，如提交選項）
+    this.viewButton = iconButton('eye', t('View options'), () => this.showOptions());
     const toolbar = el(
       'div',
       { className: 'vertical-toolbar' },
@@ -112,7 +113,7 @@ export class BranchesPane {
       this.favToolButton,
       refButton('locate', t('Navigate Log to Selected Branch Head'), 'navigate'),
       el('div', { className: 'toolbar-sep' }),
-      this.settingsButton,
+      this.viewButton,
       iconButton('expand-all', t('Expand all'), () => this.expandAll()),
       iconButton('collapse-all', t('Collapse all'), () => this.collapseAll()),
     );
@@ -174,7 +175,7 @@ export class BranchesPane {
 
   /** ⚙ 選單：分組方式、只顯示我的最愛、顯示標籤 */
   private showOptions(): void {
-    const r = this.settingsButton.getBoundingClientRect();
+    const r = this.viewButton.getBoundingClientRect();
     const toggle = (k: keyof BranchOptions) => () => {
       this.options = { ...this.options, [k]: !this.options[k] };
       // 開啟依儲存庫分組時，各儲存庫的群組預設展開
@@ -186,7 +187,9 @@ export class BranchesPane {
       this.cb.onOptionsChange(this.options);
       this.render();
     };
-    showMenu(r.right + 2, r.top, [
+    // 面板：工具列直放在左側，選單開在按鈕右邊；側邊欄：工具列橫放在上方，選單開在按鈕下方（開在右邊會被擠回來蓋住按鈕）
+    const below = this.element.classList.contains('sidebar');
+    showMenu(below ? r.left : r.right + 2, below ? r.bottom + 2 : r.top, [
       { label: t('Group by Directory'), checked: this.options.groupByDirectory, action: toggle('groupByDirectory') },
       { label: t('Group by Repository'), checked: this.options.groupByRepository, disabled: this.states.length < 2, action: toggle('groupByRepository') },
       '-',

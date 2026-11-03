@@ -417,7 +417,7 @@ test('右鍵選單包含 IntelliJ 的 commit 操作', async () => {
 });
 
 test('Log 分頁：新增分頁各自保留篩選', async () => {
-  await page.locator('[title="View options"]').click();
+  await page.locator('.filter-bar [title="View options"]').click();
   await h.menu(page, 'New Log Tab');
   await h.eventually(async () => assert.equal(await page.locator('.log-tab').count(), 2));
   await search('pagination');
@@ -442,7 +442,7 @@ test('欄位：拖曳 Author 欄左緣調整寬度；👁 隱藏 Hash 欄', asyn
   await page.mouse.up();
   const after = await width();
   assert.ok(after > before + 30, `${before} → ${after}`);
-  await page.locator('[title="View options"]').click();
+  await page.locator('.filter-bar [title="View options"]').click();
   await h.menu(page, 'Show Hash');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);

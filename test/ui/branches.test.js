@@ -123,13 +123,13 @@ test('我的最愛：工具列 ★ 標記選取的分支；設定選單「只顯
   const rows = await h.texts(tree());
   const local = rows.findIndex((r) => r.startsWith('Local'));
   assert.ok(rows.slice(local + 1, local + 4).some((r) => /^feature\/rate-limiter|^rate-limiter/.test(r)), `置頂：${rows.join(' / ')}`);
-  await tool('Branch options').click();
+  await tool('View options').click();
   await h.menu(page, 'Show Only Favorites');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
   const favs = await h.texts(tree());
   assert.ok(favs.some((r) => r.startsWith('main')) && !favs.some((r) => r.startsWith('release')), favs.join(' / '));
-  await tool('Branch options').click();
+  await tool('View options').click();
   await h.menu(page, 'Show Only Favorites');
   await page.keyboard.press('Escape');
 });
