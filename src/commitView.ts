@@ -152,12 +152,14 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
       this.refreshAgain = true;
       return this.refreshing;
     }
-    this.refreshing = (async () => {
+    const run = async () => {
       do {
         this.refreshAgain = false;
         await this.doRefresh();
       } while (this.refreshAgain);
-    })();
+    };
+    // 第一次載入（大型工作區要先找 repo）在 view 頂端顯示進度；之後存檔等觸發的更新很快，不顯示以免閃爍
+    this.refreshing = this.lastState ? run() : Promise.resolve(vscode.window.withProgress({ location: { viewId: CommitViewProvider.viewId } }, run));
     try {
       await this.refreshing;
     } finally {

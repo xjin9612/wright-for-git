@@ -56,6 +56,10 @@ test('合併顯示所有 repo 的 commit；同名 local／remote 合併標籤；
   assert.match(all, /v1\.1\.0/);
 });
 
+test('載入提示：開啟時在 Log 面板頂端顯示 VS Code 的進度（找 repo、讀取狀態期間）', async () => {
+  assert.ok(app.calls.progress.some((l) => l?.viewId === 'gitWorkbench.log'), JSON.stringify(app.calls.progress));
+});
+
 test('文字篩選、hash 前綴、regex', async () => {
   await search('pagination');
   const list = await subjects();

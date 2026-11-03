@@ -4,6 +4,7 @@ import type { BranchesEvent, BranchesSync, ToWebview } from '../shared/protocol'
 import { refMenuItems, runBranchToolbar, type BranchHost } from './branchActions';
 import { BranchesPane } from './branchesPane';
 import { el, showMenu } from './dom';
+import { t } from './l10n';
 import { post } from './vscodeApi';
 
 let sync: BranchesSync | undefined;
@@ -42,10 +43,12 @@ const pane = new BranchesPane(
   'sidebar',
 );
 
-const empty = el('div', { className: 'empty-text hidden' });
+// 收到 Log 的第一次同步前顯示「載入中」（Log 找 repo 期間側邊欄不再一片空白）
+const empty = el('div', { className: 'empty-text', text: t('Loading…') });
 const app = document.getElementById('app')!;
 app.className = 'branches-app';
 app.append(empty, pane.element);
+pane.element.classList.add('hidden');
 
 window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
   const m = ev.data;

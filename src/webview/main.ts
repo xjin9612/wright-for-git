@@ -1315,4 +1315,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
   }
 });
 
+// 找 repo、讀取各 repo 狀態期間（收到第一個 repos 之前）顯示提示文字，大型工作區可能要好幾秒。
+// 這段期間的進度條由 extension 以 VS Code 的 view 進度顯示（面板分頁上也有轉圈），這裡不再顯示自己的進度條以免兩條重疊
+table.setMessage(t('Loading repositories…'));
 post({ type: 'ready' });

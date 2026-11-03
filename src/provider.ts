@@ -252,6 +252,14 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
       this.dirtyWhileHidden = true;
       return;
     }
+    // 強制重新整理（開啟面板、按重新整理、操作後）要找 repo 並讀取全部狀態，大型工作區可能要好幾秒：
+    // 在面板頂端顯示 VS Code 的進度條（面板收合只剩分頁標籤時也看得到）
+    if (force) await vscode.window.withProgress({ location: { viewId: WorkbenchViewProvider.viewId } }, () => this.readStates(true));
+    else await this.readStates(false);
+  }
+
+  private async readStates(force: boolean): Promise<void> {
+    if (!this.view) return;
     await this.ensureDiscovered();
     if (this.entries.length === 0) {
       this.post({ type: 'repos', states: [], generation: this.generation, message: t('No Git repository found in the workspace.') });

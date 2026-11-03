@@ -32,6 +32,8 @@ function resetCalls() {
     warnings: [],
     infos: [],
     status: [],
+    /** withProgress 的 location（確認進度顯示在哪裡） */
+    progress: [],
     quickPicks: [],
     /** showQuickPick 的回答：依序取用，函式（item => boolean）或 undefined（取消）；沒排時選第一項 */
     picks: [],
@@ -187,7 +189,10 @@ const vscode = {
       calls.status.push(m);
       return { dispose() {} };
     },
-    withProgress: async (_o, fn) => fn({ report: () => undefined }),
+    withProgress: async (o, fn) => {
+      calls.progress.push(o.location);
+      return fn({ report: () => undefined });
+    },
     createWebviewPanel: (viewType, title) => {
       const panel = {
         viewType,

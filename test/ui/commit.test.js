@@ -43,6 +43,11 @@ async function commit(message) {
 }
 const headFiles = (repo) => h.git(repo, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean);
 
+test('載入提示：第一次載入在提交視窗頂端顯示 VS Code 的進度；之後的更新不顯示', async () => {
+  const commitProgress = () => app.calls.progress.filter((l) => l?.viewId === 'gitWorkbench.commit').length;
+  assert.equal(commitProgress(), 1, JSON.stringify(app.calls.progress));
+});
+
 test('列出兩個 repo 的變更、未追蹤檔案；預設勾選變更、不勾未追蹤', async () => {
   const list = (await rows()).join(' / ');
   for (const s of ['Changes', 'api-server', 'web-app', 'config.ts', 'db.yml', 'index.ts', 'Login.tsx', 'Unversioned Files', 'todo.ts']) assert.ok(list.includes(s), `${s}：${list}`);

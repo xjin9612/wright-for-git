@@ -6,6 +6,7 @@
   "Checkout revision {0}? This will put the repository in detached HEAD state.": "要簽出 {0} 嗎？儲存庫會進入分離的 HEAD 狀態。",
   "Checkout": "簽出",
   "Copied: {0}": "已複製：{0}",
+  "Loading repositories…": "正在載入儲存庫…",
   "File does not exist in the working tree: {0}": "工作目錄中沒有這個檔案：{0}",
   "Git command failed: {0}": "Git 指令失敗：{0}",
   "{0} is not inside a Git repository.": "{0} 不在 Git 儲存庫中。",
