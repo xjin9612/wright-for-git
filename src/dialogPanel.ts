@@ -240,6 +240,7 @@ export class DialogPanels {
         if (m.type === 'confirmResult') host.resolve(m.id, m.ok);
         else if (m.type === 'closeDialog') panel.dispose();
         else if (m.type === 'dialogPref') await this.provider.setDialogPref(m.key, m.value);
+        else if (m.type === 'copy') await vscode.env.clipboard.writeText(m.text);
         else await entry.handler(m, reply, host, () => panel.dispose());
       } catch (e) {
         void showGitError(errorMessage(e));

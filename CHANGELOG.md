@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed files
+- `Ctrl+C` in a changed-files tree (commit details, stashes, push and unstash dialogs) copies the selected file's name
+
 ### Releasing
 - Versions follow the VS Code Marketplace rule: `major.minor.patch` only, an even minor is a regular release and an odd minor a pre-release. CI and the release workflow check it (`scripts/check-version.mjs`)
 

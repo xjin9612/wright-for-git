@@ -4,6 +4,7 @@ import { buildTree, type TreeNode } from '../shared/tree';
 import { clear, el, icon, iconButton, showMenu, treeItemAttrs } from './dom';
 import { fileIcon, statusClass, statusLetter } from './fileIcons';
 import { plural, t } from './l10n';
+import { post } from './vscodeApi';
 
 /** 變更檔案的分組方式 */
 export interface FileGrouping {
@@ -277,6 +278,12 @@ export class FileTree {
       this.render();
       this.element.querySelector('.tree-row.selected')?.scrollIntoView({ block: 'nearest' });
     };
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'c') {
+      // Ctrl+C：複製選取檔案的檔名（資料夾、repo 列不動作）
+      if (row?.file) post({ type: 'copy', text: fileName(row.file.path) });
+      e.preventDefault();
+      return;
+    }
     switch (e.key) {
       case 'ArrowDown':
         moveTo(idx + 1);

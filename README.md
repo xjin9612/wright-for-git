@@ -52,6 +52,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 | `↑` `↓` `PageUp` `PageDown` `Home` `End` | Move the selection |
 | `Shift+↑↓`, `Ctrl`/`Shift`+click, `Ctrl+A` | Select several commits |
 | `Ctrl+C` | Copy the selected commit hash |
+| `Ctrl+C` (in a changed-files tree) | Copy the selected file's name |
 | `Ctrl+F` | Focus the search box |
 | `Esc` (in the search box) | Clear the text filter |
 | `Alt+9` (anywhere) | Show the Git log |

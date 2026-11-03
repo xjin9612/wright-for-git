@@ -92,6 +92,7 @@
 | 4.1.6 | 樹狀／平鋪切換、展開／收合全部 | P1 |
 | 4.1.7 | 工具列：Show Diff、Revert selected changes、File History | P1 |
 | 4.1.8 | 依模組／repo 分組（`web-app 2 files`） | P2 |
+| 4.1.9 | `Ctrl+C` 複製選取檔案的檔名（資料夾不動作） | P1 |
 
 ### 4.2 Commit 詳情
 
