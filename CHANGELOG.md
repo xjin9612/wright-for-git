@@ -4,6 +4,7 @@
 
 ### Renamed to Wright for Git
 - Git Workbench is now **Wright for Git** (extension ID `xjin9612.wright-for-git`). Settings moved from `gitWorkbench.*` to `wright.*`, and commands and keybindings use the new IDs: copy any settings or custom keybindings you had over to the new names. Changelists and other state saved by Git Workbench start fresh
+- New icon
 
 ### Shelf
 - **Shelve Changes…** in the Commit window sets the selected changes aside — modified, deleted and untracked files, across several repositories as one entry — and restores those files; *Keep in Working Tree* saves a copy without touching them. Shelves are kept in the repositories (not in the stash list) and survive restarts. For files where you selected only some changes to commit, only those changes are shelved and the rest stays in the file, like Commit does
