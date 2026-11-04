@@ -1,6 +1,6 @@
 {
   "displayName": "Wright for Git: Multi-Repo Log, Commit & Shelf",
-  "description": "IntelliJ 風格的 Git 工具視窗：記錄面板整合分支樹、提交圖、篩選與提交詳情，側邊欄另有提交視窗與分支樹。",
+  "description": "IntelliJ 風格的 Git 工具視窗，支援多 repo 工作區：含提交圖、分支樹與完整篩選的記錄，可用 Changelist 與逐段提交的提交視窗，跨 repo 的擱置，互動式 rebase 與合併衝突處理。",
   "capabilities.untrustedWorkspaces": "Wright 會在工作區的儲存庫執行 git，而儲存庫的 Git 設定與 hook 可以執行任意指令，因此需要信任此工作區。",
   "container.title": "Git",
   "view.log": "記錄",

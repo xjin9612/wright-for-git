@@ -1,6 +1,6 @@
 {
   "displayName": "Wright for Git: Multi-Repo Log, Commit & Shelf",
-  "description": "IntelliJ-style Git tool windows: a log panel with branches tree, commit graph, filters and commit details, plus a Commit window and Branches tree in the side bar.",
+  "description": "IntelliJ-style Git tool windows for multi-repository workspaces: a log with commit graph, branches tree and powerful filters, a Commit window with changelists and partial commits, a cross-repository Shelf, interactive rebase and merge conflict resolution.",
   "capabilities.untrustedWorkspaces": "Wright runs git in the workspace's repositories, and a repository's Git configuration and hooks can execute arbitrary commands, so it needs a trusted workspace.",
   "container.title": "Git",
   "view.log": "Log",

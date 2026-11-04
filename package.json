@@ -23,11 +23,41 @@
   ],
   "keywords": [
     "git",
+    "git log",
+    "git graph",
+    "git history",
+    "git gui",
     "log",
     "graph",
+    "history",
     "branches",
-    "history"
+    "commit",
+    "changelist",
+    "partial commit",
+    "shelf",
+    "shelve",
+    "stash",
+    "patch",
+    "interactive rebase",
+    "rebase",
+    "cherry-pick",
+    "merge conflict",
+    "three-way merge",
+    "blame",
+    "multi-repo",
+    "multi-root",
+    "monorepo",
+    "intellij",
+    "jetbrains",
+    "idea",
+    "source control",
+    "scm"
   ],
+  "galleryBanner": {
+    "color": "#28347a",
+    "theme": "dark"
+  },
+  "pricing": "Free",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
