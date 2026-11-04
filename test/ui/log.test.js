@@ -334,7 +334,42 @@ test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔�
   assert.equal(opened().length, n);
 });
 
-test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版本、複製檔名與路徑；刪除的檔案停用開啟', async () => {
+test('Select In（Alt+F1、右鍵）：在檔案總管檢視、檔案管理員或終端機中顯示工作目錄的檔案；已刪除的檔案只提示', async () => {
+  const tree = page.locator('.details-pane .file-tree');
+  const selectIn = () => app.calls.commands['gitWorkbench.selectInSelectedFile']();
+  const revealed = (cmd) => app.calls.executed.filter(([c]) => c === cmd).map((a) => a[1].fsPath.replace(/\\/g, '/'));
+  await (await row('feat(auth): add API keys')).click();
+  await tree.locator('.tree-row', { hasText: 'keys.ts' }).click();
+  await page.waitForTimeout(200);
+
+  // 快捷鍵指令：跳出三個選項，選檔案總管檢視
+  const picks = app.calls.quickPicks.length;
+  app.calls.picks.push((x) => x.label === 'Reveal in Explorer View');
+  await selectIn();
+  await h.until(() => revealed('revealInExplorer').length > 0, '在檔案總管檢視中顯示');
+  assert.deepEqual(app.calls.quickPicks[picks], ['Reveal in Explorer View', process.platform === 'win32' ? 'Reveal in File Explorer' : process.platform === 'darwin' ? 'Reveal in Finder' : 'Open Containing Folder', 'Open in Integrated Terminal']);
+  assert.match(revealed('revealInExplorer').at(-1), /\/api-server\/src\/auth\/keys\.ts$/);
+
+  // 右鍵選單：選終端機
+  app.calls.picks.push((x) => x.label === 'Open in Integrated Terminal');
+  await tree.locator('.tree-row', { hasText: 'keys.ts' }).click({ button: 'right' });
+  await h.menu(page, 'Select In…');
+  await h.until(() => revealed('openInIntegratedTerminal').length > 0, '在終端機中開啟');
+
+  // 已刪除的檔案：右鍵停用；快捷鍵只在狀態列提示，不跳選單
+  await (await row('chore: drop legacy script')).click();
+  await tree.locator('.tree-row', { hasText: 'legacy.sh' }).click({ button: 'right' });
+  assert.equal(await page.locator('.context-menu .menu-item.disabled', { hasText: 'Select In…' }).count(), 1);
+  await page.keyboard.press('Escape');
+  await tree.locator('.tree-row', { hasText: 'legacy.sh' }).click();
+  await page.waitForTimeout(200);
+  const n = app.calls.quickPicks.length;
+  await selectIn();
+  assert.equal(app.calls.quickPicks.length, n);
+  assert.match(app.calls.status.at(-1), /legacy\.sh/);
+});
+
+test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版本、Select In、複製檔名與路徑；刪除的檔案停用開啟與 Select In', async () => {
   const opened = () => app.calls.executed.filter(([c]) => c === 'vscode.open').map((a) => a[1]);
   const tree = page.locator('.details-pane .file-tree');
   const keys = 'feat(auth): add API keys';
@@ -346,7 +381,7 @@ test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版�
     await page.waitForSelector('.context-menu');
   };
   await openMenu('keys.ts');
-  assert.deepEqual(await h.texts(page.locator('.context-menu .menu-item .menu-label')), ['Show Diff', 'Open File', 'Open Repository Version', 'Copy File Name', 'Copy Path']);
+  assert.deepEqual(await h.texts(page.locator('.context-menu .menu-item .menu-label')), ['Show Diff', 'Open File', 'Open Repository Version', 'Select In…', 'Copy File Name', 'Copy Path']);
   assert.match(await tree.locator('.tree-row.selected').innerText(), /keys\.ts/, '右鍵同時選取該檔案');
 
   app.calls.clipboard = undefined;
@@ -380,7 +415,7 @@ test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版�
   await (await row('chore: drop legacy script')).click();
   await openMenu('legacy.sh');
   const disabled = await h.texts(page.locator('.context-menu .menu-item.disabled .menu-label'));
-  assert.deepEqual(disabled, ['Open File', 'Open Repository Version']);
+  assert.deepEqual(disabled, ['Open File', 'Open Repository Version', 'Select In…']);
   await page.keyboard.press('Escape');
 
   // 資料夾列沒有選單

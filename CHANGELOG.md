@@ -10,7 +10,8 @@
 ### Changed files
 - `Ctrl+C` in a changed-files tree (commit details, stashes, push and unstash dialogs) copies the selected file's name; on a folder it copies the folder's path in the repository, on a repository row the repository name
 - `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Git Workbench: Open Selected File in Changed Files*
-- Context menu on files in the log's commit details (also with the Menu key or `Shift+F10`): Show Diff, Open File, Open Repository Version (the file as of that commit, read-only), Copy File Name, Copy Path
+- `Alt+F1` in the same places (like IntelliJ's Select In) reveals the selected file in the Explorer view, in File Explorer / Finder, or opens an integrated terminal in its folder. Also *Select In…* in the context menu of the log's commit details and the Commit window
+- Context menu on files in the log's commit details (also with the Menu key or `Shift+F10`): Show Diff, Open File, Open Repository Version (the file as of that commit, read-only), Select In…, Copy File Name, Copy Path
 
 ### Commit window
 - Open File opens a regular tab instead of a preview, so opening several files no longer replaces the previous one; a file that no longer exists shows a status-bar message

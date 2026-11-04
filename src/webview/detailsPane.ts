@@ -99,6 +99,7 @@ export class DetailsPane {
       { label: t('Show Diff'), keybinding: 'Enter', action: () => this.tree.openSelected() },
       { label: t('Open File'), disabled: file.status === 'D', action: () => post({ type: 'openWorkingFile', root: g.root, path: file.path }) },
       { label: t('Open Repository Version'), disabled: !ref, action: () => post({ type: 'openRevisionFile', root: g.root, ref, path: file.path }) },
+      { label: t('Select In…'), disabled: file.status === 'D', action: () => post({ type: 'selectInFile', root: g.root, path: file.path }) },
       '-',
       { label: t('Copy File Name'), keybinding: `${MOD_KEY}C`, action: () => post({ type: 'copy', text: fileName(file.path) }) },
       { label: t('Copy Path'), action: () => post({ type: 'copy', text: file.path }) },

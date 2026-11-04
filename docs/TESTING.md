@@ -25,7 +25,7 @@ npm run test:ui
 
 | 檔案 | 內容 |
 |---|---|
-| `test/ui/log.test.js` | 開啟時的載入進度；前往 HEAD；鍵盤移動選取、`Ctrl+C`、`Ctrl+F`、`Esc`；webview 已處理的按鍵不轉給 VS Code；彈出框放不下時只捲清單、從按鈕展開的選單不蓋住按鈕；焦點離開 webview 時選單關閉；鍵盤開啟與操作右鍵選單；狀態字母；沒有結果時清除篩選；多 repo 合併顯示與標籤；文字、hash、regex 篩選；User（`me`）、Branch 串接選單、Date、Paths（Ctrl+點選；Select… 對話框的鍵盤展開與勾選）篩選；HEAD 不在篩選中的提示；repo 名稱欄；選取 commit 的檔案與詳情；變更檔案樹的 `Ctrl+C`（檔名、資料夾路徑、repo 名稱）、`F4` 開檔（失去焦點後不作用）、右鍵選單（顯示差異、開啟檔案、開啟儲存庫版本、複製檔名與路徑）；issue 連結；多選合併變更、`Ctrl+C` 與右鍵複製全部選取的 hash；右鍵選單；Log 分頁；欄寬拖曳與隱藏欄位 |
+| `test/ui/log.test.js` | 開啟時的載入進度；前往 HEAD；鍵盤移動選取、`Ctrl+C`、`Ctrl+F`、`Esc`；webview 已處理的按鍵不轉給 VS Code；彈出框放不下時只捲清單、從按鈕展開的選單不蓋住按鈕；焦點離開 webview 時選單關閉；鍵盤開啟與操作右鍵選單；狀態字母；沒有結果時清除篩選；多 repo 合併顯示與標籤；文字、hash、regex 篩選；User（`me`）、Branch 串接選單、Date、Paths（Ctrl+點選；Select… 對話框的鍵盤展開與勾選）篩選；HEAD 不在篩選中的提示；repo 名稱欄；選取 commit 的檔案與詳情；變更檔案樹的 `Ctrl+C`（檔名、資料夾路徑、repo 名稱）、`F4` 開檔（失去焦點後不作用）、`Alt+F1` Select In（三個選項、已刪除的檔案只提示）、右鍵選單（顯示差異、開啟檔案、開啟儲存庫版本、Select In、複製檔名與路徑）；issue 連結；多選合併變更、`Ctrl+C` 與右鍵複製全部選取的 hash；右鍵選單；Log 分頁；欄寬拖曳與隱藏欄位 |
 | `test/ui/branches.test.js` | 確認框的焦點、`Tab`、`Esc`；Branches 樹與資料夾、同名分支合併；搜尋；新增分支（名稱驗證）；刪除已合併／未合併（確認框）；重新命名；右鍵選單與停用項目；我的最愛、`gitWorkbench.defaultFavoriteBranches` 設定；雙擊遠端分支（失敗與成功）；合併衝突、進行中列、中止確認 |
 | `test/ui/sync.test.js` | Git 主控台記錄指令與失敗原因；Push 分頁（目標、commit、警告；預設看全部 commit 合併後的檔案、Ctrl 多選、點 repo 列、檔案分組並記住）；推送成功與被拒；Pull；Force Push 確認；新分支 New 與改名後設定 upstream；Push 到這裡為止；Fetch |
 | `test/ui/commit.test.js` | 第一次載入的進度；空白鍵勾選、`Ctrl+Enter` 提交；提交視窗的清單與預設勾選；分組（模組、平鋪）；逐段提交且不動內建暫存區；跨 repo 提交；Amend（只改訊息）；捨棄變更；加入 .gitignore；Changelist；儲藏分頁（分組、未追蹤、diff、刪除後即時更新）；儲藏變更；擱置（跨 repo 一筆、保留工作目錄、只擱置選取的段落、不帶走使用者暫存的檔案）；擱置分頁（清單、檔案依 repo 分組、diff、改名、多選刪除）；取回對話框（預先勾選、取回部分檔案、從擱置移除或保留、changelist、已存在的檔案勾選才覆蓋、Esc）；取回有衝突時打開衝突清單並標示擱置名稱；多筆依序取回（取消、衝突時停下並提示）；匯出 patch（各 repo 一個檔）與匯入（依檔名與能否套用判斷 repo、套不上時請使用者選並顯示錯誤） |
@@ -102,7 +102,7 @@ node scripts/make-playground.mjs --force               # 測完想重來：刪�
 node scripts/make-playground.mjs remote-push web-app   # 模擬別人推了一筆新 commit
 node scripts/make-large-repo.mjs 3000                  # 3000 筆 commit 的 large-repo（看長線性分支折疊；約 1 秒）
 node scripts/make-large-repo.mjs --force               # 10 萬筆（看大型 repo 的效能；約 15 秒）
-node scripts/make-shelf-fixture.mjs init               # 擱置的手動測試 repo（之後每個情境一個指令，見第 5 節）
+node scripts/make-shelf-fixture.mjs init               # 擱置的手動測試 repo（之後每個情境一個指令，見第 6 節）
 ```
 
 `large-repo` 的 main 每 100 筆會合併一條 5 筆的 feature 分支：👁 →「Collapse Linear Branches」後往下捲約 90 列，可以看到第一個「⋯ 3 commits」。10 萬筆時可以試「Git Workbench: 最佳化儲存庫」前後，以單一檔案（例如 `src/mod07/file03.ts`）路徑篩選的速度差異。
@@ -201,7 +201,17 @@ node scripts/make-shelf-fixture.mjs init               # 擱置的手動測試 r
     - 受限模式頁的延伸模組清單裡，Git Workbench 附有說明「會在工作區的儲存庫執行 git…因此需要信任此工作區」（中文介面）或英文版說明。
     - 改回「信任」後 Git Workbench 啟用（VS Code 若要求重新載入視窗就照做），Log 正常載入。
 
-## 5. 擱置（只在真實 VS Code 才看得到的部分）
+## 5. 變更檔案樹的 Select In（Alt+F1）
+
+- [ ] **三個去處都真的打開**
+  - **做**：在 Git 記錄點一筆 commit，右欄選一個還存在的檔案，按 `Alt+F1`，依序試三個選項。
+  - **應該看到**：
+    - 「在檔案總管檢視中顯示」：側邊欄切到檔案總管，展開並選取該檔案。
+    - 「在 Windows 檔案總管中顯示」（macOS 為 Finder、Linux 為開啟所在資料夾）：系統的檔案管理員打開並選取該檔案。透過 WSL 開啟的專案也要試，SSH／容器遠端時這一項不出現。
+    - 「在整合式終端機中開啟」：開一個終端機，目前目錄是該檔案所在的資料夾。
+    - 在編輯器中按 `Alt+F1` 仍是 VS Code 原本的協助工具說明（不被搶走）。
+
+## 6. 擱置（只在真實 VS Code 才看得到的部分）
 
 擱置的操作、取回對話框、衝突、匯出匯入都有 UI 測試；這裡只測 UI 測試模擬不到的部分。先執行 `node scripts/make-shelf-fixture.mjs init`，用 VS Code 開 `vscode-git-workbench-test/shelf`。以下 `F <情境>` 指 `node scripts/make-shelf-fixture.mjs <情境>`：每個情境會把兩個 repo 還原成同一個起點（含清掉擱置、儲藏）再做出修改，執行後在提交視窗按重新整理。`F status` 顯示兩個 repo 的工作區、暫存區、儲藏筆數與擱置。
 

@@ -359,6 +359,8 @@ export type ToExtension =
   | { type: 'fileTreeFocus'; focused: boolean; file?: FocusedFile }
   /** 開啟工作目錄中的檔案 */
   | { type: 'openWorkingFile'; root: string; path: string }
+  /** Select In：在檔案總管檢視、檔案管理員或終端機中顯示工作目錄的檔案 */
+  | { type: 'selectInFile'; root: string; path: string }
   /** 以唯讀方式開啟檔案在某個 revision 的內容 */
   | { type: 'openRevisionFile'; root: string; ref: string; path: string }
   /** 開啟外部連結（只接受 http／https） */

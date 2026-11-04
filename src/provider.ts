@@ -19,7 +19,7 @@ import { ConfirmHost, confirm, setWebviewConfirm } from './dialogs';
 import { handleSettingsMessage, openSettingsIn, settingsAfterReady } from './settingsBridge';
 import { DialogPanels } from './dialogPanel';
 import { opName } from './conflicts';
-import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
+import { openWorkingFile, selectInFile, setFileTreeFocus } from './fileTreeFocus';
 
 interface RepoEntry {
   repo: GitRepository;
@@ -416,6 +416,9 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
           break;
         case 'openWorkingFile':
           await openWorkingFile(m.root, m.path);
+          break;
+        case 'selectInFile':
+          await selectInFile(m.root, m.path);
           break;
         case 'openRevisionFile': {
           const e = this.find(m.root);

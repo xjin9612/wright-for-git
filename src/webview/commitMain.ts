@@ -701,6 +701,7 @@ function showRowMenu(r: Row, x: number, y: number): void {
   menu.push(
     { label: t('Show Diff'), keybinding: 'Enter', disabled: !single || single.change.kind === 'ignored', action: () => single && post({ type: 'commitDiff', root: single.root, change: single.change }) },
     { label: t('Open File'), disabled: !single || single.change.status === 'D', action: () => single && post({ type: 'commitOpenFile', root: single.root, path: single.change.path }) },
+    { label: t('Select In…'), disabled: !single || single.change.status === 'D', action: () => single && post({ type: 'selectInFile', root: single.root, path: single.change.path }) },
     {
       label: t('Select Changes to Commit…'),
       disabled: !single || single.change.kind !== 'changed' || single.change.status !== 'M',

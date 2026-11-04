@@ -12,7 +12,7 @@ import { registerGitConsole } from './gitConsole';
 import { registerExplorerCommands } from './explorerCommands';
 import { createTestApi, type TestApi } from './testApi';
 import { optimizeRepositories } from './optimize';
-import { openFocusedFile } from './fileTreeFocus';
+import { openFocusedFile, selectInFocusedFile } from './fileTreeFocus';
 
 export async function activate(context: vscode.ExtensionContext): Promise<TestApi> {
   initI18n(context);
@@ -43,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     vscode.commands.registerCommand('gitWorkbench.diff.nextFile', () => provider.navigateDiff(1)),
     vscode.commands.registerCommand('gitWorkbench.diff.previousFile', () => provider.navigateDiff(-1)),
     vscode.commands.registerCommand('gitWorkbench.openSelectedFile', () => openFocusedFile()),
+    vscode.commands.registerCommand('gitWorkbench.selectInSelectedFile', () => selectInFocusedFile()),
     // 檔案總管右鍵（可多選 .patch）或指令面板
     vscode.commands.registerCommand('gitWorkbench.importPatch', (uri?: vscode.Uri, uris?: vscode.Uri[]) => commitView?.importPatches(uris?.length ? uris : uri ? [uri] : undefined)),
     vscode.commands.registerCommand('gitWorkbench.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),

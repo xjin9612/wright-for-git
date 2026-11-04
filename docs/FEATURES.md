@@ -94,7 +94,8 @@
 | 4.1.8 | 依模組／repo 分組（`web-app 2 files`） | P2 |
 | 4.1.9 | `Ctrl+C` 複製選取檔案的檔名；資料夾複製 repo 內的相對路徑、repo 列複製 repo 名稱 | P1 |
 | 4.1.10 | `F4` 開啟選取檔案的工作目錄版本（Jump to Source；可在鍵盤快速鍵改鍵） | P1 |
-| 4.1.11 | 檔案右鍵選單（也可用選單鍵／Shift+F10）：Show Diff、Open File、Open Repository Version、Copy File Name、Copy Path | P1 |
+| 4.1.11 | 檔案右鍵選單（也可用選單鍵／Shift+F10）：Show Diff、Open File、Open Repository Version、Select In…、Copy File Name、Copy Path | P1 |
+| 4.1.12 | `Alt+F1` Select In：在檔案總管檢視、系統檔案管理員或整合式終端機中顯示選取的檔案（可在鍵盤快速鍵改鍵） | P1 |
 
 ### 4.2 Commit 詳情
 

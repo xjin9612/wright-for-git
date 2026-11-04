@@ -27,7 +27,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Shelf** — set changes aside without committing, across several repositories as one entry (*Shelve Changes…* in the Commit window). The Shelf tab lists them with their files; *Unshelve…* lets you pick repositories and files, a changelist, and whether to remove what you unshelved. Conflicts open the conflict list. Shelves live in the repositories (not in the stash list), and can be exported to and imported from `.patch` files that `git apply` and IntelliJ understand
 - **Merge conflicts** — a Conflicts tab (Accept Yours / Accept Theirs / Merge…, then Continue) and a three-way Merge tab: Yours, an editable Result and Theirs, with ≫ ✕ per change or per line (Line by Line), Apply Non-Conflicting Changes, and undo / redo. Works for merge, rebase, cherry-pick, revert and stash conflicts
 - **Sync** — Fetch in the Branches toolbar, Pull and Push in the log toolbar. Push always opens a Push Commits dialog (in an editor tab) listing what will be pushed; Force Push (`--force-with-lease`) is in the dialog's drop-down. Push All up to Here… pushes only up to a chosen commit. Local branches show ↑ahead ↓behind in the Branches tree
-- **Changed files** — tree (or flat list), grouped by directory, repository or module, with file-type icons and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff; step to the previous / next file with ← → in the diff's title bar. Context menu: Show Diff, Open File (`F4`), Open Repository Version, Copy File Name (`Ctrl+C`), Copy Path.
+- **Changed files** — tree (or flat list), grouped by directory, repository or module, with file-type icons and file counts; added in green, modified in blue, deleted in gray. Double-click (or `Enter`) opens VS Code's native diff; step to the previous / next file with ← → in the diff's title bar. Context menu: Show Diff, Open File (`F4`), Open Repository Version, Select In… (`Alt+F1`: Explorer view, File Explorer / Finder, terminal), Copy File Name (`Ctrl+C`), Copy Path.
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Two Activity Bar icons** — *Commit* opens the Commit window; *Git History* shows the Branches tree in the side bar and opens the log below it (the log then hides its own Branches pane, so the commit list gets the full width; switch the side bar to something else and the pane comes back)
 - **Open the log your way** — the *Git History* icon, "Git Log" in the status bar, or `Alt+9`
@@ -55,6 +55,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 | `Ctrl+C` | Copy the selected commit hash |
 | `Ctrl+C` (in a changed-files tree) | Copy the selected file's name (a folder: its path in the repository) |
 | `F4` (in a changed-files tree) | Open the selected file from the working tree; rebind *Open Selected File in Changed Files* in Keyboard Shortcuts |
+| `Alt+F1` (in a changed-files tree) | Select In: reveal the selected file in the Explorer view, File Explorer / Finder, or a terminal |
 | `Ctrl+F` | Focus the search box |
 | `Esc` (in the search box) | Clear the text filter |
 | `Alt+9` (anywhere) | Show the Git log |

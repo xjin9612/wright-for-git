@@ -24,6 +24,7 @@
   "command.diff.previousFile": "上一個變更檔案",
   "command.diff.nextFile": "下一個變更檔案",
   "command.openSelectedFile": "開啟變更檔案樹中選取的檔案",
+  "command.selectInSelectedFile": "在其他位置顯示變更檔案樹中選取的檔案…",
   "config.language": "Git Workbench 面板、對話框與訊息的語言。指令名稱與設定說明一律跟隨 VS Code 的顯示語言。",
   "config.language.auto": "跟隨 VS Code 的顯示語言",
   "command.compareWithRef": "與分支或標籤比較…",

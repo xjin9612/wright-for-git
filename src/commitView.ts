@@ -14,7 +14,7 @@ import { ModuleResolver } from './modules';
 import type { WorkbenchViewProvider } from './provider';
 import type { Changelist, CommitState, DiffHunk, ToExtension, ToWebview, WorkingChange } from './shared/protocol';
 import { openStashFile, stashChanges } from './stashView';
-import { openWorkingFile, setFileTreeFocus } from './fileTreeFocus';
+import { openWorkingFile, selectInFile, setFileTreeFocus } from './fileTreeFocus';
 import { dropShelfGroup, importAcross, listShelfGroups, matchPatchRepos, patchFileName, renameShelfGroup, shelfNameFromPatch, shelveAcross, ShelveError, unshelveAcross, type ShelfGroup } from './shelf';
 
 const DEFAULT_LIST: Changelist = { id: 'default', name: 'Changes' };
@@ -222,6 +222,9 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
           break;
         case 'commitOpenFile':
           await openWorkingFile(m.root, m.path);
+          break;
+        case 'selectInFile':
+          await selectInFile(m.root, m.path);
           break;
         case 'commitRollback':
           await this.rollback(m.items);
