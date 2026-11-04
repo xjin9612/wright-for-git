@@ -27,7 +27,7 @@ test('diff 的 ← → 切換同一個 commit 的其他檔案，標題的位置�
   const before = activeDiff()!;
   // 檔案順序由 git 決定：目前在最後一個就先往前，在第一個就先往後
   const atLast = /· 2\/2$/.test(before.label);
-  const [go, back] = atLast ? ['gitWorkbench.diff.previousFile', 'gitWorkbench.diff.nextFile'] : ['gitWorkbench.diff.nextFile', 'gitWorkbench.diff.previousFile'];
+  const [go, back] = atLast ? ['wright.diff.previousFile', 'wright.diff.nextFile'] : ['wright.diff.nextFile', 'wright.diff.previousFile'];
   await vscode.commands.executeCommand(go);
   const after = await until(() => activeDiff()?.modified.toString() !== before.modified.toString() && activeDiff(), '切換到另一個檔案');
   assert.match(after.label, atLast ? /· 1\/2$/ : /· 2\/2$/);

@@ -54,7 +54,7 @@ test('Local／Remote／Tags；依 / 分資料夾；main 預設為我的最愛並
 });
 
 test('設定 defaultFavoriteBranches：設為 [] 時 main 不是我的最愛；改成 release/1.x 時它置頂；移除設定後回到 main', async () => {
-  const key = 'gitWorkbench.defaultFavoriteBranches';
+  const key = 'wright.defaultFavoriteBranches';
   const setConfig = async (v) => {
     if (v === undefined) delete app.calls.config[key];
     else app.calls.config[key] = v;

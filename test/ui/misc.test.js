@@ -15,7 +15,7 @@ before(async () => {
   pg = h.makePlayground();
   api = `${pg}/api-server`;
   web = `${pg}/web-app`;
-  app = await h.launch(pg, { config: { 'gitWorkbench.language': 'zh-tw' } });
+  app = await h.launch(pg, { config: { 'wright.language': 'zh-tw' } });
   page = app.page;
 });
 after(async () => app && (await app.close()));
@@ -42,49 +42,49 @@ test('介面語言 zh-tw：面板、選單、提交視窗都是中文', async ()
 test('切換語言為 en：面板以英文重新載入', async () => {
   const bundle = () => /id="l10n-bundle">([\s\S]*?)<\/script>/.exec(app.logView.webview.html)?.[1] ?? '';
   assert.match(bundle(), /推送/);
-  await app.setConfig('gitWorkbench.language', 'en');
+  await app.setConfig('wright.language', 'en');
   await h.until(() => !/推送/.test(bundle()));
-  await app.setConfig('gitWorkbench.language', 'zh-tw');
+  await app.setConfig('wright.language', 'zh-tw');
   await h.until(() => /推送/.test(bundle()));
 });
 
 test('面板內設定框：標題列齒輪打開，切換語言立即生效、其他設定寫入使用者設定', async () => {
   const bundle = () => /id="l10n-bundle">([\s\S]*?)<\/script>/.exec(app.logView.webview.html)?.[1] ?? '';
-  await app.run('gitWorkbench.openSettings');
+  await app.run('wright.openSettings');
   await page.waitForSelector('.settings-popover select');
   assert.equal(await page.locator('#gwb-language').inputValue(), 'zh-tw');
   const options = await page.locator('#gwb-language option').allInnerTexts();
   assert.deepEqual(options.slice(1), ['English', '繁體中文']);
   await page.locator('#gwb-max').selectOption('100000');
-  await h.until(() => app.calls.config['gitWorkbench.maxCommits'] === 100000);
+  await h.until(() => app.calls.config['wright.maxCommits'] === 100000);
   await page.locator('#gwb-auto').uncheck();
-  await h.until(() => app.calls.config['gitWorkbench.autoRefresh'] === false);
+  await h.until(() => app.calls.config['wright.autoRefresh'] === false);
   await page.locator('#gwb-language').selectOption('en');
-  await h.until(() => app.calls.config['gitWorkbench.language'] === 'en' && !/推送/.test(bundle()));
+  await h.until(() => app.calls.config['wright.language'] === 'en' && !/推送/.test(bundle()));
   // 改回中文（直接寫設定，避免依賴重新載入後的頁面）
-  await app.setConfig('gitWorkbench.language', 'zh-tw');
-  await app.setConfig('gitWorkbench.autoRefresh', true);
+  await app.setConfig('wright.language', 'zh-tw');
+  await app.setConfig('wright.autoRefresh', true);
   await page.keyboard.press('Escape');
 });
 
 test('標題列齒輪指令：打開面板內設定框', async () => {
   await page.evaluate(() => document.querySelector('.settings-popover')?.remove());
-  await app.run('gitWorkbench.openSettings');
+  await app.run('wright.openSettings');
   await page.waitForSelector('.settings-popover');
   await page.locator('.settings-popover .link').last().click();
   await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openSettings'));
 
   // 鍵盤快速鍵：打開快速鍵頁並只列出這個擴充功能
-  await app.run('gitWorkbench.openSettings');
+  await app.run('wright.openSettings');
   await page.waitForSelector('.settings-popover');
   // 這個測試檔的介面語言是繁體中文
   await page.locator('.settings-popover .link', { hasText: '鍵盤快速鍵' }).click();
-  await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openGlobalKeybindings' && c[1] === '@ext:xjin9612.vscode-git-workbench'));
+  await h.until(() => app.calls.executed.some((c) => c[0] === 'workbench.action.openGlobalKeybindings' && c[1] === '@ext:xjin9612.wright-for-git'));
 });
 
 test('設定框：焦點真的離開 webview（點到編輯器等）才關閉；下拉選單展開時不關閉', async () => {
   const blur = () => page.evaluate(() => window.dispatchEvent(new Event('blur')));
-  await app.run('gitWorkbench.openSettings');
+  await app.run('wright.openSettings');
   await page.waitForSelector('.settings-popover');
   // 焦點仍在頁面（例如 select 展開）：不關閉
   await blur();
@@ -106,7 +106,7 @@ test('設定框：焦點真的離開 webview（點到編輯器等）才關閉；
 });
 
 test('顯示 Git 歷史：切到檔案所屬 repo 並以路徑篩選', async () => {
-  await app.run('gitWorkbench.showHistory', fileUri(path.join(api, 'src/orders/pricing.ts')));
+  await app.run('wright.showHistory', fileUri(path.join(api, 'src/orders/pricing.ts')));
   await page.waitForTimeout(1200);
   await page.waitForFunction(() => !document.querySelector('.progress.active'));
   const subjects = await h.texts(page.locator('.log-row:visible .cell-subject-text'));
@@ -116,11 +116,11 @@ test('顯示 Git 歷史：切到檔案所屬 repo 並以路徑篩選', async () 
 
 test('與分支或標籤比較：單一檔案直接開 diff；資料夾列出不同檔案', async () => {
   app.calls.picks.push((x) => /release\/1\.x/.test(x.label));
-  await app.run('gitWorkbench.compareWithRef', fileUri(path.join(api, 'src/orders/pricing.ts')));
+  await app.run('wright.compareWithRef', fileUri(path.join(api, 'src/orders/pricing.ts')));
   await h.until(() => app.calls.executed.some((c) => c[0] === 'vscode.diff' && /release\/1\.x/.test(c[3])));
   app.calls.picks.push((x) => /v1\.0\.0/.test(x.label), () => false);
   const before = app.calls.quickPicks.length;
-  await app.run('gitWorkbench.compareWithRef', fileUri(path.join(api, 'src')));
+  await app.run('wright.compareWithRef', fileUri(path.join(api, 'src')));
   await h.until(() => app.calls.quickPicks.length >= before + 2);
   const files = app.calls.quickPicks[app.calls.quickPicks.length - 1].join(' ');
   assert.match(files, /pricing\.ts/);
@@ -128,7 +128,7 @@ test('與分支或標籤比較：單一檔案直接開 diff；資料夾列出不
 });
 
 test('取消儲藏分頁：選 stash 看檔案；以新分支取消儲藏', async () => {
-  await app.run('gitWorkbench.unstash', fileUri(path.join(web, 'src')));
+  await app.run('wright.unstash', fileUri(path.join(web, 'src')));
   const d = await app.lastPanel();
   // 清單與檔案都是非同步載入（Windows 上較慢）：等到內容出現，不用固定的等待時間
   await h.until(async () => (await h.texts(d.page.locator('.push-list > *'))).some((x) => /draft: new page/.test(x)), 30000);
@@ -149,21 +149,21 @@ test('取消儲藏分頁：選 stash 看檔案；以新分支取消儲藏', asyn
 test('儲藏變更（檔案總管）：無變更時提示', async () => {
   h.git(web, 'stash', '-q', '-u');
   const before = app.calls.infos.length;
-  await app.run('gitWorkbench.stashChangesIn', fileUri(path.join(web, 'src')));
+  await app.run('wright.stashChangesIn', fileUri(path.join(web, 'src')));
   await h.until(() => app.calls.infos.length > before);
   assert.match(app.calls.infos[app.calls.infos.length - 1], /沒有可儲藏的本機變更/);
 });
 
 test('切換 Git Blame：改變內建的 git.blame.editorDecoration.enabled', async () => {
-  await app.run('gitWorkbench.toggleBlame');
+  await app.run('wright.toggleBlame');
   assert.equal(app.calls.config['git.blame.editorDecoration.enabled'], true);
-  await app.run('gitWorkbench.toggleBlame');
+  await app.run('wright.toggleBlame');
   assert.equal(app.calls.config['git.blame.editorDecoration.enabled'], false);
 });
 
 test('Fetch 指令：多 repo 一次執行並彙整結果', async () => {
   const before = app.calls.status.length + app.calls.infos.length + app.calls.warnings.length;
-  await app.run('gitWorkbench.fetch');
+  await app.run('wright.fetch');
   await h.until(() => app.calls.status.length + app.calls.infos.length + app.calls.warnings.length > before, 15000);
 });
 

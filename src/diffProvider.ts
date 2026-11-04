@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { GitRepository } from './git/repository';
 
-export const SCHEME = 'git-workbench';
+export const SCHEME = 'wright';
 
 interface Query {
   root: string;

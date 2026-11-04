@@ -44,7 +44,7 @@ async function commit(message) {
 const headFiles = (repo) => h.git(repo, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean);
 
 test('載入提示：第一次載入在提交視窗頂端顯示 VS Code 的進度；之後的更新不顯示', async () => {
-  const commitProgress = () => app.calls.progress.filter((l) => l?.viewId === 'gitWorkbench.commit').length;
+  const commitProgress = () => app.calls.progress.filter((l) => l?.viewId === 'wright.commit').length;
   assert.equal(commitProgress(), 1, JSON.stringify(app.calls.progress));
 });
 
@@ -198,7 +198,7 @@ test('儲藏變更：從工具列儲藏 web-app 的修改', async () => {
 });
 
 test('擱置：跨兩個 repo 選取的檔案擱置成同一筆（不在 stash 清單）；保留工作目錄的版本檔案留著', async () => {
-  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean);
   const stashesBefore = h.git(web, 'stash', 'list');
   fs.writeFileSync(path.join(api, 'shelf-a.txt'), 'a\n');
   fs.writeFileSync(path.join(web, 'shelf-b.txt'), 'b\n');
@@ -229,7 +229,7 @@ test('擱置：跨兩個 repo 選取的檔案擱置成同一筆（不在 stash �
 });
 
 test('擱置分頁：清單、檔案依 repo 分組、diff；取回對話框（預先勾選、移除取回的檔案、保留）、改名、多選刪除', async () => {
-  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean);
   const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
   const dialogFiles = () => h.texts(cv.locator('.unshelve-dialog .unshelve-file'));
   const checkedFiles = () => cv.locator('.unshelve-dialog .unshelve-file input:checked').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
@@ -296,7 +296,7 @@ test('擱置分頁：清單、檔案依 repo 分組、diff；取回對話框（�
 });
 
 test('擱置匯出／匯入 patch：跨 repo 匯出成各 repo 一個檔；匯入後判斷 repo 並成為一筆擱置', async () => {
-  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean);
   const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
   const out = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'gwb-patch-'));
   fs.writeFileSync(path.join(api, 'patch-a.txt'), 'pa\n');
@@ -343,7 +343,7 @@ test('擱置匯出／匯入 patch：跨 repo 匯出成各 repo 一個檔；匯�
 });
 
 test('多筆擱置依序取回：由舊到新逐筆開對話框；中途取消時剩下的保留並提示', async () => {
-  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+  const shelfRefs = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean);
   const shelfRow = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
   const shelveFile = async (file, name) => {
     fs.writeFileSync(path.join(api, file), `${file}\n`);
@@ -393,7 +393,7 @@ test('多筆擱置依序取回：由舊到新逐筆開對話框；中途取消�
 
 // ---------- 擱置：部分段落、暫存區、changelist、已存在、衝突、匯入選 repo ----------
 
-const shelfRefsOf = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+const shelfRefsOf = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean);
 const shelfRowOf = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
 /** 在 api-server 建立並提交一個檔案（只提交這個路徑，不動其他暫存） */
 function commitFile(file, content) {
@@ -534,8 +534,8 @@ test('取回有衝突：衝突清單自動打開、「他們的」標示擱置�
   const warnings = app.calls.warnings.length;
   await cv.locator('.unshelve-dialog .button.primary').click();
   await h.until(() => h.git(api, 'diff', '--name-only', '--diff-filter=U').includes('clash.txt'), 'clash.txt 衝突');
-  await h.until(() => app.calls.panels.some((p) => p.viewType === 'gitWorkbench.conflicts' && !p.disposed), '衝突清單打開');
-  assert.match(fs.readFileSync(path.join(api, '.git', 'gitworkbench-unshelve'), 'utf8'), /Shelf: clash shelf/, '「他們的」標示擱置名稱');
+  await h.until(() => app.calls.panels.some((p) => p.viewType === 'wright.conflicts' && !p.disposed), '衝突清單打開');
+  assert.match(fs.readFileSync(path.join(api, '.git', 'wright-unshelve'), 'utf8'), /Shelf: clash shelf/, '「他們的」標示擱置名稱');
   await h.until(() => app.calls.warnings.slice(warnings).some((w) => /Stopped after "clash shelf"\. 1 shelved entries were not unshelved/.test(w)), '提示停下');
   assert.equal(await cv.locator('.unshelve-dialog').count(), 0, '不再開下一筆');
   await h.until(async () => (await shelfRowOf('clash shelf').count()) === 0 && (await shelfRowOf('after shelf').count()) === 1, '衝突的檔案已從擱置移除；下一筆保留');

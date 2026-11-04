@@ -51,7 +51,7 @@ function promptConflict(target: RepoTarget, op: Operation): void {
   void vscode.window
     .showWarningMessage(t('{0}: {1} stopped because of conflicts. Resolve them, then continue or abort.', target.name, opName(op)), resolve, abort)
     .then(async (answer) => {
-      if (answer === resolve) await vscode.commands.executeCommand('gitWorkbench.resolveConflicts', target.repo.root);
+      if (answer === resolve) await vscode.commands.executeCommand('wright.resolveConflicts', target.repo.root);
       else if (answer === abort) {
         try {
           await target.repo.abortOperation(op);

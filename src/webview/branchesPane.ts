@@ -61,7 +61,7 @@ export class BranchesPane {
   private selectedRefName: string | undefined;
   /** undefined：使用預設（defaultFavorites） */
   private favorites: Set<string> | undefined;
-  /** 沒有自訂我的最愛時的預設（設定 gitWorkbench.defaultFavoriteBranches；local 與 remote 都算） */
+  /** 沒有自訂我的最愛時的預設（設定 wright.defaultFavoriteBranches；local 與 remote 都算） */
   private defaultFavorites = new Set(['main', 'master']);
   private onlyFavorites: boolean;
   private options: BranchOptions;

@@ -10,7 +10,7 @@ let page;
 
 before(async () => {
   pg = h.makePlayground();
-  app = await h.launch(pg, { config: { 'gitWorkbench.issueLinks': [{ pattern: 'PROJ-(\\d+)', url: 'https://tracker.example.com/browse/PROJ-$1' }] } });
+  app = await h.launch(pg, { config: { 'wright.issueLinks': [{ pattern: 'PROJ-(\\d+)', url: 'https://tracker.example.com/browse/PROJ-$1' }] } });
   page = app.page;
 });
 after(async () => app && (await app.close()));
@@ -57,7 +57,7 @@ test('合併顯示所有 repo 的 commit；同名 local／remote 合併標籤；
 });
 
 test('載入提示：開啟時在 Log 面板頂端顯示 VS Code 的進度（找 repo、讀取狀態期間）', async () => {
-  assert.ok(app.calls.progress.some((l) => l?.viewId === 'gitWorkbench.log'), JSON.stringify(app.calls.progress));
+  assert.ok(app.calls.progress.some((l) => l?.viewId === 'wright.log'), JSON.stringify(app.calls.progress));
   // 開啟後畫面從最上面開始（仍選取 HEAD，但不為它捲動）
   assert.equal(await page.locator('.log-viewport').evaluate((e) => e.scrollTop), 0);
   assert.equal(await page.locator('.log-row.selected.is-head:visible').count(), 1, '選取 HEAD');
@@ -303,9 +303,9 @@ test('選取 commit：右側列出檔案與詳情；issue 編號轉連結', asyn
 });
 
 test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔案；檔案已不存在時提示；失去焦點後不作用', async () => {
-  const focusContext = () => app.calls.executed.filter(([c, k]) => c === 'setContext' && k === 'gitWorkbench.fileTreeFocus').map((a) => a[2]);
+  const focusContext = () => app.calls.executed.filter(([c, k]) => c === 'setContext' && k === 'wright.fileTreeFocus').map((a) => a[2]);
   const opened = () => app.calls.executed.filter(([c]) => c === 'vscode.open').map((a) => a[1].fsPath.replace(/\\/g, '/'));
-  const openSelected = () => app.calls.commands['gitWorkbench.openSelectedFile']();
+  const openSelected = () => app.calls.commands['wright.openSelectedFile']();
   const tree = page.locator('.details-pane .file-tree');
 
   await (await row('feat(auth): add API keys')).click();
@@ -336,7 +336,7 @@ test('檔案樹 F4（openSelectedFile）：有焦點時開啟工作目錄的檔�
 
 test('Select In（Alt+F1、右鍵）：在檔案總管檢視、檔案管理員或終端機中顯示工作目錄的檔案；已刪除的檔案只提示', async () => {
   const tree = page.locator('.details-pane .file-tree');
-  const selectIn = () => app.calls.commands['gitWorkbench.selectInSelectedFile']();
+  const selectIn = () => app.calls.commands['wright.selectInSelectedFile']();
   const revealed = (cmd) => app.calls.executed.filter(([c]) => c === cmd).map((a) => a[1].fsPath.replace(/\\/g, '/'));
   await (await row('feat(auth): add API keys')).click();
   await tree.locator('.tree-row', { hasText: 'keys.ts' }).click();
@@ -402,7 +402,7 @@ test('檔案樹右鍵選單：顯示差異、開啟檔案、開啟儲存庫版�
   await openMenu('keys.ts');
   await h.menu(page, 'Open Repository Version');
   await h.until(() => opened().length > n);
-  assert.equal(opened().at(-1).scheme, 'git-workbench');
+  assert.equal(opened().at(-1).scheme, 'wright');
   assert.equal(JSON.parse(opened().at(-1).query).ref, hash);
 
   // Shift+F10 也能開選單

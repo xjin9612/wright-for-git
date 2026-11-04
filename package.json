@@ -1,5 +1,5 @@
 {
-  "name": "vscode-git-workbench",
+  "name": "wright-for-git",
   "displayName": "%displayName%",
   "description": "%description%",
   "version": "1.3.0",
@@ -8,11 +8,11 @@
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xjin9612/vscode-git-workbench.git"
+    "url": "https://github.com/xjin9612/wright-for-git.git"
   },
-  "homepage": "https://github.com/xjin9612/vscode-git-workbench#readme",
+  "homepage": "https://github.com/xjin9612/wright-for-git#readme",
   "bugs": {
-    "url": "https://github.com/xjin9612/vscode-git-workbench/issues"
+    "url": "https://github.com/xjin9612/wright-for-git/issues"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -43,44 +43,44 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "gitWorkbench",
+          "id": "wright",
           "title": "%container.title%",
           "icon": "media/activity.svg"
         }
       ],
       "activitybar": [
         {
-          "id": "gitWorkbenchBar",
+          "id": "wrightBar",
           "title": "%container.commit%",
           "icon": "media/commit.svg"
         },
         {
-          "id": "gitWorkbenchHistory",
+          "id": "wrightHistory",
           "title": "%container.history%",
           "icon": "media/activity.svg"
         }
       ]
     },
     "views": {
-      "gitWorkbench": [
+      "wright": [
         {
           "type": "webview",
-          "id": "gitWorkbench.log",
+          "id": "wright.log",
           "name": "%view.log%"
         }
       ],
-      "gitWorkbenchBar": [
+      "wrightBar": [
         {
           "type": "webview",
-          "id": "gitWorkbench.commit",
+          "id": "wright.commit",
           "name": "%view.commit%",
           "icon": "media/commit.svg"
         }
       ],
-      "gitWorkbenchHistory": [
+      "wrightHistory": [
         {
           "type": "webview",
-          "id": "gitWorkbench.branches",
+          "id": "wright.branches",
           "name": "%view.branches%",
           "icon": "media/activity.svg"
         }
@@ -88,281 +88,281 @@
     },
     "commands": [
       {
-        "command": "gitWorkbench.importPatch",
+        "command": "wright.importPatch",
         "title": "%command.importPatch%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.openSelectedFile",
+        "command": "wright.openSelectedFile",
         "title": "%command.openSelectedFile%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.selectInSelectedFile",
+        "command": "wright.selectInSelectedFile",
         "title": "%command.selectInSelectedFile%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.refresh",
+        "command": "wright.refresh",
         "title": "%command.refresh%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(refresh)"
       },
       {
-        "command": "gitWorkbench.selectRepository",
+        "command": "wright.selectRepository",
         "title": "%command.selectRepository%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(repo)"
       },
       {
-        "command": "gitWorkbench.show",
+        "command": "wright.show",
         "title": "%command.show%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.showHistory",
+        "command": "wright.showHistory",
         "title": "%command.showHistory%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.showAllRepositories",
+        "command": "wright.showAllRepositories",
         "title": "%command.showAllRepositories%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.fetch",
+        "command": "wright.fetch",
         "title": "%command.fetch%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(repo-fetch)"
       },
       {
-        "command": "gitWorkbench.pull",
+        "command": "wright.pull",
         "title": "%command.pull%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(repo-pull)"
       },
       {
-        "command": "gitWorkbench.push",
+        "command": "wright.push",
         "title": "%command.push%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(repo-push)"
       },
       {
-        "command": "gitWorkbench.stash.save",
+        "command": "wright.stash.save",
         "title": "%command.stash.save%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(git-stash)"
       },
       {
-        "command": "gitWorkbench.diff.previousFile",
+        "command": "wright.diff.previousFile",
         "title": "%command.diff.previousFile%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(arrow-left)"
       },
       {
-        "command": "gitWorkbench.diff.nextFile",
+        "command": "wright.diff.nextFile",
         "title": "%command.diff.nextFile%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(arrow-right)"
       },
       {
-        "command": "gitWorkbench.compareWithRef",
+        "command": "wright.compareWithRef",
         "title": "%command.compareWithRef%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.stashChangesIn",
+        "command": "wright.stashChangesIn",
         "title": "%command.stashChangesIn%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.unstash",
+        "command": "wright.unstash",
         "title": "%command.unstash%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.optimizeRepository",
+        "command": "wright.optimizeRepository",
         "title": "%command.optimizeRepository%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.resolveConflicts",
+        "command": "wright.resolveConflicts",
         "title": "%command.resolveConflicts%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.showCommit",
+        "command": "wright.showCommit",
         "title": "%command.showCommit%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.unstashChanges",
+        "command": "wright.unstashChanges",
         "title": "%command.unstash%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.toggleBlame",
+        "command": "wright.toggleBlame",
         "title": "%command.toggleBlame%",
-        "category": "Git Workbench"
+        "category": "Wright"
       },
       {
-        "command": "gitWorkbench.openSettings",
+        "command": "wright.openSettings",
         "title": "%command.openSettings%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(gear)"
       },
       {
-        "command": "gitWorkbench.showConsole",
+        "command": "wright.showConsole",
         "title": "%command.showConsole%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(output)"
       },
       {
-        "command": "gitWorkbench.commit.openSettings",
+        "command": "wright.commit.openSettings",
         "title": "%command.openSettings%",
-        "category": "Git Workbench",
+        "category": "Wright",
         "icon": "$(gear)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "gitWorkbench.refresh",
-          "when": "view == gitWorkbench.branches",
+          "command": "wright.refresh",
+          "when": "view == wright.branches",
           "group": "navigation@1"
         },
         {
-          "command": "gitWorkbench.selectRepository",
-          "when": "view == gitWorkbench.log",
+          "command": "wright.selectRepository",
+          "when": "view == wright.log",
           "group": "navigation@1"
         },
         {
-          "command": "gitWorkbench.refresh",
-          "when": "view == gitWorkbench.log",
+          "command": "wright.refresh",
+          "when": "view == wright.log",
           "group": "navigation@2"
         },
         {
-          "command": "gitWorkbench.openSettings",
-          "when": "view == gitWorkbench.log",
+          "command": "wright.openSettings",
+          "when": "view == wright.log",
           "group": "navigation@9"
         },
         {
-          "command": "gitWorkbench.commit.openSettings",
-          "when": "view == gitWorkbench.commit",
+          "command": "wright.commit.openSettings",
+          "when": "view == wright.commit",
           "group": "navigation@9"
         },
         {
-          "command": "gitWorkbench.showConsole",
-          "when": "view == gitWorkbench.log",
+          "command": "wright.showConsole",
+          "when": "view == wright.log",
           "group": "navigation@8"
         }
       ],
       "explorer/context": [
         {
-          "submenu": "gitWorkbench.explorer",
+          "submenu": "wright.explorer",
           "group": "7_modification@90"
         }
       ],
       "editor/title/context": [
         {
-          "command": "gitWorkbench.showHistory",
+          "command": "wright.showHistory",
           "when": "resourceScheme == file",
           "group": "2_files@90"
         }
       ],
       "editor/context": [
         {
-          "command": "gitWorkbench.showHistory",
+          "command": "wright.showHistory",
           "when": "resourceScheme == file",
           "group": "9_cutcopypaste@90"
         },
         {
-          "command": "gitWorkbench.toggleBlame",
+          "command": "wright.toggleBlame",
           "when": "resourceScheme == file",
           "group": "9_cutcopypaste@91"
         }
       ],
       "commandPalette": [
         {
-          "command": "gitWorkbench.openSelectedFile",
+          "command": "wright.openSelectedFile",
           "when": "false"
         },
         {
-          "command": "gitWorkbench.selectInSelectedFile",
+          "command": "wright.selectInSelectedFile",
           "when": "false"
         },
         {
-          "command": "gitWorkbench.showHistory",
+          "command": "wright.showHistory",
           "when": "resourceScheme == file"
         },
         {
-          "command": "gitWorkbench.diff.previousFile",
-          "when": "gitWorkbench.diffNav"
+          "command": "wright.diff.previousFile",
+          "when": "wright.diffNav"
         },
         {
-          "command": "gitWorkbench.diff.nextFile",
-          "when": "gitWorkbench.diffNav"
+          "command": "wright.diff.nextFile",
+          "when": "wright.diffNav"
         },
         {
-          "command": "gitWorkbench.commit.openSettings",
+          "command": "wright.commit.openSettings",
           "when": "false"
         },
         {
-          "command": "gitWorkbench.stashChangesIn",
+          "command": "wright.stashChangesIn",
           "when": "false"
         },
         {
-          "command": "gitWorkbench.unstash",
+          "command": "wright.unstash",
           "when": "false"
         }
       ],
       "editor/title": [
         {
-          "command": "gitWorkbench.diff.previousFile",
-          "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
+          "command": "wright.diff.previousFile",
+          "when": "isInDiffEditor && resourceScheme == wright && wright.diffNav",
           "group": "navigation@11.1"
         },
         {
-          "command": "gitWorkbench.diff.nextFile",
-          "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav",
+          "command": "wright.diff.nextFile",
+          "when": "isInDiffEditor && resourceScheme == wright && wright.diffNav",
           "group": "navigation@11.2"
         }
       ],
-      "gitWorkbench.explorer": [
+      "wright.explorer": [
         {
-          "command": "gitWorkbench.showHistory",
+          "command": "wright.showHistory",
           "group": "1_history@1"
         },
         {
-          "command": "gitWorkbench.compareWithRef",
+          "command": "wright.compareWithRef",
           "group": "1_history@2"
         },
         {
-          "command": "gitWorkbench.stashChangesIn",
+          "command": "wright.stashChangesIn",
           "group": "2_stash@1"
         },
         {
-          "command": "gitWorkbench.unstash",
+          "command": "wright.unstash",
           "group": "2_stash@2"
         },
         {
-          "command": "gitWorkbench.importPatch",
+          "command": "wright.importPatch",
           "when": "resourceExtname =~ /^\\.(patch|diff)$/i",
           "group": "2_stash@3"
         }
       ]
     },
     "configuration": {
-      "title": "Git Workbench",
+      "title": "Wright for Git",
       "properties": {
-        "gitWorkbench.maxCommits": {
+        "wright.maxCommits": {
           "type": "number",
           "default": 50000,
           "minimum": 100,
           "description": "%config.maxCommits%",
           "maximum": 200000
         },
-        "gitWorkbench.defaultFavoriteBranches": {
+        "wright.defaultFavoriteBranches": {
           "type": "array",
           "items": {
             "type": "string"
@@ -373,19 +373,19 @@
           ],
           "markdownDescription": "%config.defaultFavoriteBranches%"
         },
-        "gitWorkbench.autoRefresh": {
+        "wright.autoRefresh": {
           "type": "boolean",
           "default": true,
           "description": "%config.autoRefresh%"
         },
-        "gitWorkbench.scanDepth": {
+        "wright.scanDepth": {
           "type": "number",
           "default": 3,
           "minimum": 0,
           "maximum": 10,
           "description": "%config.scanDepth%"
         },
-        "gitWorkbench.scanExclude": {
+        "wright.scanExclude": {
           "type": "array",
           "items": {
             "type": "string"
@@ -411,7 +411,7 @@
           ],
           "description": "%config.scanExclude%"
         },
-        "gitWorkbench.language": {
+        "wright.language": {
           "type": "string",
           "enum": [
             "auto",
@@ -426,7 +426,7 @@
           "default": "auto",
           "description": "%config.language%"
         },
-        "gitWorkbench.issueLinks": {
+        "wright.issueLinks": {
           "type": "array",
           "default": [],
           "markdownDescription": "%config.issueLinks%",
@@ -452,39 +452,39 @@
     },
     "keybindings": [
       {
-        "command": "gitWorkbench.openSelectedFile",
+        "command": "wright.openSelectedFile",
         "key": "f4",
-        "when": "gitWorkbench.fileTreeFocus"
+        "when": "wright.fileTreeFocus"
       },
       {
-        "command": "gitWorkbench.selectInSelectedFile",
+        "command": "wright.selectInSelectedFile",
         "key": "alt+f1",
-        "when": "gitWorkbench.fileTreeFocus"
+        "when": "wright.fileTreeFocus"
       },
       {
-        "command": "gitWorkbench.show",
+        "command": "wright.show",
         "key": "alt+9"
       },
       {
-        "command": "gitWorkbench.diff.nextFile",
+        "command": "wright.diff.nextFile",
         "key": "ctrl+alt+pagedown",
         "mac": "cmd+alt+pagedown",
-        "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
+        "when": "isInDiffEditor && resourceScheme == wright && wright.diffNav"
       },
       {
-        "command": "gitWorkbench.diff.previousFile",
+        "command": "wright.diff.previousFile",
         "key": "ctrl+alt+pageup",
         "mac": "cmd+alt+pageup",
-        "when": "isInDiffEditor && resourceScheme == git-workbench && gitWorkbench.diffNav"
+        "when": "isInDiffEditor && resourceScheme == wright && wright.diffNav"
       },
       {
-        "command": "gitWorkbench.showCommit",
+        "command": "wright.showCommit",
         "key": "alt+0"
       }
     ],
     "submenus": [
       {
-        "id": "gitWorkbench.explorer",
+        "id": "wright.explorer",
         "label": "%submenu.explorer%"
       }
     ]

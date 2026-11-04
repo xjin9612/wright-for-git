@@ -9,7 +9,7 @@ const same = (a: string, b: string) => path.normalize(a).toLowerCase() === path.
 
 test('顯示 Git 歷史：記錄切到檔案所屬的 repo，並以路徑篩選', async () => {
   const a = await api();
-  await vscode.commands.executeCommand('gitWorkbench.showHistory', vscode.Uri.file(path.join(API, 'src', 'orders', 'pricing.ts')));
+  await vscode.commands.executeCommand('wright.showHistory', vscode.Uri.file(path.join(API, 'src', 'orders', 'pricing.ts')));
   await until(() => {
     const f = a.logFilter();
     return f.roots.length === 1 && same(f.roots[0], API) && f.paths.join() === 'src/orders/pricing.ts';
@@ -25,19 +25,19 @@ test('切換 Git Blame：1.96 以上切換內建的 git.blame.editorDecoration.e
   const [major, minor] = vscode.version.split('.').map(Number);
   assert.equal(supported, major > 1 || minor >= 96, `VS Code ${vscode.version} 的內建 blame 設定`);
   if (!supported) {
-    await vscode.commands.executeCommand('gitWorkbench.toggleBlame');
+    await vscode.commands.executeCommand('wright.toggleBlame');
     return;
   }
   const get = () => cfg().get<boolean>('blame.editorDecoration.enabled', false);
   const before = get();
-  await vscode.commands.executeCommand('gitWorkbench.toggleBlame');
+  await vscode.commands.executeCommand('wright.toggleBlame');
   await until(() => get() !== before, '設定被切換');
-  await vscode.commands.executeCommand('gitWorkbench.toggleBlame');
+  await vscode.commands.executeCommand('wright.toggleBlame');
   await until(() => get() === before, '設定切回原值');
 });
 
 test('顯示 Git 主控台：指令可執行', async () => {
-  await vscode.commands.executeCommand('gitWorkbench.showConsole');
+  await vscode.commands.executeCommand('wright.showConsole');
 });
 
 test('最佳化儲存庫：寫入 commit-graph', async () => {
@@ -45,6 +45,6 @@ test('最佳化儲存庫：寫入 commit-graph', async () => {
   const a = await api();
   const root = (await a.repositories()).find((r) => same(r.root, API))!.root;
   const file = path.join(API, '.git', 'objects', 'info', 'commit-graph');
-  await vscode.commands.executeCommand('gitWorkbench.optimizeRepository', [root]);
+  await vscode.commands.executeCommand('wright.optimizeRepository', [root]);
   await until(() => existsSync(file), 'api-server 有 commit-graph');
 });

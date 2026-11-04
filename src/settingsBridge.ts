@@ -1,4 +1,4 @@
-// 面板內的「設定」彈出框（Log 面板與提交視窗共用）：讀取／寫入 gitWorkbench 的設定，變更立即生效。
+// 面板內的「設定」彈出框（Log 面板與提交視窗共用）：讀取／寫入 wright 的設定，變更立即生效。
 // 切換語言會重新載入 webview，載入完成後自動重新打開彈出框，讓使用者看到結果。
 import * as vscode from 'vscode';
 import type { SettingsValues, ToWebview } from './shared/protocol';
@@ -9,7 +9,7 @@ type ViewId = 'log' | 'commit';
 const reopen = new Set<ViewId>();
 
 export function readSettings(): SettingsValues {
-  const c = vscode.workspace.getConfiguration('gitWorkbench');
+  const c = vscode.workspace.getConfiguration('wright');
   return {
     language: c.get<SettingsValues['language']>('language', 'auto'),
     autoRefresh: c.get<boolean>('autoRefresh', true),
@@ -27,7 +27,7 @@ async function write(key: string, value: unknown): Promise<boolean> {
     (key === 'maxCommits' && typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 200000) ||
     (key === 'scanDepth' && typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 10);
   if (!ok) return false;
-  await vscode.workspace.getConfiguration('gitWorkbench').update(key, value, vscode.ConfigurationTarget.Global);
+  await vscode.workspace.getConfiguration('wright').update(key, value, vscode.ConfigurationTarget.Global);
   return true;
 }
 
@@ -43,13 +43,13 @@ export async function handleSettingsMessage(m: { type: string; key?: string; val
       else reopen.delete(view);
       return true;
     case 'openSettingsPage':
-      await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:xjin9612.vscode-git-workbench');
+      await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:xjin9612.wright-for-git');
       return true;
     case 'openKeybindingsPage':
-      await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', '@ext:xjin9612.vscode-git-workbench');
+      await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', '@ext:xjin9612.wright-for-git');
       return true;
     case 'editIssueLinks':
-      await vscode.commands.executeCommand('workbench.action.openSettingsJson', { revealSetting: { key: 'gitWorkbench.issueLinks', edit: true } });
+      await vscode.commands.executeCommand('workbench.action.openSettingsJson', { revealSetting: { key: 'wright.issueLinks', edit: true } });
       return true;
   }
   return false;

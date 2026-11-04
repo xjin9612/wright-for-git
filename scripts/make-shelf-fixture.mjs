@@ -2,7 +2,7 @@
 // 擱置（Shelf）手動測試用的兩個 repo：每個情境先把兩個 repo 還原成同一個起點（含清掉擱置、儲藏），再做出該情境需要的修改。
 //
 //   node scripts/make-shelf-fixture.mjs <情境> [目標資料夾]
-//       目標資料夾預設為 ../vscode-git-workbench-test/shelf（見 sandbox.mjs），用 VS Code 開這個資料夾
+//       目標資料夾預設為 ../wright-for-git-test/shelf（見 sandbox.mjs），用 VS Code 開這個資料夾
 //
 //   init             建立 api、web 兩個 repo（--force 先刪除舊的）
 //   basic            兩個 repo 各一個修改、一個新檔
@@ -91,8 +91,8 @@ function reset() {
     git(r, 'reset', '-q', '--hard', 'fixture-base');
     git(r, 'clean', '-fdq');
     git(r, 'stash', 'clear');
-    for (const ref of git(r, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean)) git(r, 'update-ref', '-d', ref);
-    rmSync(path.join(r, '.git', 'gitworkbench-unshelve'), { force: true });
+    for (const ref of git(r, 'for-each-ref', '--format=%(refname)', 'refs/wright/shelf/').split('\n').filter(Boolean)) git(r, 'update-ref', '-d', ref);
+    rmSync(path.join(r, '.git', 'wright-unshelve'), { force: true });
   }
   rmSync(PATCHES, { recursive: true, force: true });
   mkdirSync(PATCHES, { recursive: true });
@@ -174,7 +174,7 @@ const scenarios = {
       if (st) say(st);
       say(`-- 暫存區：${git(r, 'diff', '--cached', '--name-only').trim().split('\n').join(' ')}`);
       say(`-- stash：${git(r, 'stash', 'list').split('\n').filter(Boolean).length} 筆`);
-      const shelves = git(r, 'for-each-ref', '--format=-- 擱置 %(refname:lstrip=3)  %(subject)', 'refs/git-workbench/shelf/').trimEnd();
+      const shelves = git(r, 'for-each-ref', '--format=-- 擱置 %(refname:lstrip=3)  %(subject)', 'refs/wright/shelf/').trimEnd();
       if (shelves) say(shelves);
     }
   },

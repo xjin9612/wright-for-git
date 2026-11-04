@@ -1,4 +1,4 @@
-// 介面語言：預設跟隨 VS Code，也可以在設定 gitWorkbench.language 單獨指定（不必切換整個 VS Code 的語言）
+// 介面語言：預設跟隨 VS Code，也可以在設定 wright.language 單獨指定（不必切換整個 VS Code 的語言）
 // 註：指令名稱、設定說明等 package.json 內的文字由 VS Code 依其顯示語言決定，無法由擴充套件切換。
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
@@ -20,7 +20,7 @@ export function resetI18n(): void {
 }
 
 function configuredLanguage(): Language {
-  const v = vscode.workspace.getConfiguration('gitWorkbench').get<string>('language', 'auto');
+  const v = vscode.workspace.getConfiguration('wright').get<string>('language', 'auto');
   return v === 'en' || v === 'zh-tw' ? v : 'auto';
 }
 

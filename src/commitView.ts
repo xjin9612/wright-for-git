@@ -41,7 +41,7 @@ export function gitignoreEntry(p: string): string {
 }
 
 export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
-  static readonly viewId = 'gitWorkbench.commit';
+  static readonly viewId = 'wright.commit';
   private view: vscode.WebviewView | undefined;
   private readonly confirms = new ConfirmHost(
     (msg) => this.post(msg),
@@ -137,13 +137,13 @@ export class CommitViewProvider implements vscode.WebviewViewProvider, vscode.Di
   }
 
   private get store(): ChangelistStore {
-    const s = this.context.workspaceState.get<ChangelistStore>('gitWorkbench.changelists');
+    const s = this.context.workspaceState.get<ChangelistStore>('wright.changelists');
     const lists = s?.lists?.length ? s.lists : [DEFAULT_LIST];
     return { lists, active: s?.active && lists.some((l) => l.id === s.active) ? s.active : lists[0].id, assign: s?.assign ?? {} };
   }
 
   private async saveStore(store: ChangelistStore): Promise<void> {
-    await this.context.workspaceState.update('gitWorkbench.changelists', store);
+    await this.context.workspaceState.update('wright.changelists', store);
   }
 
   /** 重新讀取所有 repo 的工作區變更（同時只跑一次，期間有新的要求就再跑一次） */
@@ -802,7 +802,7 @@ export function registerCommitView(context: vscode.ExtensionContext, provider: W
   context.subscriptions.push(
     view,
     vscode.window.registerWebviewViewProvider(CommitViewProvider.viewId, view, { webviewOptions: { retainContextWhenHidden: true } }),
-    vscode.commands.registerCommand('gitWorkbench.showCommit', () => vscode.commands.executeCommand(`${CommitViewProvider.viewId}.focus`)),
+    vscode.commands.registerCommand('wright.showCommit', () => vscode.commands.executeCommand(`${CommitViewProvider.viewId}.focus`)),
   );
   return view;
 }

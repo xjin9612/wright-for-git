@@ -2,11 +2,11 @@
 // 建立手動測試用的 playground（docs/TESTING.md 的各種情境），全部是虛構的人名與內容。
 //
 //   node scripts/make-playground.mjs [目標資料夾] [--force]
-//       建立 playground（預設為 ../vscode-git-workbench-test/playground，見 sandbox.mjs）；--force 會先刪除舊的
+//       建立 playground（預設為 ../wright-for-git-test/playground，見 sandbox.mjs）；--force 會先刪除舊的
 //   node scripts/make-playground.mjs remote-push <repo> [目標資料夾]
 //       模擬「另一台電腦」對 <repo>（api-server／web-app）推一個新 commit，用來測試 Pull 與 Push 被拒
 //
-// 產生的結構（預設在 ../vscode-git-workbench-test/ 底下）：
+// 產生的結構（預設在 ../wright-for-git-test/ 底下）：
 //   playground/                 ← 用 VS Code 開這個資料夾（本身不是 git repo）
 //     api-server/               ← repo；main 領先遠端 2 筆、有沒有 upstream 的新 branch、未合併的 branch、tag、
 //                                  未提交的變更（Commit 視窗）、packages/sdk 模組
@@ -253,7 +253,7 @@ function main() {
       process.exit(1);
     }
     otherPush(remotes, repo, `chore: change from another computer (${new Date().toLocaleTimeString()})`);
-    console.log(`已從另一台電腦推送一筆 commit 到 ${repo}；在 Git Workbench 按 Fetch 後就會看到 ↓1`);
+    console.log(`已從另一台電腦推送一筆 commit 到 ${repo}；在 Wright 按 Fetch 後就會看到 ↓1`);
     return;
   }
 

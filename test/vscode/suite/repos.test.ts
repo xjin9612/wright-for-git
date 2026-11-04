@@ -10,7 +10,7 @@ const same = (a: string, b: string) => path.normalize(a).toLowerCase() === path.
 test('只勾 api-server：記錄的 repo 篩選與儲存庫清單同步；全部勾回來恢復', async () => {
   const a = await api();
   // 篩選要等記錄面板的 webview 套用後回報，面板要開著
-  await vscode.commands.executeCommand('gitWorkbench.show');
+  await vscode.commands.executeCommand('wright.show');
   const all = await a.repositories();
   const apiRoot = all.find((r) => same(r.root, API))!.root;
   await a.setRepositoriesVisible([apiRoot]);

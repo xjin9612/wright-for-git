@@ -226,7 +226,7 @@ export interface DiffHunk {
 }
 
 /**
- * Shelf 在單一 repo 的一筆：存成 refs/git-workbench/shelf/<id>，內容與 stash 相同（git stash push 產生的 commit），
+ * Shelf 在單一 repo 的一筆：存成 refs/wright/shelf/<id>，內容與 stash 相同（git stash push 產生的 commit），
  * 但不在 refs/stash，不會出現在 stash 清單，也不會被 gc 清掉。同一次 shelve 的各 repo 共用 id。
  */
 export interface ShelfInfo {
@@ -304,7 +304,7 @@ export interface BranchesSync {
   /** Branch 篩選只有一個值時的 ref 名稱（或 'HEAD'） */
   selected?: string;
   prefs: BranchPrefs;
-  /** 設定 gitWorkbench.defaultFavoriteBranches */
+  /** 設定 wright.defaultFavoriteBranches */
   defaultFavorites?: string[];
 }
 

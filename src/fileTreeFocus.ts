@@ -1,12 +1,12 @@
 // 變更檔案樹的焦點與選取檔案（由 webview 回報）：讓 F4 這類使用者可自訂的快速鍵知道目前選了哪個檔案
-// 快速鍵在 package.json 以 context key `gitWorkbench.fileTreeFocus` 限定，只在檔案樹有焦點時作用
+// 快速鍵在 package.json 以 context key `wright.fileTreeFocus` 限定，只在檔案樹有焦點時作用
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { t } from './i18n';
 import type { FocusedFile } from './shared/protocol';
 
-export const FILE_TREE_FOCUS_CONTEXT = 'gitWorkbench.fileTreeFocus';
+export const FILE_TREE_FOCUS_CONTEXT = 'wright.fileTreeFocus';
 
 /** 有焦點的檔案樹（來源：log、commit）→ 其選取的檔案；Log 與提交視窗的焦點事件可能交錯，所以分開記 */
 const focused = new Map<string, FocusedFile | undefined>();

@@ -69,7 +69,7 @@ async function round(commitGraph: boolean): Promise<void> {
 
 test('大型 repo：各種篩選的載入時間（沒有 commit-graph，再寫入 commit-graph 後）', async () => {
   const a = await api();
-  await vscode.commands.executeCommand('gitWorkbench.show');
+  await vscode.commands.executeCommand('wright.show');
   await until(async () => (await a.repositories()).length === 1, '偵測到 repo', 60000);
   // 第一次載入（開啟面板時）
   const first = await until(() => a.logStats()?.doneMs !== undefined && a.logStats(), '第一次載入完成', 180000, 50);

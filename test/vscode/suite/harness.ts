@@ -22,8 +22,8 @@ export function git(cwd: string, ...args: string[]): string {
 let apiPromise: Promise<TestApi> | undefined;
 export function api(): Promise<TestApi> {
   apiPromise ??= (async () => {
-    const ext = vscode.extensions.getExtension<TestApi>('xjin9612.vscode-git-workbench');
-    if (!ext) throw new Error('找不到擴充功能 xjin9612.vscode-git-workbench');
+    const ext = vscode.extensions.getExtension<TestApi>('xjin9612.wright-for-git');
+    if (!ext) throw new Error('找不到擴充功能 xjin9612.wright-for-git');
     return ext.isActive ? ext.exports : await ext.activate();
   })();
   return apiPromise;

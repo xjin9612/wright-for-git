@@ -1,4 +1,4 @@
-/* Git Workbench webview：全部顏色取自 VS Code 主題變數 */
+/* Wright webview：全部顏色取自 VS Code 主題變數 */
 :root {
   --row-h: 22px;
   --border: var(--vscode-panel-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));

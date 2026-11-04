@@ -5,7 +5,7 @@ import type { WorkbenchViewProvider } from './provider';
 import type { ToExtension, ToWebview } from './shared/protocol';
 
 export class BranchesViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
-  static readonly viewId = 'gitWorkbench.branches';
+  static readonly viewId = 'wright.branches';
   private view: vscode.WebviewView | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   /** 目前這個 view 的監聽；view 重新 resolve（例如被拖到別的容器）或 dispose 時釋放，避免越積越多 */

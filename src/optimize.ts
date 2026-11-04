@@ -1,4 +1,4 @@
-// 「Git Workbench: 最佳化儲存庫」：對選取的 repo 寫入 commit-graph。
+// 「Wright: 最佳化儲存庫」：對選取的 repo 寫入 commit-graph。
 // 不主動提示；大型 repo 想加快歷史與路徑篩選時由使用者自己執行（說明見 README）。
 import * as vscode from 'vscode';
 import { showGitError } from './gitConsole';

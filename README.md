@@ -1,12 +1,12 @@
-# Git Workbench
+# Wright for Git
 
-[![CI](https://github.com/xjin9612/vscode-git-workbench/actions/workflows/ci.yml/badge.svg)](https://github.com/xjin9612/vscode-git-workbench/actions/workflows/ci.yml)
+[![CI](https://github.com/xjin9612/wright-for-git/actions/workflows/ci.yml/badge.svg)](https://github.com/xjin9612/wright-for-git/actions/workflows/ci.yml)
 
 English | [繁體中文](README.zh-TW.md)
 
 IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel — Branches tree | Commit log with graph | Changed files + commit details, three linked panes — a **Commit window** and a **Branches** tree in the side bar, with first-class support for workspaces that contain many repositories.
 
-![Git Workbench](docs/images/screenshot.png)
+![Wright for Git](docs/images/screenshot.png)
 
 ## Features
 
@@ -22,7 +22,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
   - Context menu: copy hash / subject, checkout revision, new branch / tag, cherry-pick, revert, reset (soft / mixed / hard), push up to here, compare with the working tree, interactively rebase from here
   - Multi-select with `Ctrl` / `Shift`: combined changes in the right pane, cherry-pick or revert several commits at once
   - Interactive rebase: pick, reword, edit, squash, fixup, drop, reorder by drag or `Alt+↑↓`. An in-progress rebase / merge / cherry-pick / revert shows a bar with Resolve Conflicts…, Continue, Skip and Abort
-  - Issue numbers in messages become links (`gitWorkbench.issueLinks`); selecting a commit dims the rows outside its path; Collapse Linear Branches (👁 menu) folds long runs of branch commits into a dotted `⋯ N commits` row, click it to expand
+  - Issue numbers in messages become links (`wright.issueLinks`); selecting a commit dims the rows outside its path; Collapse Linear Branches (👁 menu) folds long runs of branch commits into a dotted `⋯ N commits` row, click it to expand
 - **Commit window** (`Alt+0`) — check the files to commit, or pick single hunks; changelists; unversioned and ignored files; group by directory, repository or module; amend, sign-off, skip hooks, Commit and Push…; rollback, add to `.gitignore`. Commits through a temporary index, so the staging area you use in VS Code's Source Control is left alone. A Stash tab lists every repository's stashes
 - **Shelf** — set changes aside without committing, across several repositories as one entry (*Shelve Changes…* in the Commit window). The Shelf tab lists them with their files; *Unshelve…* lets you pick repositories and files, a changelist, and whether to remove what you unshelved. Conflicts open the conflict list. Shelves live in the repositories (not in the stash list), and can be exported to and imported from `.patch` files that `git apply` and IntelliJ understand
 - **Merge conflicts** — a Conflicts tab (Accept Yours / Accept Theirs / Merge…, then Continue) and a three-way Merge tab: Yours, an editable Result and Theirs, with ≫ ✕ per change or per line (Line by Line), Apply Non-Conflicting Changes, and undo / redo. Works for merge, rebase, cherry-pick, revert and stash conflicts
@@ -31,15 +31,15 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 - **Commit details** — full message, author / committer, refs, and the branches that contain the commit
 - **Two Activity Bar icons** — *Commit* opens the Commit window; *Git History* shows the Branches tree in the side bar and opens the log below it (the log then hides its own Branches pane, so the commit list gets the full width; switch the side bar to something else and the pane comes back)
 - **Open the log your way** — the *Git History* icon, "Git Log" in the status bar, or `Alt+9`
-- **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path. The Explorer's Git Workbench submenu also has Compare with Branch or Tag…, Stash Changes…, Unstash Changes… and, on `.patch` files, Import Patch to Shelf…
-- **Git console** — every git command, its output and the reason it failed, in the Output panel's *Git Workbench* channel (button in the log panel's title bar)
+- **Show Git History** from the Explorer or editor context menu — jumps to the file's repository and filters by its path. The Explorer's Wright submenu also has Compare with Branch or Tag…, Stash Changes…, Unstash Changes… and, on `.patch` files, Import Patch to Shelf…
+- **Git console** — every git command, its output and the reason it failed, in the Output panel's *Wright* channel (button in the log panel's title bar)
 - **Annotate with Git Blame (toggle)** in the editor context menu switches VS Code's built-in blame annotations
-- English and Traditional Chinese UI, switchable on its own with `gitWorkbench.language`
+- English and Traditional Chinese UI, switchable on its own with `wright.language`
 - Refreshes automatically when branches, tags or HEAD change
 
 ## Multiple repositories
 
-- Scans each workspace folder for repositories (`gitWorkbench.scanDepth`, `gitWorkbench.scanExclude`), including folders that are not repositories and repositories nested inside other repositories
+- Scans each workspace folder for repositories (`wright.scanDepth`, `wright.scanExclude`), including folders that are not repositories and repositories nested inside other repositories
 - Commits from all repositories are merged by time into one log; each repository gets its own graph lanes and a color strip on the left (hover to see its name)
 - **Paths** filter: check repositories under Roots (`Ctrl+click` or `Ctrl+Enter` for just one), search them by name or branch, Show All Repositories, or Select Folders… to pick folders across repositories (like IntelliJ's multi-root Paths filter)
 - Click the color strip to show a repository-name column
@@ -67,7 +67,7 @@ IntelliJ-style Git tool windows for VS Code. **Git log** in the bottom panel —
 
 The log loads 50,000 commits of a 100,000-commit repository in about a second. Git's commit-graph file makes it faster still: in our measurements the first screen appeared in about 0.1 s instead of 0.6 s, and filtering by a file path took about 0.2 s instead of 1.2 s.
 
-Git usually writes a commit-graph during its automatic `git gc`, but not the part that speeds up path filters. Run **Git Workbench: Optimize Repository (speed up history)** from the Command Palette to write the full commit-graph (`git commit-graph write --reachable --changed-paths`). It only adds a file under `.git/objects/info`, changes no commits or files, is not pushed, and also speeds up git itself and other git tools. Deleting the file undoes it.
+Git usually writes a commit-graph during its automatic `git gc`, but not the part that speeds up path filters. Run **Wright: Optimize Repository (speed up history)** from the Command Palette to write the full commit-graph (`git commit-graph write --reachable --changed-paths`). It only adds a file under `.git/objects/info`, changes no commits or files, is not pushed, and also speeds up git itself and other git tools. Deleting the file undoes it.
 
 ## Settings
 
@@ -75,17 +75,17 @@ Most of these can be changed from the gear in the Git log's or the Commit window
 
 | Setting | Default | Description |
 |---|---|---|
-| `gitWorkbench.maxCommits` | `50000` | Maximum number of commits loaded (total across repositories, up to 200000) |
-| `gitWorkbench.autoRefresh` | `true` | Refresh when refs or HEAD change |
-| `gitWorkbench.defaultFavoriteBranches` | `["main", "master"]` | Favorite branches (local and remote) until you star or unstar one in the workspace; `[]` for none |
-| `gitWorkbench.scanDepth` | `3` | How many folder levels below each workspace folder are scanned for repositories |
-| `gitWorkbench.scanExclude` | `node_modules`, `target`, … | Folder names skipped while scanning |
-| `gitWorkbench.language` | `auto` | Language of the panel, dialogs and messages: `auto` (follow VS Code), `en`, `zh-tw` |
-| `gitWorkbench.issueLinks` | `[]` | Turn issue numbers in commit messages into links, e.g. `{ "pattern": "PROJ-(\\d+)", "url": "https://tracker.example.com/browse/PROJ-$1" }`. `$1`… are capture groups, `{repo}` is the repository's web URL. When empty, `#123` links to the remote's issues page |
+| `wright.maxCommits` | `50000` | Maximum number of commits loaded (total across repositories, up to 200000) |
+| `wright.autoRefresh` | `true` | Refresh when refs or HEAD change |
+| `wright.defaultFavoriteBranches` | `["main", "master"]` | Favorite branches (local and remote) until you star or unstar one in the workspace; `[]` for none |
+| `wright.scanDepth` | `3` | How many folder levels below each workspace folder are scanned for repositories |
+| `wright.scanExclude` | `node_modules`, `target`, … | Folder names skipped while scanning |
+| `wright.language` | `auto` | Language of the panel, dialogs and messages: `auto` (follow VS Code), `en`, `zh-tw` |
+| `wright.issueLinks` | `[]` | Turn issue numbers in commit messages into links, e.g. `{ "pattern": "PROJ-(\\d+)", "url": "https://tracker.example.com/browse/PROJ-$1" }`. `$1`… are capture groups, `{repo}` is the repository's web URL. When empty, `#123` links to the remote's issues page |
 
 ## Installation
 
-Download the `.vsix` from [Releases](https://github.com/xjin9612/vscode-git-workbench/releases), then run **Extensions: Install from VSIX…** in VS Code. Reload the window after installing or updating.
+Download the `.vsix` from [Releases](https://github.com/xjin9612/wright-for-git/releases), then run **Extensions: Install from VSIX…** in VS Code. Reload the window after installing or updating.
 
 Requires VS Code 1.90 or later and Git on your `PATH` (or configured through the built-in Git extension).
 
@@ -131,9 +131,9 @@ src/
   optimize.ts         Optimize Repository command (writes the commit-graph)
   settingsBridge.ts   in-panel settings popup
   modules.ts          "module" grouping (nearest folder with a project file)
-  i18n.ts             UI language (follows VS Code or gitWorkbench.language)
+  i18n.ts             UI language (follows VS Code or wright.language)
   sidebar.ts          status bar item and the Show All Repositories command
-  diffProvider.ts     git-workbench: read-only file system serving file contents at a revision for vscode.diff
+  diffProvider.ts     wright: read-only file system serving file contents at a revision for vscode.diff
   gitExtension.ts     git path and state events from the built-in Git extension
   testApi.ts          state and actions exposed to the real VS Code tests only
   git/                runs the git CLI, parses its output, three-way merge (no vscode dependency, directly testable)

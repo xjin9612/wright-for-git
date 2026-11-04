@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     path.join(userData, 'User', 'settings.json'),
     JSON.stringify(
       {
-        'gitWorkbench.language': 'en',
+        'wright.language': 'en',
         'security.workspace.trust.enabled': false,
         'workbench.startupEditor': 'none',
         'workbench.tips.enabled': false,

@@ -12,7 +12,7 @@
 
 ## 與 VS Code 內建 Git 的差距
 
-| 功能 | 內建 Git | Git Workbench | 規劃 |
+| 功能 | 內建 Git | Wright | 規劃 |
 |---|---|---|---|
 | 歷史與 graph | Source Control Graph（較陽春） | ✅ 完整 | — |
 | 多 repo 合併檢視 | 各 repo 分開 | ✅ | — |
@@ -29,7 +29,7 @@
 | 編輯器行號旁的變更標示 | ✅ | ❌ | 沿用內建 |
 | Clone／Init／Remote 管理 | ✅ | ❌ | 沿用內建 |
 
-定位：**歷史、branch、同步、stash、commit、合併衝突由 Git Workbench 負責（IntelliJ 式勾選提交）；內建 Source Control 仍可並用**——Commit 視窗透過暫時 index 提交，不改動內建的暫存區狀態。行號旁的變更標示綁定 VS Code 的 SCM 介面，重做的成本高且會和內建重複。
+定位：**歷史、branch、同步、stash、commit、合併衝突由 Wright 負責（IntelliJ 式勾選提交）；內建 Source Control 仍可並用**——Commit 視窗透過暫時 index 提交，不改動內建的暫存區狀態。行號旁的變更標示綁定 VS Code 的 SCM 介面，重做的成本高且會和內建重複。
 
 ---
 
@@ -63,7 +63,7 @@
 |---|---|---|
 | 4.1 | ✅ Interactive rebase | pick／reword／edit／squash／fixup／drop、拖曳或 `Alt+↑↓` 調整順序；進行中的 rebase／merge 在 Log 上方顯示繼續／略過／中止 |
 | 4.2 | ✅ Annotate（blame） | 沿用 VS Code 內建 blame，編輯器右鍵切換（不重做） |
-| 4.3 | ✅ Issue 連結 | `gitWorkbench.issueLinks` 自訂規則；預設 `#123` 連到遠端 issues |
+| 4.3 | ✅ Issue 連結 | `wright.issueLinks` 自訂規則；預設 `#123` 連到遠端 issues |
 | 4.4 | ✅ 路徑高亮與分支折疊 | 選取 commit 時淡化不在其路徑上的列；長線性分支折疊（👁 選單全部收合／展開、點收合列展開、點分支線收合；主線不收，分支頭尾保留，中間至少 3 筆才收） |
 
 ## 階段五：IntelliJ 風格 Commit 視窗 ✅
@@ -94,8 +94,8 @@
 - Paths 篩選：Roots 勾選與跨 repo 資料夾選擇；repo 名稱欄
 - Push、取消儲藏、hunk 選擇、互動式 rebase 改開在編輯器分頁
 - 確認框顯示在面板內；介面語言可獨立切換（英文／繁中）
-- 檔案總管右鍵 Git Workbench 子選單
-- Git 主控台：「輸出」面板的 Git Workbench 頻道記錄每個 git 指令、耗時與失敗原因；錯誤通知可直接開啟
+- 檔案總管右鍵 Wright 子選單
+- Git 主控台：「輸出」面板的 Wright 頻道記錄每個 git 指令、耗時與失敗原因；錯誤通知可直接開啟
 - 面板內設定框：Git 記錄與提交視窗標題列的齒輪，語言切換立即生效
 - 無障礙：右鍵選單可用鍵盤操作（Shift+F10／選單鍵、方向鍵、Enter、Esc）、高對比主題、減少動態效果
 - 介面收斂：狀態字母與線條圖示、提交類型只為 feat／fix／revert 上色、4px 間距與圓角一致
@@ -104,7 +104,7 @@
 
 | # | 項目 | 說明 |
 |---|---|---|
-| 5.1 | ✅ 上 GitHub | `xjin9612/vscode-git-workbench`，1.0.0 已發佈 |
+| 5.1 | ✅ 上 GitHub | `xjin9612/wright-for-git`，1.0.0 已發佈 |
 | 5.2 | CI | ✅ GitHub Actions：typecheck、測試、打包（Windows／Linux）；推 tag 自動發佈 Release |
 | 5.3 | ✅ 整合測試 | `npm run test:ui`：Playwright 操作真實 webview＋真實 git（VS Code API 模擬）；`npm run test:vscode`：真實 VS Code（`@vscode/test-electron`）中的 diff、指令、檔案監看、內建 Git 整合。CI 在 Windows、Linux 與最低支援版本 1.90.0 全數通過 |
 | 5.4 | ✅ 大型 repo 效能 | `npm run bench:vscode` 在真實 VS Code 量測 10 萬 commit。Windows 實測（VS Code 1.144）：全部載入 5 萬筆約 1 秒；首屏 0.6 秒（有 commit-graph 0.1 秒）；單一檔案路徑篩選 1.2 秒（有 commit-graph 0.2 秒）。不主動提示，提供「最佳化儲存庫」指令寫入 commit-graph，README 說明 |

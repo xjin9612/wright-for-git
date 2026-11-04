@@ -8,7 +8,7 @@ const API = repoPath('api-server');
 
 test('終端機建立分支、commit：記錄自動讀到新的分支與 HEAD', async () => {
   const a = await api();
-  await vscode.commands.executeCommand('gitWorkbench.show');
+  await vscode.commands.executeCommand('wright.show');
   git(API, 'branch', 'tmp/watch');
   await until(() => a.repoSnapshot(API)?.refs.some((r) => r.endsWith('tmp/watch')), '記錄讀到新分支 tmp/watch', 20000);
   git(API, 'commit', '-q', '--allow-empty', '-m', 'watch test');
@@ -20,7 +20,7 @@ test('終端機建立分支、commit：記錄自動讀到新的分支與 HEAD', 
 
 test('存檔：提交視窗自動出現這個檔案，還原後消失', async () => {
   const a = await api();
-  await vscode.commands.executeCommand('gitWorkbench.commit.focus');
+  await vscode.commands.executeCommand('wright.commit.focus');
   const file = path.join(API, 'src', 'index.ts');
   const listed = () => a.commitState()?.repos.some((r) => r.name === 'api-server' && r.changes.some((c) => c.path === 'src/index.ts'));
   const doc = await vscode.workspace.openTextDocument(file);

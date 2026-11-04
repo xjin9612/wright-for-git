@@ -22,8 +22,8 @@ import {
 /** 路徑一律當作字面名稱（[id].tsx、:memo.txt 這類檔名不會被當成 pathspec 樣式） */
 const LITERAL = { GIT_LITERAL_PATHSPECS: '1' };
 
-/** Shelf 的 ref 前綴（每筆 refs/git-workbench/shelf/<id>） */
-const SHELF_REF = 'refs/git-workbench/shelf/';
+/** Shelf 的 ref 前綴（每筆 refs/wright/shelf/<id>） */
+const SHELF_REF = 'refs/wright/shelf/';
 /** stash 訊息中的 shelf 標記：git stash push -m 會存成「On <branch>: shelf:<id> <name>」 */
 const SHELF_MARK = /shelf:([0-9A-Za-z_-]+)(?: (.*))?$/s;
 
@@ -322,7 +322,7 @@ export class GitRepository {
     if (await this.operationInProgress()) return;
     const { promises: fsp } = await import('node:fs');
     const names = await fsp.readdir(this.gitDir).catch(() => [] as string[]);
-    for (const n of names) if (n.startsWith('gitworkbench-rebase-')) await fsp.rm(path.join(this.gitDir, n), { recursive: true, force: true });
+    for (const n of names) if (n.startsWith('wright-rebase-')) await fsp.rm(path.join(this.gitDir, n), { recursive: true, force: true });
   }
 
   /** 解決衝突後繼續（不開編輯器，沿用預設的提交訊息） */
@@ -491,7 +491,7 @@ export class GitRepository {
     await this.cleanupRebaseTemp();
     const parent = (await this.tryRun(['rev-parse', '-q', '--verify', `${base}^`]))?.trim();
     const stamp = `${process.pid}-${Date.now()}`;
-    const dir = path.join(this.gitDir, `gitworkbench-rebase-${stamp}`);
+    const dir = path.join(this.gitDir, `wright-rebase-${stamp}`);
     await fsp.mkdir(dir, { recursive: true });
     // git 透過 sh 執行編輯器指令：路徑一律用 '/'，並以單引號包住
     const q = (p: string) => `'${p.replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
@@ -671,8 +671,8 @@ export class GitRepository {
     // merge／cherry-pick／revert 進行中時，只提交部分檔案會把另一邊的變更從歷史中丟掉
     const op = await this.operationInProgress();
     if (op && op !== 'rebase') throw new GitError(`A ${op} is in progress. Finish it with Continue (commits all resolved changes) or abort it first.`, null, '');
-    const tmpIndex = path.join(this.gitDir, `gitworkbench-index-${process.pid}-${Date.now()}`);
-    const msgFile = path.join(this.gitDir, `gitworkbench-msg-${process.pid}-${Date.now()}`);
+    const tmpIndex = path.join(this.gitDir, `wright-index-${process.pid}-${Date.now()}`);
+    const msgFile = path.join(this.gitDir, `wright-msg-${process.pid}-${Date.now()}`);
     const env = { GIT_INDEX_FILE: tmpIndex, ...LITERAL };
     const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env, input });
     try {
@@ -865,7 +865,7 @@ export class GitRepository {
     const head = await this.headHash();
     if (!head) throw new GitError('Cannot shelve part of a file before the first commit', null, '');
     const { existsSync, promises: fsp } = await import('node:fs');
-    const tmpIndex = path.join(this.gitDir, `gitworkbench-shelf-patch-${process.pid}-${Date.now()}`);
+    const tmpIndex = path.join(this.gitDir, `wright-shelf-patch-${process.pid}-${Date.now()}`);
     const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env: { GIT_INDEX_FILE: tmpIndex }, input });
     try {
       let base = head;
@@ -915,7 +915,7 @@ export class GitRepository {
 
   /** 取回擱置發生衝突時記下擱置名稱，讓衝突畫面標示「對方」是哪一筆擱置 */
   private get unshelveMarker(): string {
-    return path.join(this.gitDir, 'gitworkbench-unshelve');
+    return path.join(this.gitDir, 'wright-unshelve');
   }
 
   private async clearUnshelveMarker(): Promise<void> {
@@ -994,7 +994,7 @@ export class GitRepository {
     const [parentList, subject, authorDate, committerDate] = (await this.run(['log', '-1', '--format=%P%x1f%s%x1f%aI%x1f%cI', hash])).trim().split('\x1f');
     const [base, indexCommit, untrackedCommit] = parentList.split(' ');
     const { existsSync, promises: fsp } = await import('node:fs');
-    const tmpIndex = path.join(this.gitDir, `gitworkbench-shelf-index-${process.pid}-${Date.now()}`);
+    const tmpIndex = path.join(this.gitDir, `wright-shelf-index-${process.pid}-${Date.now()}`);
     const env = { GIT_INDEX_FILE: tmpIndex, ...LITERAL };
     const git = (args: string[], input?: string) => runGit(this.gitPath, args, { cwd: this.root, env, input });
     const dates = { GIT_AUTHOR_DATE: authorDate, GIT_COMMITTER_DATE: committerDate };
@@ -1076,7 +1076,7 @@ export class GitRepository {
     const head = await this.headHash();
     if (!head) return undefined;
     const { existsSync, promises: fsp } = await import('node:fs');
-    const tmpIndex = path.join(this.gitDir, `gitworkbench-patch-index-${process.pid}-${Date.now()}`);
+    const tmpIndex = path.join(this.gitDir, `wright-patch-index-${process.pid}-${Date.now()}`);
     const git = (args: string[], input?: Buffer) => runGit(this.gitPath, args, { cwd: this.root, env: { GIT_INDEX_FILE: tmpIndex }, input });
     try {
       await git(['read-tree', head]);

@@ -4,15 +4,15 @@ import type { WorkbenchViewProvider } from './provider';
 import { t } from './i18n';
 
 export function registerLaunchers(context: vscode.ExtensionContext, provider: WorkbenchViewProvider): void {
-  const status = vscode.window.createStatusBarItem('gitWorkbench.status', vscode.StatusBarAlignment.Left, -100);
-  status.name = 'Git Workbench';
+  const status = vscode.window.createStatusBarItem('wright.status', vscode.StatusBarAlignment.Left, -100);
+  status.name = 'Wright';
   status.text = `$(git-commit) ${t('Git Log')}`;
   status.tooltip = t('Show Git Log (Alt+9)');
-  status.command = 'gitWorkbench.show';
+  status.command = 'wright.show';
   status.show();
 
   context.subscriptions.push(
     status,
-    vscode.commands.registerCommand('gitWorkbench.showAllRepositories', () => provider.showRepositories([])),
+    vscode.commands.registerCommand('wright.showAllRepositories', () => provider.showRepositories([])),
   );
 }

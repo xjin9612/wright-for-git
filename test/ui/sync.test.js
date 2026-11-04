@@ -73,7 +73,7 @@ test('Push 對話框：列出各 repo 的目標與待推 commit；點 commit 列
   await d.page.locator('.push-files-toolbar [title="Group By"]').click();
   await h.menu(d.page, 'Directory');
   await h.eventually(async () => assert.ok((await h.texts(d.page.locator('.push-files .tree-row'))).every((r) => !/^docs\b/.test(r))));
-  await h.until(() => app.ctx.globalState.get('gitWorkbench.dialogPrefs')?.['fileGrouping.push']?.directory === false);
+  await h.until(() => app.ctx.globalState.get('wright.dialogPrefs')?.['fileGrouping.push']?.directory === false);
   await d.page.locator('.button.secondary', { hasText: 'Cancel' }).click();
   await h.until(() => d.panel.disposed);
   await d.page.close();
@@ -181,7 +181,7 @@ test('Git 主控台：記錄會改變狀態的指令與失敗原因；指令可�
   assert.doesNotMatch(all, /git log /);
   assert.ok(app.calls.console.some(([level, text]) => level === 'trace' && /git (log|status|for-each-ref)/.test(text)));
   app.calls.consoleShown = false;
-  await app.run('gitWorkbench.showConsole');
+  await app.run('wright.showConsole');
   assert.ok(app.calls.consoleShown);
 });
 

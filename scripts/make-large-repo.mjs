@@ -1,6 +1,6 @@
 // 建立大型測試 repo（效能量測、長線性分支折疊）：以 git fast-import 快速產生大量 commit、合併、分支與 tag。
 // 用法：node scripts/make-large-repo.mjs [資料夾] [commit 數] [--force]
-//   資料夾預設為 ../vscode-git-workbench-test/large-repo（見 sandbox.mjs）；commit 數預設 100000
+//   資料夾預設為 ../wright-for-git-test/large-repo（見 sandbox.mjs）；commit 數預設 100000
 //   例：node scripts/make-large-repo.mjs 3000          （3000 筆，看分支折疊）
 //       node scripts/make-large-repo.mjs --force       （刪除舊的再重建）
 // 內容全部是虛構的（作者、訊息、檔案），可安全分享；main 每 100 筆合併一條 5 筆的 feature 分支。

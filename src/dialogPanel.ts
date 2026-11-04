@@ -225,7 +225,7 @@ export class DialogPanels {
       existing.panel.reveal();
       return;
     }
-    const panel = vscode.window.createWebviewPanel(`gitWorkbench.${key}`, title, vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel(`wright.${key}`, title, vscode.ViewColumn.Active, {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(this.provider.extensionUri, 'dist'), vscode.Uri.joinPath(this.provider.extensionUri, 'media')],

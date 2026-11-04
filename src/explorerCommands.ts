@@ -1,4 +1,4 @@
-// 檔案總管右鍵「Git Workbench」子選單：與分支或標籤比較、儲藏變更、取消儲藏（對應 IntelliJ 專案樹的 Git 子選單）
+// 檔案總管右鍵「Wright」子選單：與分支或標籤比較、儲藏變更、取消儲藏（對應 IntelliJ 專案樹的 Git 子選單）
 import * as vscode from 'vscode';
 import { compareWithWorkingTree } from './actions';
 import { t } from './i18n';
@@ -13,7 +13,7 @@ export function registerExplorerCommands(context: vscode.ExtensionContext, provi
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('gitWorkbench.compareWithRef', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('wright.compareWithRef', async (uri?: vscode.Uri) => {
       const u = targetUri(uri);
       const loc = u && (await provider.locateUri(u));
       if (!loc) return;
@@ -33,7 +33,7 @@ export function registerExplorerCommands(context: vscode.ExtensionContext, provi
       if (!pick) return;
       await compareWithWorkingTree(target, pick.ref.hash, pick.ref.short, loc.rel || undefined);
     }),
-    vscode.commands.registerCommand('gitWorkbench.stashChangesIn', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('wright.stashChangesIn', async (uri?: vscode.Uri) => {
       const u = targetUri(uri);
       const loc = u && (await provider.locateUri(u));
       if (!loc) return;
@@ -42,7 +42,7 @@ export function registerExplorerCommands(context: vscode.ExtensionContext, provi
         await provider.refresh(true);
       }
     }),
-    vscode.commands.registerCommand('gitWorkbench.unstash', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('wright.unstash', async (uri?: vscode.Uri) => {
       const u = targetUri(uri);
       const loc = u ? await provider.locateUri(u) : undefined;
       provider.dialogs.openUnstash(loc?.repo.root);

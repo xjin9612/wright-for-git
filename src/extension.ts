@@ -34,31 +34,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
       isReadonly: true,
       isCaseSensitive: true,
     }),
-    vscode.commands.registerCommand('gitWorkbench.refresh', () => provider.rediscover(true)),
-    vscode.commands.registerCommand('gitWorkbench.selectRepository', () => provider.selectRepository()),
-    vscode.commands.registerCommand('gitWorkbench.showHistory', (uri?: vscode.Uri) => provider.showHistory(uri)),
-    vscode.commands.registerCommand('gitWorkbench.fetch', () => provider.sync('fetch')),
-    vscode.commands.registerCommand('gitWorkbench.pull', () => provider.sync('pull')),
-    vscode.commands.registerCommand('gitWorkbench.push', () => provider.openPush()),
-    vscode.commands.registerCommand('gitWorkbench.diff.nextFile', () => provider.navigateDiff(1)),
-    vscode.commands.registerCommand('gitWorkbench.diff.previousFile', () => provider.navigateDiff(-1)),
-    vscode.commands.registerCommand('gitWorkbench.openSelectedFile', () => openFocusedFile()),
-    vscode.commands.registerCommand('gitWorkbench.selectInSelectedFile', () => selectInFocusedFile()),
+    vscode.commands.registerCommand('wright.refresh', () => provider.rediscover(true)),
+    vscode.commands.registerCommand('wright.selectRepository', () => provider.selectRepository()),
+    vscode.commands.registerCommand('wright.showHistory', (uri?: vscode.Uri) => provider.showHistory(uri)),
+    vscode.commands.registerCommand('wright.fetch', () => provider.sync('fetch')),
+    vscode.commands.registerCommand('wright.pull', () => provider.sync('pull')),
+    vscode.commands.registerCommand('wright.push', () => provider.openPush()),
+    vscode.commands.registerCommand('wright.diff.nextFile', () => provider.navigateDiff(1)),
+    vscode.commands.registerCommand('wright.diff.previousFile', () => provider.navigateDiff(-1)),
+    vscode.commands.registerCommand('wright.openSelectedFile', () => openFocusedFile()),
+    vscode.commands.registerCommand('wright.selectInSelectedFile', () => selectInFocusedFile()),
     // 檔案總管右鍵（可多選 .patch）或指令面板
-    vscode.commands.registerCommand('gitWorkbench.importPatch', (uri?: vscode.Uri, uris?: vscode.Uri[]) => commitView?.importPatches(uris?.length ? uris : uri ? [uri] : undefined)),
-    vscode.commands.registerCommand('gitWorkbench.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),
+    vscode.commands.registerCommand('wright.importPatch', (uri?: vscode.Uri, uris?: vscode.Uri[]) => commitView?.importPatches(uris?.length ? uris : uri ? [uri] : undefined)),
+    vscode.commands.registerCommand('wright.show', () => vscode.commands.executeCommand(`${WorkbenchViewProvider.viewId}.focus`)),
     // 設定變更集中處理，避免同一次變更觸發多次重新載入
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('gitWorkbench.language')) {
+      if (e.affectsConfiguration('wright.language')) {
         resetI18n();
         provider.reloadWebview();
         branchesView.reload();
         commitView?.reload();
-      } else if (e.affectsConfiguration('gitWorkbench.scanDepth') || e.affectsConfiguration('gitWorkbench.scanExclude')) {
+      } else if (e.affectsConfiguration('wright.scanDepth') || e.affectsConfiguration('wright.scanExclude')) {
         void provider.rediscover(true);
-      } else if (e.affectsConfiguration('gitWorkbench.autoRefresh')) {
+      } else if (e.affectsConfiguration('wright.autoRefresh')) {
         provider.rewatch();
-      } else if (e.affectsConfiguration('gitWorkbench')) {
+      } else if (e.affectsConfiguration('wright')) {
         void provider.refresh(true);
       }
     }),
@@ -68,7 +68,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
   try {
     commitView = registerCommitView(context, provider);
   } catch (e) {
-    console.error('[Git Workbench] commit view init failed:', e);
+    console.error('[Wright] commit view init failed:', e);
   }
   provider.dialogs.onStashChanged = () => commitView?.stashChanged();
   provider.dialogs.conflicts.onChanged = () => void commitView?.refresh();
@@ -77,7 +77,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     void commitView?.refresh();
   });
   context.subscriptions.push(
-    vscode.commands.registerCommand('gitWorkbench.stash.save', async () => {
+    vscode.commands.registerCommand('wright.stash.save', async () => {
       const repos = await provider.repositories();
       let root = repos[0]?.root;
       if (repos.length > 1) {
@@ -95,15 +95,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
       }
     }),
     // 標題列齒輪：打開面板內的設定框（語言等設定立即生效）
-    vscode.commands.registerCommand('gitWorkbench.openSettings', () => provider.openSettingsPanel()),
-    vscode.commands.registerCommand('gitWorkbench.commit.openSettings', () => commitView?.openSettingsPanel()),
-    vscode.commands.registerCommand('gitWorkbench.unstashChanges', () => provider.dialogs.openUnstash()),
+    vscode.commands.registerCommand('wright.openSettings', () => provider.openSettingsPanel()),
+    vscode.commands.registerCommand('wright.commit.openSettings', () => commitView?.openSettingsPanel()),
+    vscode.commands.registerCommand('wright.unstashChanges', () => provider.dialogs.openUnstash()),
     // 最佳化儲存庫：寫入 commit-graph（大型 repo 的歷史與路徑篩選變快）；roots 給自動化測試略過選擇
-    vscode.commands.registerCommand('gitWorkbench.optimizeRepository', (roots?: unknown) => optimizeRepositories(provider, Array.isArray(roots) ? roots.filter((r): r is string => typeof r === 'string') : undefined)),
+    vscode.commands.registerCommand('wright.optimizeRepository', (roots?: unknown) => optimizeRepositories(provider, Array.isArray(roots) ? roots.filter((r): r is string => typeof r === 'string') : undefined)),
     // 衝突清單分頁（指令面板、衝突提示的按鈕）；root 為字串時只是預設選取的 repo
-    vscode.commands.registerCommand('gitWorkbench.resolveConflicts', (root?: unknown) => provider.dialogs.conflicts.openList(typeof root === 'string' ? root : undefined)),
+    vscode.commands.registerCommand('wright.resolveConflicts', (root?: unknown) => provider.dialogs.conflicts.openList(typeof root === 'string' ? root : undefined)),
     // Annotate：VS Code 1.96 起內建 git blame，這裡只切換內建的編輯器標註，不重複實作
-    vscode.commands.registerCommand('gitWorkbench.toggleBlame', async () => {
+    vscode.commands.registerCommand('wright.toggleBlame', async () => {
       const cfg = vscode.workspace.getConfiguration('git');
       // 內建的 blame 標註從 VS Code 1.96 開始才有；舊版沒有這個設定，寫入會失敗
       if (cfg.inspect('blame.editorDecoration.enabled')?.defaultValue === undefined) {

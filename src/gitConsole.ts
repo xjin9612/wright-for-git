@@ -1,6 +1,6 @@
-// Git 主控台（對應 IntelliJ 的 Git Console）：在「輸出」面板的「Git Workbench」頻道記錄每個 git 指令。
+// Git 主控台（對應 IntelliJ 的 Git Console）：在「輸出」面板的「Wright」頻道記錄每個 git 指令。
 // 會改變狀態的指令（fetch、push、commit、checkout…）以 info 顯示，失敗以 error 顯示並附上 git 的錯誤輸出；
-// 只讀取的指令（log、status…）以 trace 記錄（失敗為 debug），需要時用「開發人員: 設定記錄層級」把 Git Workbench 調成「追蹤」就能看到。
+// 只讀取的指令（log、status…）以 trace 記錄（失敗為 debug），需要時用「開發人員: 設定記錄層級」把 Wright 調成「追蹤」就能看到。
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { setGitLogger, type GitCommandRecord } from './git/gitRunner';
@@ -60,7 +60,7 @@ function onEnd(r: GitCommandRecord): void {
 }
 
 export function registerGitConsole(context: vscode.ExtensionContext): void {
-  channel = vscode.window.createOutputChannel('Git Workbench', { log: true });
+  channel = vscode.window.createOutputChannel('Wright', { log: true });
   context.subscriptions.push(channel);
   setGitLogger(
     (r) => {
@@ -71,7 +71,7 @@ export function registerGitConsole(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(
     { dispose: () => setGitLogger(undefined, undefined) },
-    vscode.commands.registerCommand('gitWorkbench.showConsole', () => channel?.show(true)),
+    vscode.commands.registerCommand('wright.showConsole', () => channel?.show(true)),
   );
 }
 

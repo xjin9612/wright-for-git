@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Renamed to Wright for Git
+- Git Workbench is now **Wright for Git** (extension ID `xjin9612.wright-for-git`). Settings moved from `gitWorkbench.*` to `wright.*`, and commands and keybindings use the new IDs: copy any settings or custom keybindings you had over to the new names. Changelists and other state saved by Git Workbench start fresh
+
 ### Shelf
 - **Shelve Changes…** in the Commit window sets the selected changes aside — modified, deleted and untracked files, across several repositories as one entry — and restores those files; *Keep in Working Tree* saves a copy without touching them. Shelves are kept in the repositories (not in the stash list) and survive restarts. For files where you selected only some changes to commit, only those changes are shelved and the rest stays in the file, like Commit does
 - New **Shelf** tab: shelved entries with their repositories and date, files grouped by repository with diffs. **Unshelve…** opens a dialog to pick the repositories and files (preselected from the files you selected), the changelist to put them in (the shelf's name by default), and whether to remove the unshelved files from the Shelf — the rest stays shelved. Untracked files that already exist are listed and only overwritten if you check them. Conflicts are left in the files and the conflict list opens, with the shelf's name as the other side. Rename, and Delete one or several entries. Select several entries to unshelve them one after another, oldest first; it stops at a conflict or a failure, or when you cancel, and tells you which were not unshelved
@@ -9,7 +12,7 @@
 
 ### Changed files
 - `Ctrl+C` in a changed-files tree (commit details, stashes, push and unstash dialogs) copies the selected file's name; on a folder it copies the folder's path in the repository, on a repository row the repository name
-- `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Git Workbench: Open Selected File in Changed Files*
+- `F4` in the log's commit details and the Commit window's stash files opens the selected file from the working tree (like Jump to Source). Rebind it in Keyboard Shortcuts: *Wright: Open Selected File in Changed Files*
 - `Alt+F1` in the same places (like IntelliJ's Select In) reveals the selected file in the Explorer view, in File Explorer / Finder, or opens an integrated terminal in its folder. Also *Select In…* in the context menu of the log's commit details and the Commit window
 - Context menu on files in the log's commit details (also with the Menu key or `Shift+F10`): Show Diff, Open File, Open Repository Version (the file as of that commit, read-only), Select In…, Copy File Name, Copy Path
 
@@ -19,10 +22,10 @@
 ### Commit log
 - Opening the log starts at the top of the list, like IntelliJ: the last selected commit (or HEAD) is still selected and shown in the details, but the list no longer scrolls to it
 - *Go to HEAD* button in the toolbar selects HEAD and scrolls to it
-- The settings (gear) has a *Keyboard shortcuts* link that opens Keyboard Shortcuts filtered to Git Workbench, e.g. to rebind `F4`
+- The settings (gear) has a *Keyboard shortcuts* link that opens Keyboard Shortcuts filtered to Wright, e.g. to rebind `F4`
 
 ### Branches
-- New setting `gitWorkbench.defaultFavoriteBranches` (default `["main", "master"]`): the branches that are favorites in a workspace until you star or unstar one there. Set it to `[]` to start without favorites
+- New setting `wright.defaultFavoriteBranches` (default `["main", "master"]`): the branches that are favorites in a workspace until you star or unstar one there. Set it to `[]` to start without favorites
 - The Branches view options (group by, favorites only) use the eye icon like the other view options; the gear stays for options that change what a command does, like the Commit window's commit options
 - In the side bar, the Branches view options menu opens below its button instead of covering the toolbar
 
@@ -36,7 +39,7 @@
 - The Paths menu's *Ctrl+Click to show only that repository* hint moved under the search box, like the User filter's hint, and no longer scrolls away at the end of a long list
 
 ### Keyboard
-- Keys a Git Workbench panel handles itself (such as `Shift+F10` for the context menu, arrows, `Enter`) no longer also run a VS Code shortcut bound to the same key — e.g. with an IntelliJ keymap, `Shift+F10` used to open the menu and the Run Task list at once
+- Keys a Wright panel handles itself (such as `Shift+F10` for the context menu, arrows, `Enter`) no longer also run a VS Code shortcut bound to the same key — e.g. with an IntelliJ keymap, `Shift+F10` used to open the menu and the Run Task list at once
 
 ## 1.3.0
 
@@ -58,7 +61,7 @@
 - Collapse Linear Branches / Expand Linear Branches in the 👁 menu, like IntelliJ's Graph Options: long runs of branch commits fold into one `⋯ N commits` row drawn with a dotted line. The branch's newest and oldest commits stay visible, the main line (HEAD's first-parent history) and commits with a branch or tag are never folded, and only runs of at least 3 commits are folded. Click the row (or press `Enter`) to expand it; click a branch line, or use Collapse Linear Branch in the context menu, to fold one run. Jumping to a folded commit expands its run
 
 ### Large repositories
-- New command **Git Workbench: Optimize Repository (speed up history)** writes git's commit-graph (`--changed-paths`), which makes the first screen of the log about 6× faster and file path filters about 5× faster in a 100,000-commit repository. It is never suggested automatically; see "Large repositories" in the README
+- New command **Wright: Optimize Repository (speed up history)** writes git's commit-graph (`--changed-paths`), which makes the first screen of the log about 6× faster and file path filters about 5× faster in a 100,000-commit repository. It is never suggested automatically; see "Large repositories" in the README
 
 ### Other
 - `npm run bench:vscode` measures log loading in a generated 100,000-commit repository inside a real VS Code, with and without a commit-graph
@@ -70,7 +73,7 @@
 ## 1.1.0
 
 ### Commit window
-- New Commit view in the Git Workbench side bar (`Alt+0`), next to Repositories, modeled on IntelliJ's Commit tool window. It works alongside VS Code's Source Control and never touches your staging area: only the checked files are committed, through a temporary index
+- New Commit view in the Wright side bar (`Alt+0`), next to Repositories, modeled on IntelliJ's Commit tool window. It works alongside VS Code's Source Control and never touches your staging area: only the checked files are committed, through a temporary index
 - Changes, Unversioned Files, Ignored Files and Merge Conflicts in one tree with checkboxes; group by directory, repository or module (the nearest folder with a `package.json`, `pom.xml`, `go.mod`, … ); tree or flat; file-type icons
 - Partial commits: Select Changes to Commit… picks individual hunks of a file (shown as `2/5 changes`); Commit Whole File goes back to the full file
 - Commit, Commit and Push…, Amend last commit (loads the previous message), Sign-off, Skip Git hooks; `Ctrl+Enter` commits. Committing across several repositories creates one commit per repository with the same message
@@ -106,7 +109,7 @@
 - Context menu: New Branch…, New Tag… (optionally annotated), Cherry-Pick, Revert Commit (asks for the mainline parent on merge commits), Reset Current Branch to Here… (soft / mixed / hard; hard asks first and warns about uncommitted changes), Compare with Local, Interactively Rebase from Here…
 - Interactive rebase in an editor tab: pick, reword (edit the message in place), edit, squash, fixup, drop; reorder by dragging or `Alt+↑↓`; single-key shortcuts. Local changes are stashed and restored automatically
 - While a rebase, merge, cherry-pick or revert is in progress, a bar above the log offers Continue, Skip and Abort (Abort asks first)
-- Issue numbers in commit messages become links: `#123` opens the issue on the repository's remote (GitHub, GitLab, …) by default; `gitWorkbench.issueLinks` replaces this with your own patterns (e.g. `PROJ-123` → your tracker)
+- Issue numbers in commit messages become links: `#123` opens the issue on the repository's remote (GitHub, GitLab, …) by default; `wright.issueLinks` replaces this with your own patterns (e.g. `PROJ-123` → your tracker)
 - On conflicts, offers Resolve Conflicts… or Abort
 - Date filter: last 24 hours / 7 / 30 / 90 days / year, or a custom period
 - A hint appears when the Branch filter leaves out the current branch, with one-click Show HEAD / Show all branches
@@ -121,20 +124,20 @@
 - Files that are not UTF-8 text can still be resolved by accepting one side
 - The Commit window's Merge Conflicts group shows the kind of conflict (both modified, deleted by them, …), has a Resolve… link, and its context menu offers Merge…, Resolve Conflicts…, Accept Yours, Accept Theirs and Mark as Resolved (asks first when the file still has conflict markers); double-click opens the merge
 - The bar above the log shows the number of conflicts and a Resolve Conflicts… link, also for stash conflicts where no operation is in progress
-- New command: Git Workbench: Resolve Conflicts…
+- New command: Wright: Resolve Conflicts…
 
 ### Changed files
 - Group by directory, repository or module from the 👁 menu; switch between tree and flat list; file-type icons
 - In a diff opened from the log, step to the previous / next changed file with the ← → buttons in the editor title bar (separate from VS Code's own ↑↓ for changes) or with `Ctrl+Alt+PageUp` / `Ctrl+Alt+PageDown`; the tab title shows the position, like `1/5`
 
 ### Git console
-- Every git command Git Workbench runs is written to the Output panel's **Git Workbench** channel, like IntelliJ's Git Console: the repository, the full command line, how long it took, and git's own output (for example `To origin … main -> main`)
+- Every git command Wright runs is written to the Output panel's **Wright** channel, like IntelliJ's Git Console: the repository, the full command line, how long it took, and git's own output (for example `To origin … main -> main`)
 - Failed commands are logged as errors with the exit code and git's error text; error notifications have a **Show Git Console** button
 - Read-only queries (log, status, …) are logged at the Trace level, so they stay out of the way until you set the channel's log level to Trace
-- Open it from the log panel's title bar or with **Git Workbench: Show Git Console**
+- Open it from the log panel's title bar or with **Wright: Show Git Console**
 
 ### Explorer and editor
-- Explorer context menu → Git Workbench: Show History, Compare with Branch or Tag…, Stash Changes…, Unstash Changes…
+- Explorer context menu → Wright: Show History, Compare with Branch or Tag…, Stash Changes…, Unstash Changes…
 - Unstash Changes opens a dialog in an editor tab: pick a stash, see its files (grouped like the log, untracked files listed separately), Apply / Pop / Drop / Clear, or unstash as a branch
 - Editor context menu: Toggle Git Blame, which switches VS Code's built-in blame annotations
 
@@ -149,12 +152,12 @@
 - Dialog buttons follow the platform order (on Windows the primary button comes first)
 
 ### Other
-- English and Traditional Chinese UI. The new `gitWorkbench.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
+- English and Traditional Chinese UI. The new `wright.language` setting switches the panel, dialogs and messages independently of the VS Code display language (`auto` follows VS Code)
 - Confirmations triggered from the panel or a dialog tab (delete, force push, hard reset, checkout a tag or revision, rollback, …) are shown inside it in the same style as the Push dialog; destructive actions use a red button with Cancel focused
 - The gear in the Git log's and the Commit window's title bar opens a settings popover right in the panel: language (Follow VS Code / English / 繁體中文), max commits, repository scan depth and auto refresh take effect immediately; links lead to the issue link rules and all settings
 - `@vscode/vsce` is now a dev dependency, so CI no longer downloads it on every run
 - UI end-to-end tests (`npm run test:ui`, Playwright) run in CI on Windows and Linux
-- New commands: Git Workbench: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Resolve Conflicts… / Previous Changed File / Next Changed File
+- New commands: Wright: Fetch / Pull / Push… / Stash Changes… / Unstash Changes… / Show Commit Window / Toggle Git Blame / Open Settings / Show Git Console / Resolve Conflicts… / Previous Changed File / Next Changed File
 
 ## 1.0.0
 
@@ -162,7 +165,7 @@ First release.
 
 ### Tool window
 - Git panel at the bottom: Branches | Commit log | Changed files + commit details — three linked, resizable, collapsible panes
-- Open it from the Git Workbench icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
+- Open it from the Wright icon in the Activity Bar, "Git Log" in the status bar, or `Alt+9`
 - Follows the VS Code theme (light and dark)
 
 ### Branches

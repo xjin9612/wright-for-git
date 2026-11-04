@@ -99,7 +99,7 @@ function render(): void {
   queueMicrotask(() => {
     if (focusedId) document.getElementById(focusedId)?.focus();
   });
-  popover.append(el('div', { className: 'settings-title', text: t('Git Workbench Settings') }));
+  popover.append(el('div', { className: 'settings-title', text: t('Wright Settings') }));
   if (!values) {
     popover.append(el('div', { className: 'empty-text', text: t('Loading…') }));
     return;

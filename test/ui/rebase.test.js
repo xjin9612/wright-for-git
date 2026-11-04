@@ -94,7 +94,7 @@ test('edit 停下：Log 上方出現進行中列，按「繼續」完成', async
   await page.locator('.log-ops .link', { hasText: 'Continue' }).click();
   await h.until(() => !rebasing(), 40000);
   await app.waitOps(false);
-  assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('gitworkbench-')), [], '沒有殘留的暫存檔');
+  assert.deepEqual(fs.readdirSync(`${api}/.git`).filter((n) => n.startsWith('wright-')), [], '沒有殘留的暫存檔');
 });
 
 test('滑鼠拖曳列調整順序', async () => {

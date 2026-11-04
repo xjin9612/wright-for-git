@@ -1,4 +1,4 @@
-// 把提交訊息中的 issue 編號轉成連結（規則來自設定 gitWorkbench.issueLinks）
+// 把提交訊息中的 issue 編號轉成連結（規則來自設定 wright.issueLinks）
 import type { IssueLinkRule } from '../shared/protocol';
 import { el } from './dom';
 import { post } from './vscodeApi';

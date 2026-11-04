@@ -48,7 +48,7 @@ export interface RepositorySummary {
 }
 
 export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
-  static readonly viewId = 'gitWorkbench.log';
+  static readonly viewId = 'wright.log';
 
   private view?: vscode.WebviewView;
   private entries: RepoEntry[] = [];
@@ -113,7 +113,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   private updateDiffNavContext(): void {
-    void vscode.commands.executeCommand('setContext', 'gitWorkbench.diffNav', this.isNavDiffActive());
+    void vscode.commands.executeCommand('setContext', 'wright.diffNav', this.isNavDiffActive());
   }
 
   // ---------- repository 清單 ----------
@@ -177,7 +177,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   private async discover(): Promise<void> {
-    const cfg = vscode.workspace.getConfiguration('gitWorkbench');
+    const cfg = vscode.workspace.getConfiguration('wright');
     const depth = cfg.get<number>('scanDepth', 3);
     const exclude = cfg.get<string[]>('scanExclude', DEFAULT_SCAN_EXCLUDE);
     const folders = await workspaceFolderPaths();
@@ -218,7 +218,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     const gen = ++this.watchGeneration;
     this.repoWatchers.forEach((d) => d.dispose());
     this.repoWatchers = [];
-    if (!vscode.workspace.getConfiguration('gitWorkbench').get<boolean>('autoRefresh', true)) return;
+    if (!vscode.workspace.getConfiguration('wright').get<boolean>('autoRefresh', true)) return;
     for (const { repo, key } of this.entries) {
       const trigger = () => this.scheduleRefresh(key);
       for (const dir of new Set([repo.commonDir, repo.gitDir])) {
@@ -277,7 +277,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
         s = await e.repo.getState();
       } catch (err) {
         // 讀取失敗時以空狀態佔位，確保 states 與 entries 一一對應（commit.repo 索引不會錯位）
-        console.error('[Git Workbench] getState failed', e.repo.root, err);
+        console.error('[Wright] getState failed', e.repo.root, err);
         s = { root: e.repo.root, name: e.name, head: {}, refs: [], remotes: [] };
       }
       s.name = e.name;
@@ -584,7 +584,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     this.logAbort = abort;
     const stats: LogStats = { requestId, filter, startedAt: Date.now(), count: 0 };
     this.lastLogStats = stats;
-    const max = vscode.workspace.getConfiguration('gitWorkbench').get<number>('maxCommits', 50000);
+    const max = vscode.workspace.getConfiguration('wright').get<number>('maxCommits', 50000);
     const graph = isGraphFilter(filter);
     const entries = this.entries;
 
@@ -994,11 +994,11 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 
   /** 對話框分頁的偏好（變更檔案的分組方式等） */
   get dialogPrefs(): Record<string, unknown> {
-    return this.context.globalState.get<Record<string, unknown>>('gitWorkbench.dialogPrefs') ?? {};
+    return this.context.globalState.get<Record<string, unknown>>('wright.dialogPrefs') ?? {};
   }
 
   async setDialogPref(key: string, value: unknown): Promise<void> {
-    await this.context.globalState.update('gitWorkbench.dialogPrefs', { ...this.dialogPrefs, [key]: value });
+    await this.context.globalState.update('wright.dialogPrefs', { ...this.dialogPrefs, [key]: value });
   }
 
   /** 開在編輯器分頁的對話框用的 HTML（同一份樣式與翻譯） */
@@ -1046,7 +1046,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${style}">
-<title>Git Workbench</title>
+<title>Wright</title>
 </head>
 <body>
 <div id="app"></div>
@@ -1099,15 +1099,15 @@ function makeNonce(): string {
   return s;
 }
 
-/** 設定 gitWorkbench.defaultFavoriteBranches：工作區還沒自訂我的最愛時，視為我的最愛的分支名稱 */
+/** 設定 wright.defaultFavoriteBranches：工作區還沒自訂我的最愛時，視為我的最愛的分支名稱 */
 function defaultFavoriteBranches(): string[] {
-  const v = vscode.workspace.getConfiguration('gitWorkbench').get<unknown>('defaultFavoriteBranches', ['main', 'master']);
+  const v = vscode.workspace.getConfiguration('wright').get<unknown>('defaultFavoriteBranches', ['main', 'master']);
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()) : ['main', 'master'];
 }
 
-/** 設定 gitWorkbench.issueLinks；未設定時，GitHub／GitLab 等遠端的 #123 自動連到 issue */
+/** 設定 wright.issueLinks；未設定時，GitHub／GitLab 等遠端的 #123 自動連到 issue */
 function issueLinkRules(): IssueLinkRule[] {
-  const custom = vscode.workspace.getConfiguration('gitWorkbench').get<IssueLinkRule[]>('issueLinks', []);
+  const custom = vscode.workspace.getConfiguration('wright').get<IssueLinkRule[]>('issueLinks', []);
   const valid = custom.filter((r) => r && typeof r.pattern === 'string' && typeof r.url === 'string' && /^https?:\/\/|^\{repo\}/.test(r.url));
   return valid.length > 0 ? valid : [{ pattern: '#(\\d+)', url: '{repo}/issues/$1' }];
 }

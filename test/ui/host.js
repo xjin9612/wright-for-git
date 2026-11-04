@@ -436,13 +436,13 @@ async function launch(workspace, opts = {}) {
     subscriptions: [],
     extensionUri: Uri.file(ROOT),
     extensionPath: ROOT,
-    extension: { id: 'xjin9612.vscode-git-workbench' },
+    extension: { id: 'xjin9612.wright-for-git' },
     workspaceState: memento,
     globalState: { ...memento, setKeysForSync() {} },
   };
   const testApi = await ext.activate(ctx);
   const browser = await chromium.launch();
-  const log = await attachWebviewView(browser, calls.providers['gitWorkbench.log'], 'webview.js', { width: opts.width ?? 1400, height: opts.height ?? 520 });
+  const log = await attachWebviewView(browser, calls.providers['wright.log'], 'webview.js', { width: opts.width ?? 1400, height: opts.height ?? 520 });
   const page = log.page;
   await page.waitForFunction(() => document.querySelectorAll('.log-row').length > 0 && !document.querySelector('.progress.active'), null, { timeout: 30000 });
   const extraPages = [];
@@ -470,7 +470,7 @@ async function launch(workspace, opts = {}) {
     },
     /** 開啟提交視窗 */
     async commitView(viewport = { width: 420, height: 760 }) {
-      const v = await attachWebviewView(browser, calls.providers['gitWorkbench.commit'], 'commit.js', viewport);
+      const v = await attachWebviewView(browser, calls.providers['wright.commit'], 'commit.js', viewport);
       extraPages.push(['提交視窗', v.page]);
       pageLogs.push(['提交視窗', v.log]);
       await v.page.waitForSelector('.commit-tree .tree-row, .commit-tree .empty-text');
@@ -478,7 +478,7 @@ async function launch(workspace, opts = {}) {
     },
     /** 開啟側邊欄 Branches（活動列「Git 歷程」） */
     async branchesView(viewport = { width: 360, height: 760 }) {
-      const v = await attachWebviewView(browser, calls.providers['gitWorkbench.branches'], 'branches.js', viewport);
+      const v = await attachWebviewView(browser, calls.providers['wright.branches'], 'branches.js', viewport);
       extraPages.push(['側邊欄 Branches', v.page]);
       pageLogs.push(['側邊欄 Branches', v.log]);
       await v.page.waitForSelector('.branch-tree .tree-row');
