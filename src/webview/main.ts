@@ -440,6 +440,7 @@ function syncBranches(): void {
       message: repos.length > 0 ? undefined : noRepoMessage,
       selected: f.branches.length === 1 ? f.branches[0] : undefined,
       prefs: branches.prefs(),
+      defaultFavorites: branches.defaultFavoriteList(),
     };
     const json = JSON.stringify(sync);
     if (json === lastBranchesSync) return;
@@ -1226,6 +1227,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
       repos = m.states;
       generation = m.generation;
       setIssueLinkRules(m.issueLinks);
+      branches.setDefaultFavorites(m.defaultFavorites);
       noRepoMessage = m.message ?? t('No repository');
       if (repos.length === 0) {
         // 讓還在路上的 logBatch 失效（它的 repo 索引已不存在）

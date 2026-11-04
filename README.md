@@ -76,6 +76,7 @@ Most of these can be changed from the gear in the Git log's or the Commit window
 |---|---|---|
 | `gitWorkbench.maxCommits` | `50000` | Maximum number of commits loaded (total across repositories, up to 200000) |
 | `gitWorkbench.autoRefresh` | `true` | Refresh when refs or HEAD change |
+| `gitWorkbench.defaultFavoriteBranches` | `["main", "master"]` | Favorite branches (local and remote) until you star or unstar one in the workspace; `[]` for none |
 | `gitWorkbench.scanDepth` | `3` | How many folder levels below each workspace folder are scanned for repositories |
 | `gitWorkbench.scanExclude` | `node_modules`, `target`, … | Folder names skipped while scanning |
 | `gitWorkbench.language` | `auto` | Language of the panel, dialogs and messages: `auto` (follow VS Code), `en`, `zh-tw` |

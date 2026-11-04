@@ -353,6 +353,17 @@
           "description": "%config.maxCommits%",
           "maximum": 200000
         },
+        "gitWorkbench.defaultFavoriteBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "main",
+            "master"
+          ],
+          "markdownDescription": "%config.defaultFavoriteBranches%"
+        },
         "gitWorkbench.autoRefresh": {
           "type": "boolean",
           "default": true,

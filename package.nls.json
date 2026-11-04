@@ -7,6 +7,7 @@
   "command.refresh": "Refresh",
   "command.selectRepository": "Select Repositories",
   "command.show": "Show Git Log",
+  "config.defaultFavoriteBranches": "Branches marked as favorites in a workspace until you star or unstar any branch there (local and remote branches with these names, e.g. `main`, `origin/main`). Set to `[]` to start with no favorites.",
   "config.maxCommits": "Maximum number of commits loaded into the log (total across all repositories).",
   "config.autoRefresh": "Refresh the log automatically when branches, tags or HEAD change.",
   "command.showHistory": "Show Git History",

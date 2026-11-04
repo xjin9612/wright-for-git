@@ -47,8 +47,6 @@ export interface BranchesCallbacks {
   onFavoritesChange: (favorites: string[], onlyFavorites: boolean) => void;
 }
 
-/** 沒有自訂我的最愛時的預設：main／master（local 與 remote） */
-const DEFAULT_FAVORITES = new Set(['main', 'master']);
 
 export class BranchesPane {
   readonly element: HTMLElement;
@@ -61,8 +59,10 @@ export class BranchesPane {
   private rows: Row[] = [];
   /** 選取列對應的 ref 名稱：切換分組方式後列的 key 會變，用名稱找回選取 */
   private selectedRefName: string | undefined;
-  /** undefined：使用預設（main／master） */
+  /** undefined：使用預設（defaultFavorites） */
   private favorites: Set<string> | undefined;
+  /** 沒有自訂我的最愛時的預設（設定 gitWorkbench.defaultFavoriteBranches；local 與 remote 都算） */
+  private defaultFavorites = new Set(['main', 'master']);
   private onlyFavorites: boolean;
   private options: BranchOptions;
   /** 需要選取 ref 才能使用的工具列按鈕 */
@@ -143,6 +143,19 @@ export class BranchesPane {
     return { favorites: this.favorites ? [...this.favorites] : undefined, onlyFavorites: this.onlyFavorites, options: { ...this.options }, expanded: [...this.expanded] };
   }
 
+  defaultFavoriteList(): string[] {
+    return [...this.defaultFavorites];
+  }
+
+  /** 設定的預設我的最愛；沒給時維持原本的 */
+  setDefaultFavorites(names: readonly string[] | undefined): void {
+    if (!names) return;
+    const next = new Set(names);
+    if ([...next].join('\n') === [...this.defaultFavorites].join('\n')) return;
+    this.defaultFavorites = next;
+    this.render();
+  }
+
   /** 套用另一個 Branches 樹（側邊欄／Log）改過的偏好 */
   setPrefs(p: BranchPrefs): void {
     this.favorites = p.favorites ? new Set(p.favorites) : undefined;
@@ -217,7 +230,7 @@ export class BranchesPane {
   isFavorite(ref: Pick<MergedRef, 'name' | 'type' | 'short' | 'remoteBranch'>): boolean {
     if (ref.type === 'tag') return false;
     if (this.favorites) return this.favorites.has(ref.name);
-    return DEFAULT_FAVORITES.has(ref.type === 'remote' ? (ref.remoteBranch ?? ref.short) : ref.short);
+    return this.defaultFavorites.has(ref.type === 'remote' ? (ref.remoteBranch ?? ref.short) : ref.short);
   }
 
   /** 目前的我的最愛清單（預設值展開成實際的 ref） */

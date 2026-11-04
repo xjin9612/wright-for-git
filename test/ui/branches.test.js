@@ -53,6 +53,33 @@ test('Local／Remote／Tags；依 / 分資料夾；main 預設為我的最愛並
   assert.ok(rows.some((r) => /^checkout\b.*api-server.*web-app/.test(r) || /^feature\/checkout.*api-server.*web-app/.test(r)), rows.join(' / '));
 });
 
+test('設定 defaultFavoriteBranches：設為 [] 時 main 不是我的最愛；改成 release/1.x 時它置頂；移除設定後回到 main', async () => {
+  const key = 'gitWorkbench.defaultFavoriteBranches';
+  const setConfig = async (v) => {
+    if (v === undefined) delete app.calls.config[key];
+    else app.calls.config[key] = v;
+    for (const l of app.calls.configListeners) await l({ affectsConfiguration: (s) => key === s || key.startsWith(`${s}.`) });
+    await settle();
+  };
+  const isFav = async (label) => (await branch(label).locator('.favorite').count()) > 0;
+  await tool('Expand all').click();
+
+  await setConfig([]);
+  await h.until(async () => !(await isFav('main')), 'main 不是我的最愛');
+  assert.equal(await page.locator('.branch-tree .tree-row .favorite').count(), 0, '沒有任何我的最愛');
+
+  await setConfig(['release/1.x']);
+  await h.until(async () => {
+    const rows = await h.texts(tree());
+    const local = rows.findIndex((r) => r.startsWith('Local'));
+    return /^(release\/)?1\.x/.test(rows[local + 1] ?? '');
+  }, 'release/1.x 置頂');
+  assert.ok(!(await isFav('main')));
+
+  await setConfig(undefined);
+  await h.until(async () => isFav('main'), '回到預設 main');
+});
+
 test('搜尋框過濾分支', async () => {
   const input = page.locator('.branch-search input, .branches-pane input[type="text"]').first();
   await input.fill('cache');

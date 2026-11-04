@@ -304,6 +304,8 @@ export interface BranchesSync {
   /** Branch 篩選只有一個值時的 ref 名稱（或 'HEAD'） */
   selected?: string;
   prefs: BranchPrefs;
+  /** 設定 gitWorkbench.defaultFavoriteBranches */
+  defaultFavorites?: string[];
 }
 
 /** 側邊欄 Branches → Log：需要 Log 處理的操作（ref 為完整名稱） */
@@ -494,7 +496,7 @@ export type ToWebview =
   | { type: 'conflictsData'; repos: { root: string; name: string; operation?: RepoState['operation']; files: ConflictFile[] }[] }
   | { type: 'settings'; values: SettingsValues; open?: boolean }
   /** 所有 repository 的狀態；commit.repo 為此陣列的索引 */
-  | { type: 'repos'; states: RepoState[]; generation: number; message?: string; issueLinks?: IssueLinkRule[] }
+  | { type: 'repos'; states: RepoState[]; generation: number; message?: string; issueLinks?: IssueLinkRule[]; defaultFavorites?: string[] }
   /** warnings：部分 repo 讀取失敗時的訊息（只在 done 時帶） */
   | { type: 'logBatch'; requestId: number; commits: CommitInfo[]; done: boolean; graph: boolean; warnings?: string[] }
   | { type: 'logError'; requestId: number; message: string }

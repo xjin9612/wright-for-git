@@ -289,7 +289,7 @@ export class WorkbenchViewProvider implements vscode.WebviewViewProvider, vscode
     if (!force && !changed) return;
     const states = this.entries.map((e) => e.state ?? { root: e.repo.root, name: e.name, head: {}, refs: [], remotes: [] });
     this.updateDescription();
-    this.post({ type: 'repos', states, generation: this.generation, issueLinks: issueLinkRules() });
+    this.post({ type: 'repos', states, generation: this.generation, issueLinks: issueLinkRules(), defaultFavorites: defaultFavoriteBranches() });
     this.changeEmitter.fire();
   }
 
@@ -1094,6 +1094,12 @@ function makeNonce(): string {
   let s = '';
   for (let i = 0; i < 32; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
   return s;
+}
+
+/** 設定 gitWorkbench.defaultFavoriteBranches：工作區還沒自訂我的最愛時，視為我的最愛的分支名稱 */
+function defaultFavoriteBranches(): string[] {
+  const v = vscode.workspace.getConfiguration('gitWorkbench').get<unknown>('defaultFavoriteBranches', ['main', 'master']);
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()) : ['main', 'master'];
 }
 
 /** 設定 gitWorkbench.issueLinks；未設定時，GitHub／GitLab 等遠端的 #123 自動連到 issue */

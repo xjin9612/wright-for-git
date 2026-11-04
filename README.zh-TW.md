@@ -76,6 +76,7 @@ git 平常自動執行 `git gc` 時多半會寫入 commit-graph，但不含加�
 |---|---|---|
 | `gitWorkbench.maxCommits` | `50000` | Log 最多載入的 commit 數（所有 repo 合計，上限 200000） |
 | `gitWorkbench.autoRefresh` | `true` | refs／HEAD 變動時自動重新整理 |
+| `gitWorkbench.defaultFavoriteBranches` | `["main", "master"]` | 預設的我的最愛分支（本機與遠端）；在工作區手動加星或取消星號後改用你的設定；`[]` 為不預設 |
 | `gitWorkbench.scanDepth` | `3` | 工作區資料夾往下掃描 repo 的層數 |
 | `gitWorkbench.scanExclude` | `node_modules`、`target`… | 掃描時略過的資料夾名稱 |
 | `gitWorkbench.language` | `auto` | 面板、對話框與訊息的語言：`auto`（跟隨 VS Code）、`en`、`zh-tw` |

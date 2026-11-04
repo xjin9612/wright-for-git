@@ -21,6 +21,7 @@
 - The settings (gear) has a *Keyboard shortcuts* link that opens Keyboard Shortcuts filtered to Git Workbench, e.g. to rebind `F4`
 
 ### Branches
+- New setting `gitWorkbench.defaultFavoriteBranches` (default `["main", "master"]`): the branches that are favorites in a workspace until you star or unstar one there. Set it to `[]` to start without favorites
 - The Branches view options (group by, favorites only) use the eye icon like the other view options; the gear stays for options that change what a command does, like the Commit window's commit options
 - In the side bar, the Branches view options menu opens below its button instead of covering the toolbar
 

@@ -7,6 +7,7 @@
   "command.refresh": "重新整理",
   "command.selectRepository": "選擇儲存庫",
   "command.show": "顯示 Git 記錄",
+  "config.defaultFavoriteBranches": "預設的我的最愛分支：在工作區中還沒手動加星或取消星號前，這些名稱的本機與遠端分支（例如 `main`、`origin/main`）視為我的最愛。設為 `[]` 則預設沒有我的最愛。",
   "config.maxCommits": "記錄最多載入的提交數量（所有儲存庫合計）。",
   "config.autoRefresh": "分支、標籤或 HEAD 變動時自動重新整理記錄。",
   "command.showHistory": "顯示 Git 歷史",

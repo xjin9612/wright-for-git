@@ -54,6 +54,7 @@ window.addEventListener('message', (ev: MessageEvent<ToWebview>) => {
   const m = ev.data;
   if (m.type !== 'branchesSync') return;
   sync = m.sync;
+  pane.setDefaultFavorites(m.sync.defaultFavorites);
   pane.setPrefs(m.sync.prefs);
   pane.setRepos(m.sync.states);
   if (m.sync.selected !== lastSelected) {
