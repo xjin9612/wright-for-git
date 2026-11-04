@@ -1,4 +1,4 @@
-// 提交視窗：勾選提交、逐段提交、跨 repo、Amend、捨棄、.gitignore、Changelist、分組、儲藏分頁（對應 docs/TESTING.md「提交視窗」「儲藏」）
+// 提交視窗：勾選提交、逐段提交、跨 repo、Amend、捨棄、.gitignore、Changelist、分組、儲藏分頁、擱置（對應 docs/TESTING.md「提交視窗」「儲藏」「擱置」）
 'use strict';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -388,6 +388,190 @@ test('多筆擱置依序取回：由舊到新逐筆開對話框；中途取消�
   assert.equal(shelfRefs(api).length, 2);
   // 清理：直接刪掉這兩筆擱置
   for (const ref of shelfRefs(api)) h.git(api, 'update-ref', '-d', ref);
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+});
+
+// ---------- 擱置：部分段落、暫存區、changelist、已存在、衝突、匯入選 repo ----------
+
+const shelfRefsOf = (dir) => h.git(dir, 'for-each-ref', '--format=%(refname)', 'refs/git-workbench/shelf/').split('\n').filter(Boolean);
+const shelfRowOf = (name) => cv.locator('.shelf-list .tree-row', { hasText: name });
+/** 在 api-server 建立並提交一個檔案（只提交這個路徑，不動其他暫存） */
+function commitFile(file, content) {
+  fs.writeFileSync(path.join(api, file), content);
+  h.git(api, 'add', '--', file);
+  h.git(api, 'commit', '-q', '-m', `add ${file}`, '--', file);
+}
+async function shelveRows(files, name, keep = false) {
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+  await reload();
+  await fileRow(files[0]).click();
+  for (const f of files.slice(1)) await fileRow(f).click({ modifiers: ['Control'] });
+  const n = shelfRefsOf(api).length;
+  app.calls.inputs.push(name);
+  await fileRow(files[files.length - 1]).click({ button: 'right' });
+  await h.menu(cv, keep ? 'Shelve Changes, Keep in Working Tree…' : 'Shelve Changes…');
+  await h.until(() => shelfRefsOf(api).length > n, `擱置 ${name}`);
+}
+async function openUnshelve(name) {
+  await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+  await h.until(async () => (await shelfRowOf(name).count()) === 1, `清單有 ${name}`);
+  await shelfRowOf(name).dblclick();
+  await cv.waitForSelector('.unshelve-dialog');
+}
+const dropAllShelves = () => {
+  for (const ref of shelfRefsOf(api)) h.git(api, 'update-ref', '-d', ref);
+  for (const ref of shelfRefsOf(web)) h.git(web, 'update-ref', '-d', ref);
+};
+
+test('擱置部分段落：輸入框提示只擱置選取的段落；擱置後只剩另一段；取回後兩段都在；使用者暫存的其他檔案留在暫存區', async () => {
+  const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
+  commitFile('hunks.txt', `${lines.join('\n')}\n`);
+  fs.writeFileSync(path.join(api, 'hunks.txt'), `${['FIRST', ...lines.slice(1, 19), 'LAST'].join('\n')}\n`);
+  fs.writeFileSync(path.join(api, 'shelf-staged.txt'), 's\n');
+  h.git(api, 'add', '--', 'shelf-staged.txt');
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+  await reload();
+
+  // 只勾第一段
+  await fileRow('hunks.txt').click({ button: 'right' });
+  const n = app.calls.panels.length;
+  await h.menu(cv, 'Select Changes to Commit');
+  await h.until(() => app.calls.panels.length > n, '開選取段落分頁');
+  const d = await app.lastPanel();
+  await d.page.waitForSelector('.hunk');
+  assert.equal(await d.page.locator('.hunk').count(), 2);
+  await d.page.locator('.hunk input').nth(1).uncheck();
+  await d.page.locator('.button.primary').click();
+  await h.until(async () => (await h.texts(cv.locator('.commit-partial'))).includes('1/2 changes'), '顯示 1/2');
+  await d.page.close();
+
+  const prompts = app.calls.inputPrompts.length;
+  const refs = shelfRefsOf(api).length;
+  app.calls.inputs.push('hunk shelf');
+  await fileRow('hunks.txt').click();
+  await fileRow('hunks.txt').click({ button: 'right' });
+  await h.menu(cv, 'Shelve Changes…');
+  await h.until(() => shelfRefsOf(api).length > refs, '擱置');
+  assert.match(app.calls.inputPrompts[prompts] ?? '', /Only the selected changes of 1 file/);
+  const text = () => fs.readFileSync(path.join(api, 'hunks.txt'), 'utf8');
+  await h.until(() => !text().includes('FIRST'), '第一段移走');
+  assert.match(text(), /LAST/, '第二段留在工作區');
+  const [ref] = shelfRefsOf(api);
+  assert.equal(h.git(api, 'diff', '--name-only', `${ref}^1`, ref).trim(), 'hunks.txt', '擱置只有這個檔案');
+  const shelved = h.git(api, 'diff', `${ref}^1`, ref);
+  assert.match(shelved, /\+FIRST/);
+  assert.doesNotMatch(shelved, /LAST/);
+  assert.match(h.git(api, 'diff', '--cached', '--name-only'), /shelf-staged\.txt/, '暫存的檔案仍在暫存區');
+
+  await openUnshelve('hunk shelf');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => text().includes('FIRST') && text().includes('LAST'), '取回後兩段都在');
+  await h.until(() => shelfRefsOf(api).length === 0, '擱置移除');
+  h.git(api, 'checkout', '--', 'hunks.txt');
+  h.git(api, 'reset', '-q', '--', 'shelf-staged.txt');
+  fs.rmSync(path.join(api, 'shelf-staged.txt'));
+});
+
+test('取回到 changelist：預設為擱置名稱；已追蹤的檔案放進該 changelist', async () => {
+  commitFile('cl.txt', 'one\n');
+  fs.writeFileSync(path.join(api, 'cl.txt'), 'two\n');
+  await shelveRows(['cl.txt'], 'cl shelf');
+  await h.until(() => fs.readFileSync(path.join(api, 'cl.txt'), 'utf8') === 'one\n', '擱置');
+  await openUnshelve('cl shelf');
+  assert.equal(await cv.locator('.unshelve-changelist').inputValue(), 'cl shelf');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.readFileSync(path.join(api, 'cl.txt'), 'utf8') === 'two\n', '取回');
+  await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
+  await h.until(async () => {
+    const list = await rows();
+    const idx = list.findIndex((r) => r.startsWith('cl shelf'));
+    return idx >= 0 && list.slice(idx + 1).some((r) => r.includes('cl.txt'));
+  }, 'changelist 裡有 cl.txt');
+  h.git(api, 'checkout', '--', 'cl.txt');
+});
+
+test('取回時檔案已存在：標示並預設不勾，只取回其他檔；勾選後才覆蓋', async () => {
+  fs.writeFileSync(path.join(api, 'exists.txt'), 'shelved\n');
+  fs.writeFileSync(path.join(api, 'exists-other.txt'), 'other\n');
+  await shelveRows(['exists.txt', 'exists-other.txt'], 'exists shelf');
+  await h.until(() => !fs.existsSync(path.join(api, 'exists.txt')), '擱置');
+  fs.writeFileSync(path.join(api, 'exists.txt'), 'mine\n');
+
+  await openUnshelve('exists shelf');
+  const row = cv.locator('.unshelve-dialog .unshelve-file', { hasText: 'exists.txt' }).filter({ hasNotText: 'exists-other' });
+  assert.match(await row.innerText(), /already exists; check to overwrite/);
+  assert.equal(await row.locator('input').isChecked(), false, '已存在的預設不勾');
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.existsSync(path.join(api, 'exists-other.txt')), '其他檔取回');
+  assert.equal(fs.readFileSync(path.join(api, 'exists.txt'), 'utf8'), 'mine\n', '不勾不覆蓋');
+
+  await openUnshelve('exists shelf');
+  await cv.locator('.unshelve-dialog .unshelve-file input').first().check();
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => fs.readFileSync(path.join(api, 'exists.txt'), 'utf8') === 'shelved\n', '勾選後覆蓋');
+  await h.until(() => shelfRefsOf(api).length === 0, '擱置移除');
+  fs.rmSync(path.join(api, 'exists.txt'));
+  fs.rmSync(path.join(api, 'exists-other.txt'));
+});
+
+test('取回有衝突：衝突清單自動打開、「他們的」標示擱置名稱；依序取回在這筆停下並提示', async () => {
+  commitFile('clash.txt', 'base\n');
+  fs.writeFileSync(path.join(api, 'clash.txt'), 'shelved\n');
+  await shelveRows(['clash.txt'], 'clash shelf');
+  await h.until(() => fs.readFileSync(path.join(api, 'clash.txt'), 'utf8') === 'base\n', '擱置');
+  fs.writeFileSync(path.join(api, 'after.txt'), 'after\n');
+  await shelveRows(['after.txt'], 'after shelf');
+  commitFile('clash.txt', 'committed\n');
+
+  await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+  await h.until(async () => (await shelfRowOf('clash shelf').count()) === 1 && (await shelfRowOf('after shelf').count()) === 1, '清單');
+  await shelfRowOf('clash shelf').click();
+  await shelfRowOf('after shelf').click({ modifiers: ['Control'] });
+  await shelfRowOf('after shelf').click({ button: 'right' });
+  await h.menu(cv, 'Unshelve 2 Entries…');
+  await cv.waitForSelector('.unshelve-dialog');
+  assert.match(await cv.locator('.unshelve-dialog .push-header').innerText(), /clash shelf.*\(1\/2\)/);
+  const warnings = app.calls.warnings.length;
+  await cv.locator('.unshelve-dialog .button.primary').click();
+  await h.until(() => h.git(api, 'diff', '--name-only', '--diff-filter=U').includes('clash.txt'), 'clash.txt 衝突');
+  await h.until(() => app.calls.panels.some((p) => p.viewType === 'gitWorkbench.conflicts' && !p.disposed), '衝突清單打開');
+  assert.match(fs.readFileSync(path.join(api, '.git', 'gitworkbench-unshelve'), 'utf8'), /Shelf: clash shelf/, '「他們的」標示擱置名稱');
+  await h.until(() => app.calls.warnings.slice(warnings).some((w) => /Stopped after "clash shelf"\. 1 shelved entries were not unshelved/.test(w)), '提示停下');
+  assert.equal(await cv.locator('.unshelve-dialog').count(), 0, '不再開下一筆');
+  await h.until(async () => (await shelfRowOf('clash shelf').count()) === 0 && (await shelfRowOf('after shelf').count()) === 1, '衝突的檔案已從擱置移除；下一筆保留');
+
+  h.git(api, 'checkout', '-q', 'HEAD', '--', 'clash.txt');
+  dropAllShelves();
+});
+
+test('匯入 patch：檔名對不上時依能否套用判斷 repo；都套不上時請使用者選，選了仍套不上就顯示錯誤、不匯入', async () => {
+  const out = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'gwb-import-'));
+  fs.appendFileSync(path.join(web, 'src/App.css'), '/* import */\n');
+  const good = path.join(out, 'whatever.patch');
+  fs.writeFileSync(good, `${h.git(web, 'diff', '--', 'src/App.css')}\n`);
+  h.git(web, 'checkout', '--', 'src/App.css');
+  const bad = path.join(out, 'nowhere.patch');
+  fs.writeFileSync(bad, ['diff --git a/missing.txt b/missing.txt', '--- a/missing.txt', '+++ b/missing.txt', '@@ -1 +1 @@', '-nope', '+yes', ''].join('\n'));
+
+  await cv.locator('.commit-tab', { hasText: /^Shelf$/ }).click();
+  const picks = app.calls.quickPicks.length;
+  app.calls.dialogs.push([good]);
+  app.calls.inputs.push('auto repo');
+  await cv.locator('.shelf-pane [title="Import Patches…"]').click();
+  await h.until(() => shelfRefsOf(web).length === 1, '匯入到 web-app');
+  assert.equal(app.calls.quickPicks.length, picks, '能判斷時不問');
+  assert.equal(shelfRefsOf(api).length, 0);
+
+  const errors = app.calls.errors.length;
+  app.calls.dialogs.push([bad]);
+  app.calls.picks.push((x) => x.label === 'api-server');
+  app.calls.inputs.push('bad import');
+  await cv.locator('.shelf-pane [title="Import Patches…"]').click();
+  await h.until(() => app.calls.errors.length > errors, '顯示錯誤');
+  assert.ok(app.calls.quickPicks.length > picks, '請使用者選 repo');
+  assert.match(app.calls.errors.slice(errors).join('\n'), /Could not import into api-server/);
+  assert.equal(shelfRefsOf(api).length, 0, '沒有匯入');
+  dropAllShelves();
   await cv.locator('.commit-tab', { hasText: /^Commit$/ }).click();
 });
 

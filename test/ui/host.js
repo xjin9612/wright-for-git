@@ -39,6 +39,8 @@ function resetCalls() {
     picks: [],
     /** showInputBox 的回答；沒排時取消 */
     inputs: [],
+    /** showInputBox 的 prompt（確認提示文字） */
+    inputPrompts: [],
     /** showSaveDialog／showOpenDialog 的回答：路徑（開檔可為路徑陣列）；沒排時取消 */
     dialogs: [],
     inputErrors: [],
@@ -185,6 +187,7 @@ const vscode = {
       return next ? list.find(next) : undefined;
     },
     showInputBox: async (o) => {
+      calls.inputPrompts.push(o?.prompt);
       const v = calls.inputs.shift();
       if (v !== undefined && o && o.validateInput) {
         const err = await o.validateInput(v);
